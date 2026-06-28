@@ -1,6 +1,6 @@
 # Python
 
-La feature vive en `modules/features/python`.
+La feature vive en `modules/nixos/features/python`.
 
 ## Opciones
 
@@ -51,4 +51,3 @@ cd my-project
 uv add requests
 uv run python main.py
 ```
-

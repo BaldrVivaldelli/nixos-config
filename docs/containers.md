@@ -1,6 +1,6 @@
 # Contenedores y Windows VM
 
-La feature vive en `modules/features/containers` y puede habilitar Docker o
+La feature vive en `modules/nixos/features/containers` y puede habilitar Docker o
 Podman. En el host `desktop` esta activa con Docker.
 
 ## Opciones principales
@@ -36,7 +36,7 @@ La carga declarativa de imagenes esta implementada para Docker.
 
 ## Imagenes declarativas
 
-`modules/features/containers/images.json` contiene imagenes pinneadas. Hoy
+`modules/nixos/features/containers/images.json` contiene imagenes pinneadas. Hoy
 incluye:
 
 ```json
@@ -74,7 +74,7 @@ docker image ls
 
 ## Windows VM
 
-La subfeature vive en `modules/features/containers/windowsvm`.
+La subfeature vive en `modules/nixos/features/containers/windowsvm`.
 
 Solo aplica cuando:
 
@@ -201,4 +201,3 @@ Si RDP aun no esta listo:
 windowsvm web
 windowsvm logs
 ```
-

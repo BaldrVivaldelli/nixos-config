@@ -1,8 +1,8 @@
 # Features
 
-Las features son modulos reutilizables bajo `modules/features`. Todas se
-importan automaticamente, pero solo aplican cambios cuando su opcion `enable`
-esta activa.
+Las features de NixOS son modulos reutilizables bajo `modules/nixos/features`.
+Todas se importan automaticamente, pero solo aplican cambios cuando su opcion
+`enable` esta activa.
 
 ## Resumen
 

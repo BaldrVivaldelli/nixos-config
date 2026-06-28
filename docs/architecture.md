@@ -8,18 +8,20 @@ El repo usa flakes y modulos NixOS. La flake expone una sola configuracion:
 ```text
 flake.nix
   nixosConfigurations.desktop
-    home-manager.nixosModules.home-manager
-      ./home/avivaldelli
-        ./home/avivaldelli/shell.nix
-        ./home/avivaldelli/starship.nix
-        ./home/avivaldelli/aws.nix
     ./modules/parts.nix
-      ./modules/features/default.nix
-        ./modules/features/python
-        ./modules/features/nodejs
-        ./modules/features/vscodium
-        ./modules/features/holodeck
-        ./modules/features/containers
+      inputs.home-manager.nixosModules.home-manager
+      ./modules/home/default.nix
+        ./home/avivaldelli
+          ./modules/home/features/shell
+            ./modules/home/features/shell/completions.nix
+          ./modules/home/features/starship
+          ./modules/home/features/aws
+      ./modules/nixos/features/default.nix
+        ./modules/nixos/features/python
+        ./modules/nixos/features/nodejs
+        ./modules/nixos/features/vscodium
+        ./modules/nixos/features/holodeck
+        ./modules/nixos/features/containers
     ./modules/hosts/desktop
       ./modules/hosts/desktop/hardware-configuration.nix
 ```
@@ -38,15 +40,21 @@ se integra como modulo NixOS y declara la configuracion del usuario
 - input `home-manager.url = "github:nix-community/home-manager/release-26.05"`
 - output `nixosConfigurations.desktop`
 - sistema `x86_64-linux`
+- `specialArgs.inputs`, para que `modules/parts.nix` pueda importar modulos
+  desde inputs de la flake.
 
 El lockfile fija la revision exacta de `nixpkgs` y `home-manager`.
 
 ## Modulos base
 
-`modules/parts.nix` importa `./features`.
+`modules/parts.nix` agrupa las partes comunes del sistema:
 
-`modules/features/default.nix` descubre modulos automaticamente dentro de
-`modules/features`:
+- `inputs.home-manager.nixosModules.home-manager`
+- `./home`
+- `./nixos/features`
+
+`modules/nixos/features/default.nix` descubre modulos automaticamente dentro de
+`modules/nixos/features`:
 
 - archivos `.nix` regulares, excepto `default.nix`
 - directorios que tengan `default.nix`
@@ -73,12 +81,23 @@ El host `desktop` define:
 
 ## Home Manager
 
-La configuracion interactiva del usuario vive en `home/avivaldelli`.
+La configuracion interactiva del usuario se arma desde `home/avivaldelli`,
+que funciona como perfil y referencia modulos Home Manager reutilizables.
 
 - `default.nix`: datos del usuario, `home.stateVersion` e imports.
-- `shell.nix`: zsh, aliases, fzf, zoxide y direnv.
-- `starship.nix`: prompt.
-- `aws.nix`: `awscli2` y helpers interactivos.
+
+`modules/home/default.nix` es el puente NixOS hacia Home Manager: define
+`home-manager.useGlobalPkgs`, `home-manager.useUserPackages`, backups y el
+perfil `home-manager.users.avivaldelli`.
+
+Los modulos reutilizables de Home Manager viven en `modules/home/features`.
+
+- `modules/home/features/shell/default.nix`: zsh, aliases, fzf, zoxide y
+  direnv.
+- `modules/home/features/shell/completions.nix`: completions declarativas para
+  comandos propios.
+- `modules/home/features/starship/default.nix`: prompt.
+- `modules/home/features/aws/default.nix`: `awscli2` y helpers interactivos.
 
 La diferencia de responsabilidades es:
 
@@ -124,6 +143,9 @@ in
 ```nix
 nixosConfigurations.<nuevo-host> = nixpkgs.lib.nixosSystem {
   system = "x86_64-linux";
+  specialArgs = {
+    inherit inputs;
+  };
   modules = [
     ./modules/parts.nix
     ./modules/hosts/<nuevo-host>
@@ -133,7 +155,7 @@ nixosConfigurations.<nuevo-host> = nixpkgs.lib.nixosSystem {
 
 ## Agregar una feature
 
-1. Crear `modules/features/<feature>/default.nix`.
+1. Crear `modules/nixos/features/<feature>/default.nix`.
 2. Definir opciones bajo `features.<feature>`.
 3. Encapsular efectos con `lib.mkIf cfg.enable`.
 4. Activarla desde el host:

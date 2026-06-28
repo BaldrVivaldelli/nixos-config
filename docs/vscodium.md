@@ -1,6 +1,6 @@
 # VSCodium
 
-La feature vive en `modules/features/vscodium`.
+La feature vive en `modules/nixos/features/vscodium`.
 
 ## Opciones
 
@@ -22,7 +22,7 @@ programs.vscode = {
 };
 ```
 
-Las extensiones se leen desde `modules/features/vscodium/extensions.json`.
+Las extensiones se leen desde `modules/nixos/features/vscodium/extensions.json`.
 
 ## Extensiones actuales
 
@@ -40,7 +40,7 @@ Cada extension queda pinneada por:
 
 ## Agregar o actualizar extensiones
 
-Editar `modules/features/vscodium/extensions.json`:
+Editar `modules/nixos/features/vscodium/extensions.json`:
 
 ```json
 {
@@ -68,4 +68,3 @@ features.vscodium = {
   defaultEditor = true;
 };
 ```
-

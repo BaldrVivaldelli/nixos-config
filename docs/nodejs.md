@@ -1,6 +1,6 @@
 # Node.js
 
-La feature vive en `modules/features/nodejs`.
+La feature vive en `modules/nixos/features/nodejs`.
 
 ## Opciones
 
@@ -54,4 +54,3 @@ cd my-app
 npm install
 npm run dev
 ```
-

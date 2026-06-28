@@ -66,10 +66,10 @@ Esto instala Python, uv, Node.js, VSCodium, Holodeck, Docker y el helper
 
 ## Home Manager
 
-`flake.nix` integra Home Manager como modulo NixOS:
+`modules/parts.nix` integra Home Manager como modulo NixOS:
 
 ```nix
-home-manager.nixosModules.home-manager
+inputs.home-manager.nixosModules.home-manager
 ```
 
 El usuario configurado es `avivaldelli`, con archivos en:

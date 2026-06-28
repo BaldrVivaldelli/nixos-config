@@ -10,21 +10,16 @@
     };
   };
 
-  outputs = { self, nixpkgs, home-manager, ... }: {
+  outputs = inputs@{ nixpkgs, ... }: {
     nixosConfigurations.desktop = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
+      specialArgs = {
+        inherit inputs;
+      };
 
       modules = [
-        home-manager.nixosModules.home-manager
         ./modules/parts.nix
         ./modules/hosts/desktop
-
-        {
-          home-manager.useGlobalPkgs = true;
-          home-manager.useUserPackages = true;
-          home-manager.backupFileExtension = "hm-bak";
-          home-manager.users.avivaldelli = import ./home/avivaldelli;
-        }
       ];
     };
   };

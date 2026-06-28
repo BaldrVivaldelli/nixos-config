@@ -1,8 +1,8 @@
 # Home Manager
 
-Home Manager esta integrado como modulo NixOS en `flake.nix`. Esto permite
-declarar la configuracion del usuario `avivaldelli` junto con el sistema, pero
-manteniendo responsabilidades separadas.
+Home Manager esta integrado como modulo NixOS desde `modules/parts.nix`. Esto
+permite declarar la configuracion del usuario `avivaldelli` junto con el
+sistema, pero manteniendo responsabilidades separadas.
 
 ## Responsabilidades
 
@@ -29,18 +29,29 @@ Home Manager/user:
 home/
   avivaldelli/
     default.nix
-    shell.nix
-    starship.nix
-    aws.nix
+modules/
+  home/
+    default.nix
+    features/
+      shell/
+        default.nix
+        completions.nix
+      starship/
+        default.nix
+      aws/
+        default.nix
 ```
 
-`default.nix` define el usuario, `home.homeDirectory`, `home.stateVersion` e
-imports.
+`modules/home/default.nix` es un modulo NixOS que configura Home Manager:
+`useGlobalPkgs`, `useUserPackages`, backups y el usuario `avivaldelli`.
 
-`shell.nix` configura zsh:
+`home/avivaldelli/default.nix` define el usuario, `home.homeDirectory`,
+`home.stateVersion` e imports. El perfil de usuario referencia modulos Home
+Manager reutilizables desde `modules/home/features`.
+
+`modules/home/features/shell/default.nix` configura zsh:
 
 - completion
-- completions custom para `windowsvm`, `holodeck`, `awslogin` y `awscxt`
 - autosuggestions
 - syntax highlighting
 - history
@@ -49,9 +60,14 @@ imports.
 - zoxide
 - direnv con nix-direnv
 
-`starship.nix` configura el prompt.
+`modules/home/features/shell/completions.nix` declara datos de completion para
+`windowsvm`, `holodeck`, `awslogin` y `awscxt`, y genera las funciones zsh desde
+helpers Nix.
 
-`aws.nix` instala `awscli2` y define helpers de zsh.
+`modules/home/features/starship/default.nix` configura el prompt.
+
+`modules/home/features/aws/default.nix` instala `awscli2` y define helpers de
+zsh.
 
 ## Aplicar cambios
 
@@ -92,9 +108,13 @@ Completions custom incluidas:
 ```text
 windowsvm up|start|rdp|web|status|logs|down|rm
 holodeck setup|github|gitlab|login|doctor|purge
-awslogin <profile>
-awscxt <profile>
+awslogin <declarative-profile>
+awscxt <declarative-profile>
 ```
+
+Los perfiles AWS no se leen dinamicamente desde `~/.aws/config`; si queres
+completion de perfiles, agregalos como nombres no secretos en
+`modules/home/features/shell/completions.nix`.
 
 Si acabas de aplicar cambios y una completion no aparece, abrir una nueva shell
 deberia alcanzar. Si zsh conserva cache vieja:

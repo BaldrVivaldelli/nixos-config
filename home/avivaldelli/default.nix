@@ -2,9 +2,9 @@
 
 {
   imports = [
-    ./shell.nix
-    ./starship.nix
-    ./aws.nix
+    ../../modules/home/features/shell
+    ../../modules/home/features/starship
+    ../../modules/home/features/aws
   ];
 
   home = {
@@ -16,4 +16,3 @@
   programs.home-manager.enable = true;
   xdg.enable = true;
 }
-

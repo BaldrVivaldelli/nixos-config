@@ -11,23 +11,29 @@ flake.nix
 home/
   avivaldelli/
     default.nix
-    shell.nix
-    starship.nix
-    aws.nix
 modules/
   parts.nix
+  home/
+    default.nix
+    features/
+      shell/
+        default.nix
+        completions.nix
+      starship/
+      aws/
   hosts/
     desktop/
       default.nix
       hardware-configuration.nix
-  features/
-    default.nix
-    python/
-    nodejs/
-    vscodium/
-    holodeck/
-    containers/
-      windowsvm/
+  nixos/
+    features/
+      default.nix
+      python/
+      nodejs/
+      vscodium/
+      holodeck/
+      containers/
+        windowsvm/
 docs/
 ```
 

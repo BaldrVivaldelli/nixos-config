@@ -1,5 +1,9 @@
+{ inputs, ... }:
+
 {
   imports = [
-    ./features
+    inputs.home-manager.nixosModules.home-manager
+    ./home
+    ./nixos/features
   ];
 }

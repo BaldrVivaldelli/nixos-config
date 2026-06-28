@@ -1,10 +1,10 @@
 # Holodeck
 
 Holodeck es una feature para preparar perfiles de desarrollo con Git, GitHub,
-GitLab, SSH y GPG. Vive en `modules/features/holodeck`.
+GitLab, SSH y GPG. Vive en `modules/nixos/features/holodeck`.
 
 El comando esta implementado como un proyecto Python interno en
-`modules/features/holodeck/app`. Nix solo lo envuelve para inyectar defaults y
+`modules/nixos/features/holodeck/app`. Nix solo lo envuelve para inyectar defaults y
 asegurar que existan las herramientas externas.
 
 Cuando esta activa, instala herramientas de desarrollo y publica el comando

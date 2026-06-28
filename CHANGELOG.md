@@ -8,6 +8,15 @@ All notable changes to this repository are documented here.
 
 - Added custom zsh completions for `windowsvm`, `holodeck`, `awslogin` and
   `awscxt` through Home Manager `siteFunctions`.
+- Moved zsh completions into `modules/home/features/shell/completions.nix` and
+  generate them from declarative Nix data.
+- Moved reusable shell configuration into `modules/home/features/shell` so
+  `home/avivaldelli` only references it.
+- Moved NixOS features under `modules/nixos/features`.
+- Moved Home Manager shell, starship and AWS modules under
+  `modules/home/features`.
+- Moved Home Manager wiring into `modules/home/default.nix` and import it from
+  `modules/parts.nix`.
 - Linked system zsh completion paths with `environment.pathsToLink`.
 
 ### Documentation
