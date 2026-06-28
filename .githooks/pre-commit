@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+blocked_path_regex='(^|/)(\.env(\..*)?|\.ssh|\.gnupg|secrets|private|\.secrets|\.private)(/|$)|(^|/)(id_rsa|id_ed25519)(\.|$)|\.(key|pem|p12|pfx|gpg|pgp|asc|age|kdbx)$'
+secret_content_regex='-----BEGIN (RSA |DSA |EC |OPENSSH |PGP )?PRIVATE KEY-----|ghp_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|aws[_-]?secret[_-]?access[_-]?key|xox[baprs]-[A-Za-z0-9-]{20,}'
+
+failed=0
+
+while IFS= read -r file; do
+  [ -n "$file" ] || continue
+  [ -f "$file" ] || continue
+
+  if printf '%s\n' "$file" | grep -Eiq "$blocked_path_regex"; then
+    echo "Blocked possible secret path: $file" >&2
+    failed=1
+    continue
+  fi
+
+  if grep -Iq . "$file" && grep -Eiq -- "$secret_content_regex" "$file"; then
+    echo "Blocked possible secret content in: $file" >&2
+    failed=1
+  fi
+done < <(git diff --cached --name-only --diff-filter=ACMR)
+
+if [ "$failed" -ne 0 ]; then
+  echo >&2
+  echo "Commit blocked: this repo should never handle secrets." >&2
+  echo "Move secrets to local state outside the repo, for example ~/.config/holodeck, ~/.ssh, or a real secret manager." >&2
+  exit 1
+fi

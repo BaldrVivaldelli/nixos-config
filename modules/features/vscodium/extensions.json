@@ -1,0 +1,21 @@
+[
+  {
+    "publisher": "catppuccin",
+    "name": "catppuccin-vsc",
+    "version": "3.19.0",
+    "sha256": "104p68k861bngh9ra2zcxs5s5m4n9k8z63wjr68vxv9p91k4gwzb"
+  },
+  {
+    "publisher": "catppuccin",
+    "name": "catppuccin-vsc-icons",
+    "version": "1.26.0",
+    "sha256": "0ggz024rf69awnkx66fjyc2bpk48dj3bxrdn1q28vfm8s0v62mjp"
+  },
+  {
+    "publisher": "openai",
+    "name": "chatgpt",
+    "version": "26.623.31443",
+    "arch": "linux-x64",
+    "sha256": "0kmym299z8srmzb0nzwgy2q5bfwnxd6djzjvk3dhpmr13rbznvb3"
+  }
+]

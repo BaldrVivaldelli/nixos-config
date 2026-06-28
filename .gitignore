@@ -1,0 +1,44 @@
+# Nix build outputs
+/result
+/result-*
+
+# Local shells and caches
+.direnv/
+.devenv/
+.cache/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Local editor/runtime noise
+*.swp
+*.swo
+*~
+
+# Private keys, certificates, and secret material
+.ssh/
+.gnupg/
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+*.key
+*.pem
+*.p12
+*.pfx
+*.gpg
+*.pgp
+*.asc
+*.age
+*.kdbx
+
+# Secret folders if one ever appears by accident
+secrets/
+private/
+.secrets/
+.private/
+
+# Holodeck-generated state should live in ~/.config/holodeck, not in this repo.
+.config/holodeck/

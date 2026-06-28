@@ -1,0 +1,9 @@
+[
+  {
+    "imageName": "dockurr/windows",
+    "imageDigest": "sha256:3633f055f31aadf76bb650b1ca86897ab45b76ad8eb2cf81e86389ace5eb45ac",
+    "hash": "sha256-LCtjVYq4vUIpiWxWX9vb1YucWso3nsBX0MBPrSdxeQM=",
+    "finalImageName": "dockurr/windows",
+    "finalImageTag": "latest"
+  }
+]
