@@ -6,6 +6,19 @@ All notable changes to this repository are documented here.
 
 ### Added
 
+- Added custom zsh completions for `windowsvm`, `holodeck`, `awslogin` and
+  `awscxt` through Home Manager `siteFunctions`.
+- Linked system zsh completion paths with `environment.pathsToLink`.
+
+### Documentation
+
+- Documented custom zsh completions and how to refresh stale `.zcompdump`
+  caches.
+
+## 2026-06-28 - Home Manager workstation
+
+### Added
+
 - Added Home Manager as a flake input and integrated it into the `desktop`
   NixOS configuration.
 - Added `home/avivaldelli/` for user-level configuration:
@@ -49,4 +62,3 @@ All notable changes to this repository are documented here.
 - Added the initial NixOS flake for the `desktop` host.
 - Added modular features for VSCodium, Holodeck and containers.
 - Added Docker image loading and Windows VM helper support.
-

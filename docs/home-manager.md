@@ -40,6 +40,7 @@ imports.
 `shell.nix` configura zsh:
 
 - completion
+- completions custom para `windowsvm`, `holodeck`, `awslogin` y `awscxt`
 - autosuggestions
 - syntax highlighting
 - history
@@ -86,6 +87,23 @@ gs, gd, ga, gc
 nixswitch, nixbuild, rebuild
 ```
 
+Completions custom incluidas:
+
+```text
+windowsvm up|start|rdp|web|status|logs|down|rm
+holodeck setup|github|gitlab|login|doctor|purge
+awslogin <profile>
+awscxt <profile>
+```
+
+Si acabas de aplicar cambios y una completion no aparece, abrir una nueva shell
+deberia alcanzar. Si zsh conserva cache vieja:
+
+```bash
+rm -f ~/.zcompdump*
+exec zsh
+```
+
 ## Starship
 
 Starship se habilita desde Home Manager:
@@ -122,4 +140,3 @@ awswho
 
 `awscxt` es funcion de zsh porque necesita modificar el entorno de la shell
 actual. Un binario externo no podria cambiar `AWS_PROFILE` del proceso padre.
-
