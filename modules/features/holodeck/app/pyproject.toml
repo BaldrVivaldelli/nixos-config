@@ -1,0 +1,10 @@
+[project]
+name = "holodeck"
+version = "0.1.0"
+description = "Interactive Git/GitHub/GitLab/SSH/GPG profile setup"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+holodeck = "holodeck.cli:main"
+

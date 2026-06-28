@@ -16,16 +16,12 @@ let
   holodeckCommand = pkgs.writeShellApplication {
     name = "holodeck";
     runtimeInputs = with pkgs; [
-      bash
-      coreutils
-      gawk
       gh
       git
       glab
-      gnugrep
       gnupg
-      gnused
       openssh
+      python3
       xdg-utils
     ];
     text = ''
@@ -33,8 +29,10 @@ let
       export HOLODECK_DEFAULT_GITLAB_HOST=${lib.escapeShellArg cfg.gitlabHost}
       export HOLODECK_DEFAULT_PERSONAL_DIR=${shellPathDefault cfg.personalProjectsDir}
       export HOLODECK_DEFAULT_WORK_DIR=${shellPathDefault cfg.workProjectsDir}
+      export PYTHONPATH=${./app}''${PYTHONPATH:+:$PYTHONPATH}
 
-    '' + builtins.readFile ./holodeck.sh;
+      exec python3 -m holodeck "$@"
+    '';
   };
 in
 {

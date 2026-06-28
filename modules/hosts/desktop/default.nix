@@ -89,6 +89,7 @@
 
   # Install firefox.
   programs.firefox.enable = true;
+  features.python.enable = true;
   features.vscodium.enable = true;
   features.holodeck.enable = true;
   features.containers = {
