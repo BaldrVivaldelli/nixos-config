@@ -18,6 +18,7 @@ flake.nix
             ./modules/home/features/starship
             ./modules/home/features/aws
       ./modules/nixos/features/default.nix
+        ./modules/nixos/features/browser
         ./modules/nixos/features/python
         ./modules/nixos/features/nodejs
         ./modules/nixos/features/graphics

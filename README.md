@@ -31,6 +31,7 @@ modules/
   nixos/
     features/
       default.nix
+      browser/
       python/
       nodejs/
       graphics/
@@ -79,6 +80,8 @@ git config core.hooksPath .githooks
   Chromium, `wget`, `curl` y usuario `avivaldelli`.
 - Locale base `en_US.UTF-8` con settings regionales `es_AR.UTF-8`.
 - Zona horaria `America/Argentina/Buenos_Aires`.
+- Feature `browser`: instala Chromium con configuracion minimalista preparada
+  para personalizaciones futuras.
 - Feature `python`: instala Python y `uv`.
 - Feature `nodejs`: instala Node.js con npm y npx.
 - Feature `graphics`: habilita aceleracion grafica e instala `gpu-doctor` para
@@ -99,6 +102,7 @@ git config core.hooksPath .githooks
 - [Host desktop](docs/desktop.md)
 - [Home Manager](docs/home-manager.md)
 - [Features](docs/features.md)
+- [Browser](docs/browser.md)
 - [Python](docs/python.md)
 - [Node.js](docs/nodejs.md)
 - [Graficos y GPU](docs/graphics.md)

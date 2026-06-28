@@ -6,6 +6,7 @@ All notable changes to this repository are documented here.
 
 ### Added
 
+- Added a minimal `features.browser` module for Chromium.
 - Added custom zsh completions for `windowsvm`, `holodeck`, `awslogin` and
   `awscxt` through Home Manager `siteFunctions`.
 - Moved zsh completions into `modules/home/features/shell/completions.nix` and
@@ -22,6 +23,11 @@ All notable changes to this repository are documented here.
 - Added interactive `gpu-doctor` apply flow for updating the host graphics
   config and running `nixos-rebuild`.
 - Linked system zsh completion paths with `environment.pathsToLink`.
+
+### Changed
+
+- Moved Chromium setup from the `desktop` host into `features.browser`.
+- Set Google as the default Chromium search provider in `features.browser`.
 
 ### Documentation
 

@@ -8,6 +8,7 @@ Todas se importan automaticamente, pero solo aplican cambios cuando su opcion
 
 | Feature | Opcion | Que hace |
 | --- | --- | --- |
+| Browser | `features.browser` | Instala Chromium y deja lista su configuracion declarativa. |
 | Python | `features.python` | Instala Python y uv para desarrollo. |
 | Node.js | `features.nodejs` | Instala Node.js con npm y npx para desarrollo. |
 | Graphics | `features.graphics` | Habilita aceleracion grafica y agrega `gpu-doctor`. |
@@ -21,6 +22,7 @@ Todas se importan automaticamente, pero solo aplican cambios cuando su opcion
 Las features se activan desde un host:
 
 ```nix
+features.browser.enable = true;
 features.python.enable = true;
 features.nodejs.enable = true;
 features.graphics.enable = true;
@@ -32,6 +34,7 @@ features.containers.enable = true;
 ## Donde documentar cambios
 
 - Cambios generales de una feature: actualizar este archivo.
+- Detalles de Browser: [browser.md](browser.md).
 - Detalles de Python: [python.md](python.md).
 - Detalles de Node.js: [nodejs.md](nodejs.md).
 - Detalles de graficos y GPU: [graphics.md](graphics.md).
