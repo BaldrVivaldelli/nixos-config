@@ -8,6 +8,7 @@ let
     runtimeInputs = with pkgs; [
       pciutils
       python3
+      git
     ];
     text = ''
       exec python3 ${./gpu-doctor.py} "$@"
@@ -29,8 +30,8 @@ in
 
     enable32Bit = lib.mkOption {
       type = lib.types.bool;
-      default = true;
-      description = "Whether to enable 32-bit graphics libraries for games and compatibility.";
+      default = false;
+      description = "Whether to enable 32-bit graphics libraries for Steam, Wine and older games.";
     };
 
     doctor.enable = lib.mkOption {

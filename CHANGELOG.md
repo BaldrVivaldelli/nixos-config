@@ -19,6 +19,8 @@ All notable changes to this repository are documented here.
   `modules/parts.nix`.
 - Added Home Manager profiles and set `avivaldelli` to the `developer` profile.
 - Added `features.graphics` with the Python `gpu-doctor` recommendation helper.
+- Added interactive `gpu-doctor` apply flow for updating the host graphics
+  config and running `nixos-rebuild`.
 - Linked system zsh completion paths with `environment.pathsToLink`.
 
 ### Documentation

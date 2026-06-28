@@ -93,7 +93,13 @@
   programs.zsh.enable = true;
   features.python.enable = true;
   features.nodejs.enable = true;
-  features.graphics.enable = true;
+  # >>> gpu-doctor graphics
+  features.graphics = {
+    enable = true;
+    driver = "amd";
+    enable32Bit = false;
+  };
+  # <<< gpu-doctor graphics
   features.vscodium.enable = true;
   features.holodeck.enable = true;
   features.containers = {

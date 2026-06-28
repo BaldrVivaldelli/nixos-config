@@ -16,7 +16,7 @@ host declara que driver quiere usar, y `gpu-doctor` ayuda a elegirlo.
 | --- | --- | --- | --- |
 | `features.graphics.enable` | bool | `false` | Activa aceleracion grafica y diagnostico GPU. |
 | `features.graphics.driver` | enum | `mesa` | Driver: `mesa`, `amd`, `intel` o `nvidia`. |
-| `features.graphics.enable32Bit` | bool | `true` | Habilita librerias graficas de 32 bits para juegos y compatibilidad. |
+| `features.graphics.enable32Bit` | bool | `false` | Habilita librerias graficas de 32 bits para Steam, Wine y juegos viejos. |
 | `features.graphics.doctor.enable` | bool | `true` | Instala el comando `gpu-doctor`. |
 | `features.graphics.nvidia.open` | bool | `false` | Usa el kernel module abierto de NVIDIA. |
 | `features.graphics.nvidia.settings.enable` | bool | `true` | Instala `nvidia-settings`. |
@@ -27,11 +27,17 @@ host declara que driver quiere usar, y `gpu-doctor` ayuda a elegirlo.
 El host `desktop` activa:
 
 ```nix
-features.graphics.enable = true;
+# >>> gpu-doctor graphics
+features.graphics = {
+  enable = true;
+  driver = "amd";
+  enable32Bit = false;
+};
+# <<< gpu-doctor graphics
 ```
 
-Eso usa el driver conservador `mesa`, habilita `hardware.graphics`, librerias
-de 32 bits e instala `gpu-doctor`.
+Eso declara explicitamente la GPU AMD detectada por `gpu-doctor`, habilita
+`hardware.graphics` e instala `gpu-doctor`.
 
 ## Detectar GPU
 
@@ -43,6 +49,26 @@ gpu-doctor
 
 El comando muestra GPUs detectadas por `lspci` y propone un bloque Nix para el
 host.
+
+Si se ejecuta desde la raiz del repo, pregunta si queres aplicar la
+recomendacion al host y correr:
+
+```bash
+sudo nixos-rebuild switch --flake .#desktop
+```
+
+Para aplicar sin correr rebuild:
+
+```bash
+gpu-doctor --yes --no-rebuild
+```
+
+Para recomendar librerias graficas de 32 bits, util para Steam, Wine o juegos
+viejos:
+
+```bash
+gpu-doctor --gaming
+```
 
 Salida JSON:
 
@@ -58,7 +84,7 @@ Para AMD moderno:
 features.graphics = {
   enable = true;
   driver = "amd";
-  enable32Bit = true;
+  enable32Bit = false;
 };
 ```
 
@@ -73,7 +99,7 @@ Para Intel:
 features.graphics = {
   enable = true;
   driver = "intel";
-  enable32Bit = true;
+  enable32Bit = false;
 };
 ```
 
@@ -87,7 +113,7 @@ Para NVIDIA:
 features.graphics = {
   enable = true;
   driver = "nvidia";
-  enable32Bit = true;
+  enable32Bit = false;
 
   nvidia = {
     open = false;
