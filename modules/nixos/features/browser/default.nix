@@ -2,6 +2,14 @@
 
 let
   cfg = config.features.browser;
+
+  chromiumCommand = pkgs.writeShellApplication {
+    name = "chromium";
+    runtimeInputs = [ cfg.package ];
+    text = ''
+      exec ${lib.escapeShellArg cfg.command} "$@"
+    '';
+  };
 in
 {
   options.features.browser = {
@@ -12,6 +20,18 @@ in
       default = pkgs.chromium;
       defaultText = lib.literalExpression "pkgs.chromium";
       description = "Browser package to install and configure through Chromium policies.";
+    };
+
+    command = lib.mkOption {
+      type = lib.types.str;
+      default = "chromium-browser";
+      description = "Executable provided by the browser package.";
+    };
+
+    desktopFile = lib.mkOption {
+      type = lib.types.str;
+      default = "chromium-browser.desktop";
+      description = "Desktop file used for xdg default browser associations.";
     };
 
     homepage = lib.mkOption {
@@ -51,6 +71,12 @@ in
         description = "Suggest URL for Chromium's default search provider.";
       };
     };
+
+    defaultBrowser.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Whether to make Chromium the default browser for web links.";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -64,6 +90,27 @@ in
       defaultSearchProviderSuggestURL = lib.mkIf cfg.search.enable cfg.search.suggestUrl;
     };
 
-    environment.systemPackages = [ cfg.package ];
+    environment = {
+      sessionVariables.BROWSER = cfg.command;
+      systemPackages = [
+        cfg.package
+        chromiumCommand
+      ];
+    };
+
+    xdg.mime = lib.mkIf cfg.defaultBrowser.enable {
+      enable = true;
+      defaultApplications = {
+        "text/html" = cfg.desktopFile;
+        "text/xml" = cfg.desktopFile;
+        "application/xhtml+xml" = cfg.desktopFile;
+        "application/xml" = cfg.desktopFile;
+        "application/pdf" = cfg.desktopFile;
+        "x-scheme-handler/http" = cfg.desktopFile;
+        "x-scheme-handler/https" = cfg.desktopFile;
+        "x-scheme-handler/about" = cfg.desktopFile;
+        "x-scheme-handler/unknown" = cfg.desktopFile;
+      };
+    };
   };
 }

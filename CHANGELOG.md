@@ -28,6 +28,7 @@ All notable changes to this repository are documented here.
 
 - Moved Chromium setup from the `desktop` host into `features.browser`.
 - Set Google as the default Chromium search provider in `features.browser`.
+- Set Chromium as the default xdg handler for web links in `features.browser`.
 
 ### Documentation
 
