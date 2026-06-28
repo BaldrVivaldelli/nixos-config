@@ -50,6 +50,7 @@ El host activa:
 ```nix
 features.python.enable = true;
 features.nodejs.enable = true;
+features.graphics.enable = true;
 features.vscodium.enable = true;
 features.holodeck.enable = true;
 features.containers = {
@@ -60,9 +61,9 @@ features.containers = {
 };
 ```
 
-Esto instala Python, uv, Node.js, VSCodium, Holodeck, Docker y el helper
-`windowsvm`. La configuracion interactiva del usuario se define en
-`home/avivaldelli`.
+Esto instala Python, uv, Node.js, aceleracion grafica base, `gpu-doctor`,
+VSCodium, Holodeck, Docker y el helper `windowsvm`. La configuracion
+interactiva del usuario se define en `home/avivaldelli`.
 
 ## Home Manager
 

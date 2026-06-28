@@ -93,6 +93,7 @@
   programs.zsh.enable = true;
   features.python.enable = true;
   features.nodejs.enable = true;
+  features.graphics.enable = true;
   features.vscodium.enable = true;
   features.holodeck.enable = true;
   features.containers = {

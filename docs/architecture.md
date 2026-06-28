@@ -20,6 +20,7 @@ flake.nix
       ./modules/nixos/features/default.nix
         ./modules/nixos/features/python
         ./modules/nixos/features/nodejs
+        ./modules/nixos/features/graphics
         ./modules/nixos/features/vscodium
         ./modules/nixos/features/holodeck
         ./modules/nixos/features/containers

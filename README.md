@@ -33,6 +33,7 @@ modules/
       default.nix
       python/
       nodejs/
+      graphics/
       vscodium/
       holodeck/
       containers/
@@ -80,6 +81,8 @@ git config core.hooksPath .githooks
 - Zona horaria `America/Argentina/Buenos_Aires`.
 - Feature `python`: instala Python y `uv`.
 - Feature `nodejs`: instala Node.js con npm y npx.
+- Feature `graphics`: habilita aceleracion grafica e instala `gpu-doctor` para
+  recomendar drivers segun la GPU local.
 - Feature `vscodium`: instala VSCodium y extensiones pinneadas.
 - Feature `holodeck`: instala herramientas de desarrollo y un comando Python
   con colores para configurar perfiles Git, SSH, GPG, GitHub y GitLab.
@@ -98,6 +101,7 @@ git config core.hooksPath .githooks
 - [Features](docs/features.md)
 - [Python](docs/python.md)
 - [Node.js](docs/nodejs.md)
+- [Graficos y GPU](docs/graphics.md)
 - [VSCodium](docs/vscodium.md)
 - [Holodeck](docs/holodeck.md)
 - [Contenedores y Windows VM](docs/containers.md)

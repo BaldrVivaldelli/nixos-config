@@ -17,6 +17,7 @@ cuando quieras agregar o cambiar algo.
 
 - [Python](python.md)
 - [Node.js](nodejs.md)
+- [Graficos y GPU](graphics.md)
 - [VSCodium](vscodium.md)
 - [Holodeck](holodeck.md)
 - [Contenedores y Windows VM](containers.md)

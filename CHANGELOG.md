@@ -18,6 +18,7 @@ All notable changes to this repository are documented here.
 - Moved Home Manager wiring into `modules/home/default.nix` and import it from
   `modules/parts.nix`.
 - Added Home Manager profiles and set `avivaldelli` to the `developer` profile.
+- Added `features.graphics` with the Python `gpu-doctor` recommendation helper.
 - Linked system zsh completion paths with `environment.pathsToLink`.
 
 ### Documentation
