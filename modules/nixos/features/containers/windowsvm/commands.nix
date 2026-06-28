@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   vm = config.features.containers.windowsVm;
@@ -344,7 +349,10 @@ let
   };
 in
 {
-  config = lib.mkIf (config.features.containers.enable && config.features.containers.engine == "docker" && vm.enable) {
-    environment.systemPackages = [ windowsVmCommand ];
-  };
+  config =
+    lib.mkIf
+      (config.features.containers.enable && config.features.containers.engine == "docker" && vm.enable)
+      {
+        environment.systemPackages = [ windowsVmCommand ];
+      };
 }

@@ -1,12 +1,13 @@
-{ lib, ... }:
+{ config, lib, ... }:
 
 let
+  cfg = config.homeFeatures.shell;
   escape = lib.escapeShellArg;
 
-  zshWords = values:
-    lib.concatMapStringsSep " " escape values;
+  zshWords = values: lib.concatMapStringsSep " " escape values;
 
-  mkSubcommandCompletion = command: commands: extraSpecs:
+  mkSubcommandCompletion =
+    command: commands: extraSpecs:
     let
       specs = [ "1:${command} command:(${zshWords commands})" ] ++ extraSpecs;
     in
@@ -16,13 +17,6 @@ let
       _arguments \
         ${lib.concatMapStringsSep " \\\n        " escape specs}
     '';
-
-  mkWordCompletion = command: label: values: ''
-    #compdef ${command}
-
-    _arguments \
-      '*:${label}:(${zshWords values})'
-  '';
 
   windowsvmCommands = [
     "down"
@@ -58,19 +52,14 @@ let
     "gitlab"
   ];
 
-  awsProfiles = [
-    # Add non-secret profile names here if you want zsh to complete them.
-    # Example: "personal"
-  ];
 in
 {
-  programs.zsh.siteFunctions = {
-    _windowsvm = mkSubcommandCompletion "windowsvm" windowsvmCommands [ ];
-    _holodeck = mkSubcommandCompletion "holodeck" holodeckCommands [
-      "2:provider:(${zshWords providers})"
-    ];
-    _awslogin = mkWordCompletion "awslogin" "AWS profile" awsProfiles;
-    _awscxt = mkWordCompletion "awscxt" "AWS profile" awsProfiles;
+  config = lib.mkIf cfg.enable {
+    programs.zsh.siteFunctions = {
+      _windowsvm = mkSubcommandCompletion "windowsvm" windowsvmCommands [ ];
+      _holodeck = mkSubcommandCompletion "holodeck" holodeckCommands [
+        "2:provider:(${zshWords providers})"
+      ];
+    };
   };
 }
-

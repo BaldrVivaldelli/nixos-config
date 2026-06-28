@@ -55,11 +55,13 @@ modules/
 
 Los perfiles viven en `modules/home/profiles`:
 
-- `developer`: shell, starship y AWS. Es el perfil default de `avivaldelli`.
-- `minimal`: shell y starship, sin helpers cloud.
+- `developer`: activa `homeFeatures.shell`, `homeFeatures.starship` y
+  `homeFeatures.aws`. Es el perfil default de `avivaldelli`.
+- `minimal`: activa `homeFeatures.shell` y `homeFeatures.starship`, sin helpers
+  cloud.
 
 Cada perfil referencia modulos Home Manager reutilizables desde
-`modules/home/features`.
+`modules/home/features` y activa opciones bajo `homeFeatures.*`.
 
 ## Cambiar perfil
 
@@ -143,8 +145,14 @@ awscxt <declarative-profile>
 ```
 
 Los perfiles AWS no se leen dinamicamente desde `~/.aws/config`; si queres
-completion de perfiles, agregalos como nombres no secretos en
-`modules/home/features/shell/completions.nix`.
+completion de perfiles, agregalos como nombres no secretos:
+
+```nix
+homeFeatures.aws.profiles = [
+  "personal"
+  "work"
+];
+```
 
 Si acabas de aplicar cambios y una completion no aparece, abrir una nueva shell
 deberia alcanzar. Si zsh conserva cache vieja:

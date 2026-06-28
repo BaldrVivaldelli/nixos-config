@@ -37,6 +37,18 @@ sudo nixos-rebuild boot --flake .#desktop
 nix flake check
 ```
 
+Formatear archivos Nix del repo:
+
+```bash
+nix fmt
+```
+
+Entrar a un shell con el formatter:
+
+```bash
+nix develop
+```
+
 Si hay archivos nuevos sin trackear y queres validar antes de agregarlos a Git:
 
 ```bash
@@ -47,6 +59,14 @@ Tambien es util revisar espacios o conflictos de patch:
 
 ```bash
 git diff --check
+```
+
+## CI
+
+GitHub Actions corre `nix flake check` en pushes a `main` y en pull requests:
+
+```text
+.github/workflows/flake-check.yml
 ```
 
 ## Actualizar nixpkgs

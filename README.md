@@ -32,6 +32,8 @@ modules/
     features/
       default.nix
       browser/
+      desktop/
+      git/
       python/
       nodejs/
       graphics/
@@ -68,6 +70,15 @@ Validar la flake:
 nix flake check
 ```
 
+La misma validacion corre en GitHub Actions para pushes a `main` y pull
+requests.
+
+Formatear archivos Nix:
+
+```bash
+nix fmt
+```
+
 Instalar el hook local contra secretos:
 
 ```bash
@@ -82,6 +93,9 @@ git config core.hooksPath .githooks
 - Zona horaria `America/Argentina/Buenos_Aires`.
 - Feature `browser`: instala Chromium con configuracion minimalista preparada
   para personalizaciones futuras.
+- Feature `desktop`: habilita el entorno de escritorio elegido; hoy GNOME con
+  GDM y layout de teclado.
+- Feature `git`: instala Git, Git LFS, delta y lazygit.
 - Feature `python`: instala Python y `uv`.
 - Feature `nodejs`: instala Node.js con npm y npx.
 - Feature `graphics`: habilita aceleracion grafica e instala `gpu-doctor` para
@@ -103,6 +117,8 @@ git config core.hooksPath .githooks
 - [Home Manager](docs/home-manager.md)
 - [Features](docs/features.md)
 - [Browser](docs/browser.md)
+- [Desktop feature](docs/desktop-feature.md)
+- [Git](docs/git.md)
 - [Python](docs/python.md)
 - [Node.js](docs/nodejs.md)
 - [Graficos y GPU](docs/graphics.md)

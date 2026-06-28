@@ -6,7 +6,11 @@ All notable changes to this repository are documented here.
 
 ### Added
 
+- Added a `nixfmt` wrapper through `nix fmt` and a formatter dev shell.
+- Added GitHub Actions CI for `nix flake check`.
 - Added a minimal `features.browser` module for Chromium.
+- Added `features.desktop` for GNOME, GDM and keyboard layout.
+- Added `features.git` for Git, Git LFS, delta and lazygit.
 - Added custom zsh completions for `windowsvm`, `holodeck`, `awslogin` and
   `awscxt` through Home Manager `siteFunctions`.
 - Moved zsh completions into `modules/home/features/shell/completions.nix` and
@@ -19,6 +23,8 @@ All notable changes to this repository are documented here.
 - Moved Home Manager wiring into `modules/home/default.nix` and import it from
   `modules/parts.nix`.
 - Added Home Manager profiles and set `avivaldelli` to the `developer` profile.
+- Converted Home Manager shell, starship and AWS modules to `homeFeatures.*`
+  options.
 - Added `features.graphics` with the Python `gpu-doctor` recommendation helper.
 - Added interactive `gpu-doctor` apply flow for updating the host graphics
   config and running `nixos-rebuild`.
@@ -26,6 +32,8 @@ All notable changes to this repository are documented here.
 
 ### Changed
 
+- Split `features.desktop` into common options plus a dedicated `gnome.nix`
+  implementation module.
 - Moved Chromium setup from the `desktop` host into `features.browser`.
 - Set Google as the default Chromium search provider in `features.browser`.
 - Set Chromium as the default xdg handler for web links in `features.browser`.

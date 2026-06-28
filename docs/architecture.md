@@ -19,6 +19,8 @@ flake.nix
             ./modules/home/features/aws
       ./modules/nixos/features/default.nix
         ./modules/nixos/features/browser
+        ./modules/nixos/features/desktop
+        ./modules/nixos/features/git
         ./modules/nixos/features/python
         ./modules/nixos/features/nodejs
         ./modules/nixos/features/graphics
@@ -101,11 +103,13 @@ Los perfiles Home Manager viven en `modules/home/profiles`.
 Los modulos reutilizables de Home Manager viven en `modules/home/features`.
 
 - `modules/home/features/shell/default.nix`: zsh, aliases, fzf, zoxide y
-  direnv.
+  direnv. Se activa con `homeFeatures.shell.enable`.
 - `modules/home/features/shell/completions.nix`: completions declarativas para
   comandos propios.
-- `modules/home/features/starship/default.nix`: prompt.
-- `modules/home/features/aws/default.nix`: `awscli2` y helpers interactivos.
+- `modules/home/features/starship/default.nix`: prompt. Se activa con
+  `homeFeatures.starship.enable`.
+- `modules/home/features/aws/default.nix`: `awscli2`, helpers interactivos y
+  completions AWS. Se activa con `homeFeatures.aws.enable`.
 
 La diferencia de responsabilidades es:
 

@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.features.python;
@@ -22,9 +27,6 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    environment.systemPackages =
-      [ cfg.package ]
-      ++ lib.optional cfg.uv.enable pkgs.uv;
+    environment.systemPackages = [ cfg.package ] ++ lib.optional cfg.uv.enable pkgs.uv;
   };
 }
-

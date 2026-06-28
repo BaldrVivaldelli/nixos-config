@@ -49,6 +49,8 @@ El host activa:
 
 ```nix
 features.browser.enable = true;
+features.desktop.enable = true;
+features.git.enable = true;
 features.python.enable = true;
 features.nodejs.enable = true;
 # >>> gpu-doctor graphics
@@ -68,8 +70,8 @@ features.containers = {
 };
 ```
 
-Esto instala Chromium, Python, uv, Node.js, aceleracion grafica base,
-`gpu-doctor`, VSCodium, Holodeck, Docker y el helper `windowsvm`. La
+Esto instala Chromium, GNOME/GDM, Git tooling, Python, uv, Node.js, aceleracion
+grafica base, `gpu-doctor`, VSCodium, Holodeck, Docker y el helper `windowsvm`. La
 configuracion interactiva del usuario se define en `home/avivaldelli`.
 
 ## Home Manager
@@ -104,7 +106,7 @@ networking.hostName = "nuevo-nombre";
 Cambiar layout de teclado:
 
 ```nix
-services.xserver.xkb = {
+features.desktop.keyboard = {
   layout = "latam";
   variant = "";
 };

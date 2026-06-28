@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.features.nodejs;
@@ -28,10 +33,10 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    environment.systemPackages =
-      [ cfg.package ]
-      ++ lib.optional cfg.pnpm.enable pkgs.pnpm
-      ++ lib.optional cfg.yarn.enable pkgs.yarn;
+    environment.systemPackages = [
+      cfg.package
+    ]
+    ++ lib.optional cfg.pnpm.enable pkgs.pnpm
+    ++ lib.optional cfg.yarn.enable pkgs.yarn;
   };
 }
-

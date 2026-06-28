@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.features.vscodium;
@@ -15,9 +20,9 @@ in
       enable = true;
       package = pkgs.vscodium;
       defaultEditor = cfg.defaultEditor;
-      extensions =
-        pkgs.vscode-utils.extensionsFromVscodeMarketplace
-          (builtins.fromJSON (builtins.readFile ./extensions.json));
+      extensions = pkgs.vscode-utils.extensionsFromVscodeMarketplace (
+        builtins.fromJSON (builtins.readFile ./extensions.json)
+      );
     };
   };
 }

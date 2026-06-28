@@ -16,6 +16,8 @@ cuando quieras agregar o cambiar algo.
 ## Guias por feature
 
 - [Browser](browser.md)
+- [Desktop feature](desktop-feature.md)
+- [Git](git.md)
 - [Python](python.md)
 - [Node.js](nodejs.md)
 - [Graficos y GPU](graphics.md)

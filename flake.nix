@@ -10,17 +10,54 @@
     };
   };
 
-  outputs = inputs@{ nixpkgs, ... }: {
-    nixosConfigurations.desktop = nixpkgs.lib.nixosSystem {
+  outputs =
+    inputs@{ nixpkgs, ... }:
+    let
       system = "x86_64-linux";
-      specialArgs = {
-        inherit inputs;
+      pkgs = nixpkgs.legacyPackages.${system};
+      formatter = pkgs.writeShellApplication {
+        name = "nixfmt-tree";
+        runtimeInputs = [
+          pkgs.findutils
+          pkgs.nixfmt
+        ];
+        text = ''
+          if [ "$#" -gt 0 ]; then
+            exec nixfmt "$@"
+          fi
+
+          while IFS= read -r -d "" file; do
+            nixfmt "$file"
+          done < <(
+            find . \
+              -path ./.git -prune -o \
+              -type f \
+              -name "*.nix" \
+              -print0
+          )
+        '';
+      };
+    in
+    {
+      formatter.${system} = formatter;
+
+      devShells.${system}.default = pkgs.mkShell {
+        packages = [
+          pkgs.findutils
+          pkgs.nixfmt
+        ];
       };
 
-      modules = [
-        ./modules/parts.nix
-        ./modules/hosts/desktop
-      ];
+      nixosConfigurations.desktop = nixpkgs.lib.nixosSystem {
+        inherit system;
+        specialArgs = {
+          inherit inputs;
+        };
+
+        modules = [
+          ./modules/parts.nix
+          ./modules/hosts/desktop
+        ];
+      };
     };
-  };
 }

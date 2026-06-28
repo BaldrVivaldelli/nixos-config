@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.features.graphics;
@@ -20,7 +25,12 @@ in
     enable = lib.mkEnableOption "graphics acceleration and GPU diagnostics";
 
     driver = lib.mkOption {
-      type = lib.types.enum [ "mesa" "amd" "intel" "nvidia" ];
+      type = lib.types.enum [
+        "mesa"
+        "amd"
+        "intel"
+        "nvidia"
+      ];
       default = "mesa";
       description = ''
         Graphics driver family to configure.
@@ -65,33 +75,35 @@ in
     };
   };
 
-  config = lib.mkIf cfg.enable (lib.mkMerge [
-    {
-      hardware.graphics = {
-        enable = true;
-        enable32Bit = cfg.enable32Bit;
-      };
+  config = lib.mkIf cfg.enable (
+    lib.mkMerge [
+      {
+        hardware.graphics = {
+          enable = true;
+          enable32Bit = cfg.enable32Bit;
+        };
 
-      environment.systemPackages = lib.optional cfg.doctor.enable gpuDoctor;
-    }
+        environment.systemPackages = lib.optional cfg.doctor.enable gpuDoctor;
+      }
 
-    (lib.mkIf (cfg.driver == "amd") {
-      services.xserver.videoDrivers = [ "amdgpu" ];
-    })
+      (lib.mkIf (cfg.driver == "amd") {
+        services.xserver.videoDrivers = [ "amdgpu" ];
+      })
 
-    (lib.mkIf (cfg.driver == "intel") {
-      services.xserver.videoDrivers = [ "modesetting" ];
-    })
+      (lib.mkIf (cfg.driver == "intel") {
+        services.xserver.videoDrivers = [ "modesetting" ];
+      })
 
-    (lib.mkIf (cfg.driver == "nvidia") {
-      services.xserver.videoDrivers = [ "nvidia" ];
+      (lib.mkIf (cfg.driver == "nvidia") {
+        services.xserver.videoDrivers = [ "nvidia" ];
 
-      hardware.nvidia = {
-        modesetting.enable = true;
-        open = cfg.nvidia.open;
-        nvidiaSettings = cfg.nvidia.settings.enable;
-        package = cfg.nvidia.package;
-      };
-    })
-  ]);
+        hardware.nvidia = {
+          modesetting.enable = true;
+          open = cfg.nvidia.open;
+          nvidiaSettings = cfg.nvidia.settings.enable;
+          package = cfg.nvidia.package;
+        };
+      })
+    ]
+  );
 }

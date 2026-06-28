@@ -9,6 +9,8 @@ Todas se importan automaticamente, pero solo aplican cambios cuando su opcion
 | Feature | Opcion | Que hace |
 | --- | --- | --- |
 | Browser | `features.browser` | Instala Chromium y deja lista su configuracion declarativa. |
+| Desktop | `features.desktop` | Habilita el entorno de escritorio elegido; hoy GNOME con GDM. |
+| Git | `features.git` | Instala Git, Git LFS, delta y lazygit. |
 | Python | `features.python` | Instala Python y uv para desarrollo. |
 | Node.js | `features.nodejs` | Instala Node.js con npm y npx para desarrollo. |
 | Graphics | `features.graphics` | Habilita aceleracion grafica y agrega `gpu-doctor`. |
@@ -23,6 +25,8 @@ Las features se activan desde un host:
 
 ```nix
 features.browser.enable = true;
+features.desktop.enable = true;
+features.git.enable = true;
 features.python.enable = true;
 features.nodejs.enable = true;
 features.graphics.enable = true;
@@ -35,6 +39,8 @@ features.containers.enable = true;
 
 - Cambios generales de una feature: actualizar este archivo.
 - Detalles de Browser: [browser.md](browser.md).
+- Detalles de Desktop: [desktop-feature.md](desktop-feature.md).
+- Detalles de Git: [git.md](git.md).
 - Detalles de Python: [python.md](python.md).
 - Detalles de Node.js: [nodejs.md](nodejs.md).
 - Detalles de graficos y GPU: [graphics.md](graphics.md).

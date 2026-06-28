@@ -1,9 +1,15 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.features.holodeck;
 
-  shellPathDefault = value:
+  shellPathDefault =
+    value:
     if value == "$HOME" || value == "~" then
       ''"$HOME"''
     else if lib.hasPrefix "$HOME/" value then
