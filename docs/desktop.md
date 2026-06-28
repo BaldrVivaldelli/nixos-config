@@ -14,7 +14,7 @@
 - Desktop environment: GNOME
 - Red: NetworkManager
 - Audio: PipeWire con ALSA y PulseAudio compatibility
-- Browser: Firefox
+- Browser: Chromium
 - Usuario normal: `avivaldelli`
 - Grupos del usuario: `networkmanager`, `wheel`
 - Shell del usuario: zsh

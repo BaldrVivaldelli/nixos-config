@@ -76,7 +76,7 @@ git config core.hooksPath .githooks
 ## Que configura hoy
 
 - NixOS `desktop` con systemd-boot, GDM, GNOME, NetworkManager, PipeWire,
-  Firefox, `wget`, `curl` y usuario `avivaldelli`.
+  Chromium, `wget`, `curl` y usuario `avivaldelli`.
 - Locale base `en_US.UTF-8` con settings regionales `es_AR.UTF-8`.
 - Zona horaria `America/Argentina/Buenos_Aires`.
 - Feature `python`: instala Python y `uv`.

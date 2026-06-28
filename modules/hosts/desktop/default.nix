@@ -88,8 +88,8 @@
     ];
   };
 
-  # Install firefox.
-  programs.firefox.enable = true;
+  # Install Chromium.
+  programs.chromium.enable = true;
   programs.zsh.enable = true;
   features.python.enable = true;
   features.nodejs.enable = true;
