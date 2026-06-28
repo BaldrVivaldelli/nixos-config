@@ -8,9 +8,15 @@ El repo usa flakes y modulos NixOS. La flake expone una sola configuracion:
 ```text
 flake.nix
   nixosConfigurations.desktop
+    home-manager.nixosModules.home-manager
+      ./home/avivaldelli
+        ./home/avivaldelli/shell.nix
+        ./home/avivaldelli/starship.nix
+        ./home/avivaldelli/aws.nix
     ./modules/parts.nix
       ./modules/features/default.nix
         ./modules/features/python
+        ./modules/features/nodejs
         ./modules/features/vscodium
         ./modules/features/holodeck
         ./modules/features/containers
@@ -19,7 +25,9 @@ flake.nix
 ```
 
 NixOS combina todos los modulos importados. Las features se importan siempre,
-pero su configuracion efectiva queda detras de opciones `enable`.
+pero su configuracion efectiva queda detras de opciones `enable`. Home Manager
+se integra como modulo NixOS y declara la configuracion del usuario
+`avivaldelli`.
 
 ## Flake
 
@@ -27,10 +35,11 @@ pero su configuracion efectiva queda detras de opciones `enable`.
 
 - `description = "Mi configuracion NixOS"`
 - input `nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05"`
+- input `home-manager.url = "github:nix-community/home-manager/release-26.05"`
 - output `nixosConfigurations.desktop`
 - sistema `x86_64-linux`
 
-El lockfile fija la revision exacta de `nixpkgs`.
+El lockfile fija la revision exacta de `nixpkgs` y `home-manager`.
 
 ## Modulos base
 
@@ -61,6 +70,24 @@ El host `desktop` define:
 - `system.stateVersion`
 
 `hardware-configuration.nix` queda separado porque es especifico de la maquina.
+
+## Home Manager
+
+La configuracion interactiva del usuario vive en `home/avivaldelli`.
+
+- `default.nix`: datos del usuario, `home.stateVersion` e imports.
+- `shell.nix`: zsh, aliases, fzf, zoxide y direnv.
+- `starship.nix`: prompt.
+- `aws.nix`: `awscli2` y helpers interactivos.
+
+La diferencia de responsabilidades es:
+
+- NixOS/system: paquetes base, usuarios, servicios, Docker, shells disponibles.
+- Home Manager/user: dotfiles, aliases, funciones de shell, prompt y tooling
+  interactivo del usuario.
+
+Home Manager usa `useGlobalPkgs = true`, por lo que comparte el mismo `pkgs`
+del sistema.
 
 ## Features
 

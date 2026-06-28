@@ -8,13 +8,15 @@ cuando quieras agregar o cambiar algo.
 1. [Arquitectura](architecture.md): import graph, convenciones y como agregar
    hosts o features.
 2. [Host desktop](desktop.md): configuracion concreta de la maquina actual.
-3. [Features](features.md): resumen de los modulos activables.
-4. [Mantenimiento](maintenance.md): comandos habituales, updates y checks.
-5. [Seguridad y secretos](security.md): que no debe entrar al repo.
+3. [Home Manager](home-manager.md): configuracion declarativa del usuario.
+4. [Features](features.md): resumen de los modulos activables.
+5. [Mantenimiento](maintenance.md): comandos habituales, updates y checks.
+6. [Seguridad y secretos](security.md): que no debe entrar al repo.
 
 ## Guias por feature
 
 - [Python](python.md)
+- [Node.js](nodejs.md)
 - [VSCodium](vscodium.md)
 - [Holodeck](holodeck.md)
 - [Contenedores y Windows VM](containers.md)

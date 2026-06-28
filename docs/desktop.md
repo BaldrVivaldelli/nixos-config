@@ -17,6 +17,8 @@
 - Browser: Firefox
 - Usuario normal: `avivaldelli`
 - Grupos del usuario: `networkmanager`, `wheel`
+- Shell del usuario: zsh
+- Home Manager integrado para `avivaldelli`
 - Nix experimental features: `nix-command`, `flakes`
 - `nixpkgs.config.allowUnfree = true`
 - `system.stateVersion = "26.05"`
@@ -47,6 +49,7 @@ El host activa:
 
 ```nix
 features.python.enable = true;
+features.nodejs.enable = true;
 features.vscodium.enable = true;
 features.holodeck.enable = true;
 features.containers = {
@@ -57,7 +60,30 @@ features.containers = {
 };
 ```
 
-Esto instala Python, uv, VSCodium, Holodeck, Docker y el helper `windowsvm`.
+Esto instala Python, uv, Node.js, VSCodium, Holodeck, Docker y el helper
+`windowsvm`. La configuracion interactiva del usuario se define en
+`home/avivaldelli`.
+
+## Home Manager
+
+`flake.nix` integra Home Manager como modulo NixOS:
+
+```nix
+home-manager.nixosModules.home-manager
+```
+
+El usuario configurado es `avivaldelli`, con archivos en:
+
+```text
+home/avivaldelli/
+```
+
+Como Home Manager esta integrado al sistema, los cambios se aplican con el mismo
+comando:
+
+```bash
+sudo nixos-rebuild switch --flake .#desktop
+```
 
 ## Cambios comunes
 

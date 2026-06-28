@@ -18,6 +18,7 @@ sensible deben vivir fuera del repo.
 - archivos `.gpg`, `.pgp`, `.asc`, `.age`, `.kdbx`
 - directorios `secrets`, `private`, `.secrets`, `.private`
 - estado generado por Holodeck bajo `.config/holodeck`
+- caches de Python y Node.js
 
 ## Hook pre-commit
 
@@ -47,6 +48,13 @@ Holodeck esta pensado para mantener credenciales fuera de Git:
 `holodeck purge` elimina el estado local que Holodeck conoce, pero no borra
 llaves publicas ya subidas a GitHub o GitLab.
 
+## AWS
+
+Home Manager instala `awscli2` y helpers de shell, pero no declara perfiles,
+tokens ni credenciales. Esos datos deben seguir viviendo en estado local como
+`~/.aws/config`, `~/.aws/credentials`, el navegador o el keyring usado por AWS
+SSO.
+
 ## Windows VM
 
 La password por defecto de la VM es declarativa:
@@ -67,4 +75,3 @@ commitear credenciales personales.
 - Usar un secret manager o archivos locales ignorados por Git.
 - Si un secreto fue commiteado, rotarlo. Borrarlo del commit no alcanza si ya
   fue publicado.
-

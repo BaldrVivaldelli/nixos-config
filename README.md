@@ -8,6 +8,12 @@ la configuracion en modulos reutilizables bajo `modules/`.
 
 ```text
 flake.nix
+home/
+  avivaldelli/
+    default.nix
+    shell.nix
+    starship.nix
+    aws.nix
 modules/
   parts.nix
   hosts/
@@ -17,6 +23,7 @@ modules/
   features/
     default.nix
     python/
+    nodejs/
     vscodium/
     holodeck/
     containers/
@@ -63,20 +70,25 @@ git config core.hooksPath .githooks
 - Locale base `en_US.UTF-8` con settings regionales `es_AR.UTF-8`.
 - Zona horaria `America/Argentina/Buenos_Aires`.
 - Feature `python`: instala Python y `uv`.
+- Feature `nodejs`: instala Node.js con npm y npx.
 - Feature `vscodium`: instala VSCodium y extensiones pinneadas.
 - Feature `holodeck`: instala herramientas de desarrollo y un comando Python
   con colores para configurar perfiles Git, SSH, GPG, GitHub y GitLab.
 - Feature `containers`: habilita Docker o Podman. En el host actual usa Docker.
 - Feature `windowsVm`: agrega el comando `windowsvm` para correr una VM Windows
   via `dockurr/windows` dentro de Docker.
+- Home Manager para `avivaldelli`: configura zsh, aliases, fzf, zoxide,
+  direnv, starship y helpers AWS.
 
 ## Documentacion
 
 - [Indice de docs](docs/index.md)
 - [Arquitectura del repo](docs/architecture.md)
 - [Host desktop](docs/desktop.md)
+- [Home Manager](docs/home-manager.md)
 - [Features](docs/features.md)
 - [Python](docs/python.md)
+- [Node.js](docs/nodejs.md)
 - [VSCodium](docs/vscodium.md)
 - [Holodeck](docs/holodeck.md)
 - [Contenedores y Windows VM](docs/containers.md)
@@ -88,5 +100,6 @@ git config core.hooksPath .githooks
 - La flake declara sistemas reproducibles; el estado local vive fuera del repo.
 - Los modulos de features exponen opciones bajo `features.*`.
 - El host decide que features activar.
+- Home Manager declara preferencias y dotfiles del usuario.
 - Imagenes, extensiones y entradas externas se pinnean con version, digest o hash.
 - Secretos, llaves privadas y tokens no se versionan.

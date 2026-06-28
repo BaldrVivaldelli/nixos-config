@@ -82,6 +82,7 @@
     isNormalUser = true;
     description = "avivaldelli";
     extraGroups = [ "networkmanager" "wheel" ];
+    shell = pkgs.zsh;
     packages = with pkgs; [
     #  thunderbird
     ];
@@ -89,7 +90,9 @@
 
   # Install firefox.
   programs.firefox.enable = true;
+  programs.zsh.enable = true;
   features.python.enable = true;
+  features.nodejs.enable = true;
   features.vscodium.enable = true;
   features.holodeck.enable = true;
   features.containers = {

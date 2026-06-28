@@ -16,6 +16,9 @@ Aplicar ahora:
 sudo nixos-rebuild switch --flake .#desktop
 ```
 
+Esto tambien aplica la configuracion de Home Manager integrada para
+`avivaldelli`.
+
 Probar hasta el proximo reboot:
 
 ```bash
@@ -32,6 +35,12 @@ sudo nixos-rebuild boot --flake .#desktop
 
 ```bash
 nix flake check
+```
+
+Si hay archivos nuevos sin trackear y queres validar antes de agregarlos a Git:
+
+```bash
+nix eval --offline path:$PWD#nixosConfigurations.desktop.config.system.build.toplevel.drvPath
 ```
 
 Tambien es util revisar espacios o conflictos de patch:
@@ -126,4 +135,3 @@ nix store optimise
 ```
 
 No borrar manualmente contenido de `/nix/store`.
-
