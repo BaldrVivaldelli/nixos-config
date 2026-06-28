@@ -12,10 +12,11 @@ flake.nix
       inputs.home-manager.nixosModules.home-manager
       ./modules/home/default.nix
         ./home/avivaldelli
-          ./modules/home/features/shell
-            ./modules/home/features/shell/completions.nix
-          ./modules/home/features/starship
-          ./modules/home/features/aws
+          ./modules/home/profiles/developer
+            ./modules/home/features/shell
+              ./modules/home/features/shell/completions.nix
+            ./modules/home/features/starship
+            ./modules/home/features/aws
       ./modules/nixos/features/default.nix
         ./modules/nixos/features/python
         ./modules/nixos/features/nodejs
@@ -82,13 +83,18 @@ El host `desktop` define:
 ## Home Manager
 
 La configuracion interactiva del usuario se arma desde `home/avivaldelli`,
-que funciona como perfil y referencia modulos Home Manager reutilizables.
+que funciona como identidad local y elige un perfil Home Manager.
 
-- `default.nix`: datos del usuario, `home.stateVersion` e imports.
+- `default.nix`: datos del usuario, `home.stateVersion` e import del perfil.
 
 `modules/home/default.nix` es el puente NixOS hacia Home Manager: define
 `home-manager.useGlobalPkgs`, `home-manager.useUserPackages`, backups y el
 perfil `home-manager.users.avivaldelli`.
+
+Los perfiles Home Manager viven en `modules/home/profiles`.
+
+- `developer`: shell, starship y AWS. Es el perfil default de `avivaldelli`.
+- `minimal`: shell y starship, sin helpers cloud.
 
 Los modulos reutilizables de Home Manager viven en `modules/home/features`.
 

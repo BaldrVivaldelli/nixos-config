@@ -21,6 +21,9 @@ modules/
         completions.nix
       starship/
       aws/
+    profiles/
+      developer/
+      minimal/
   hosts/
     desktop/
       default.nix

@@ -2,9 +2,7 @@
 
 {
   imports = [
-    ../../modules/home/features/shell
-    ../../modules/home/features/starship
-    ../../modules/home/features/aws
+    ../../modules/home/profiles/developer
   ];
 
   home = {

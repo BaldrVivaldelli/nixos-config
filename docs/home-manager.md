@@ -40,14 +40,44 @@ modules/
         default.nix
       aws/
         default.nix
+    profiles/
+      developer/
+        default.nix
+      minimal/
+        default.nix
 ```
 
 `modules/home/default.nix` es un modulo NixOS que configura Home Manager:
 `useGlobalPkgs`, `useUserPackages`, backups y el usuario `avivaldelli`.
 
 `home/avivaldelli/default.nix` define el usuario, `home.homeDirectory`,
-`home.stateVersion` e imports. El perfil de usuario referencia modulos Home
-Manager reutilizables desde `modules/home/features`.
+`home.stateVersion` e importa un perfil Home Manager.
+
+Los perfiles viven en `modules/home/profiles`:
+
+- `developer`: shell, starship y AWS. Es el perfil default de `avivaldelli`.
+- `minimal`: shell y starship, sin helpers cloud.
+
+Cada perfil referencia modulos Home Manager reutilizables desde
+`modules/home/features`.
+
+## Cambiar perfil
+
+El perfil activo se elige desde `home/avivaldelli/default.nix`:
+
+```nix
+imports = [
+  ../../modules/home/profiles/developer
+];
+```
+
+Para probar un perfil mas chico:
+
+```nix
+imports = [
+  ../../modules/home/profiles/minimal
+];
+```
 
 `modules/home/features/shell/default.nix` configura zsh:
 
