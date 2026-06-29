@@ -20,6 +20,7 @@ cuando quieras agregar o cambiar algo.
 - [Git](git.md)
 - [Python](python.md)
 - [Node.js](nodejs.md)
+- [Lean](lean.md)
 - [Graficos y GPU](graphics.md)
 - [VSCodium](vscodium.md)
 - [Holodeck](holodeck.md)

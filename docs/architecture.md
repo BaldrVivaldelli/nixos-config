@@ -23,6 +23,7 @@ flake.nix
         ./modules/nixos/features/git
         ./modules/nixos/features/python
         ./modules/nixos/features/nodejs
+        ./modules/nixos/features/lean
         ./modules/nixos/features/graphics
         ./modules/nixos/features/vscodium
         ./modules/nixos/features/holodeck

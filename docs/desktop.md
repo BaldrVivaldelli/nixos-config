@@ -53,6 +53,7 @@ features.desktop.enable = true;
 features.git.enable = true;
 features.python.enable = true;
 features.nodejs.enable = true;
+features.lean.enable = true;
 # >>> gpu-doctor graphics
 features.graphics = {
   enable = true;
@@ -70,9 +71,10 @@ features.containers = {
 };
 ```
 
-Esto instala Chromium, GNOME/GDM, Git tooling, Python, uv, Node.js, aceleracion
-grafica base, `gpu-doctor`, VSCodium, Holodeck, Docker y el helper `windowsvm`. La
-configuracion interactiva del usuario se define en `home/avivaldelli`.
+Esto instala Chromium, GNOME/GDM, Git tooling, Python, uv, Node.js, Lean,
+aceleracion grafica base, `gpu-doctor`, VSCodium, Holodeck, Docker y el helper
+`windowsvm`. La configuracion interactiva del usuario se define en
+`home/avivaldelli`.
 
 ## Home Manager
 

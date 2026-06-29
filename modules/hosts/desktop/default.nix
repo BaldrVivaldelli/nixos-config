@@ -84,6 +84,7 @@
   features.git.enable = true;
   features.python.enable = true;
   features.nodejs.enable = true;
+  features.lean.enable = true;
   # >>> gpu-doctor graphics
   features.graphics = {
     enable = true;

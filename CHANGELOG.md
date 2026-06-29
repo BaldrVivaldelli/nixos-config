@@ -11,6 +11,7 @@ All notable changes to this repository are documented here.
 - Added a minimal `features.browser` module for Chromium.
 - Added `features.desktop` for GNOME, GDM and keyboard layout.
 - Added `features.git` for Git, Git LFS, delta and lazygit.
+- Added `features.lean` with `elan` as the default Lean toolchain manager.
 - Added custom zsh completions for `windowsvm`, `holodeck`, `awslogin` and
   `awscxt` through Home Manager `siteFunctions`.
 - Moved zsh completions into `modules/home/features/shell/completions.nix` and

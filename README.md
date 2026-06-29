@@ -36,6 +36,7 @@ modules/
       git/
       python/
       nodejs/
+      lean/
       graphics/
       vscodium/
       holodeck/
@@ -98,6 +99,7 @@ git config core.hooksPath .githooks
 - Feature `git`: instala Git, Git LFS, delta y lazygit.
 - Feature `python`: instala Python y `uv`.
 - Feature `nodejs`: instala Node.js con npm y npx.
+- Feature `lean`: instala `elan` para proyectos Lean y Lake.
 - Feature `graphics`: habilita aceleracion grafica e instala `gpu-doctor` para
   recomendar drivers segun la GPU local.
 - Feature `vscodium`: instala VSCodium y extensiones pinneadas.
@@ -121,6 +123,7 @@ git config core.hooksPath .githooks
 - [Git](docs/git.md)
 - [Python](docs/python.md)
 - [Node.js](docs/nodejs.md)
+- [Lean](docs/lean.md)
 - [Graficos y GPU](docs/graphics.md)
 - [VSCodium](docs/vscodium.md)
 - [Holodeck](docs/holodeck.md)
