@@ -16,4 +16,3 @@ def confirm(label: str, default: str = "yes") -> bool:
         return answer in {"y", "Y", "yes", "YES"}
     answer = input(f"{ui.label(label)} [y/N]: ") or "n"
     return answer in {"y", "Y", "yes", "YES"}
-

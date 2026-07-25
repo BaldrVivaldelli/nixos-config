@@ -47,7 +47,6 @@ def run_lspci() -> list[str]:
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
-
     if result.returncode != 0:
         stderr = result.stderr.strip()
         raise RuntimeError(stderr or "lspci failed")
@@ -61,13 +60,11 @@ def parse_gpus(lines: list[str]) -> list[Gpu]:
     for line in lines:
         if not any(gpu_class in line for gpu_class in GPU_CLASSES):
             continue
-
         bus_id = line.split(maxsplit=1)[0]
         ids = re.findall(r"\[([0-9a-fA-F]{4}):([0-9a-fA-F]{4})\]", line)
         vendor_id = ids[-1][0].lower() if ids else ""
         vendor = VENDORS.get(vendor_id, "unknown")
         model = line.split(":", maxsplit=2)[-1].strip()
-
         if vendor == "unknown":
             lowered = line.lower()
             if "nvidia" in lowered:
@@ -76,7 +73,6 @@ def parse_gpus(lines: list[str]) -> list[Gpu]:
                 vendor = "amd"
             elif "intel" in lowered:
                 vendor = "intel"
-
         gpus.append(
             Gpu(
                 bus_id=bus_id,
@@ -145,14 +141,12 @@ def print_report(gpus: list[Gpu], enable_32_bit: bool) -> None:
     print("Detected GPUs:")
     for gpu in gpus:
         print(f"- {gpu.vendor:7} {gpu.bus_id:12} {gpu.model}")
-
     driver = recommend_driver(gpus)
     print()
     print(f"Recommended graphics driver: {driver}")
     print()
     print("Host configuration snippet:")
     print(nix_snippet(driver, enable_32_bit))
-
     vendors = {gpu.vendor for gpu in gpus}
     if "nvidia" in vendors:
         print()
@@ -163,7 +157,6 @@ def print_report(gpus: list[Gpu], enable_32_bit: bool) -> None:
             print("- Hybrid graphics may need PRIME bus IDs; these GPUs were detected:")
             for gpu in gpus:
                 print(f"  - {gpu.vendor}: {gpu.bus_id}")
-
     if "amd" in vendors:
         print()
         print("AMD notes:")
@@ -196,9 +189,7 @@ def apply_recommendation(
     host_config = repo / "modules" / "hosts" / host / "default.nix"
     if not host_config.is_file():
         raise RuntimeError(f"host config not found: {host_config}")
-
     text = host_config.read_text()
-
     managed_pattern = re.compile(
         rf"(?ms)^([ \t]*){re.escape(MANAGED_START)}\n.*?^\1{re.escape(MANAGED_END)}"
     )
@@ -212,7 +203,6 @@ def apply_recommendation(
             r"(?m)^([ \t]*)features\.graphics\.enable\s*=\s*true;\s*$"
         )
         single_line_match = single_line_pattern.search(text)
-
         if single_line_match:
             indent = single_line_match.group(1)
             replacement = managed_snippet(driver, enable_32_bit, indent)
@@ -235,7 +225,6 @@ def apply_recommendation(
                 raise RuntimeError(
                     "could not find a safe place to insert features.graphics"
                 )
-
             indent = anchor_match.group(1)
             replacement = "\n" + managed_snippet(driver, enable_32_bit, indent)
             updated = text[: anchor_match.end()] + replacement + text[anchor_match.end() :]
@@ -251,7 +240,6 @@ def stage_file(repo: Path, path: Path) -> None:
         relative = path.relative_to(repo)
     except ValueError as error:
         raise RuntimeError(f"{path} is not inside {repo}") from error
-
     result = subprocess.run(
         ["git", "-C", str(repo), "add", str(relative)],
         check=False,
@@ -321,7 +309,6 @@ def main() -> int:
         help="Recommend 32-bit graphics libraries for Steam, Wine or older games.",
     )
     args = parser.parse_args()
-
     try:
         gpus = parse_gpus(run_lspci())
     except RuntimeError as error:
@@ -335,7 +322,6 @@ def main() -> int:
         return 0
 
     print_report(gpus, args.enable_32_bit)
-
     repo = args.repo.resolve() if args.repo else find_repo_root(Path.cwd())
     if repo is None:
         if not args.no_prompt:
@@ -345,7 +331,6 @@ def main() -> int:
 
     if args.no_prompt and not args.yes:
         return 0
-
     target = repo / "modules" / "hosts" / args.host / "default.nix"
     question = f"Apply recommendation to {target}"
     if not args.no_rebuild:
@@ -354,7 +339,6 @@ def main() -> int:
 
     if not args.yes and not ask_yes_no(question):
         return 0
-
     try:
         host_config = apply_recommendation(repo, args.host, driver, args.enable_32_bit)
         stage_file(repo, host_config)

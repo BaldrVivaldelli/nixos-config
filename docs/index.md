@@ -7,11 +7,12 @@ cuando quieras agregar o cambiar algo.
 
 1. [Arquitectura](architecture.md): import graph, convenciones y como agregar
    hosts o features.
-2. [Host desktop](desktop.md): configuracion concreta de la maquina actual.
-3. [Home Manager](home-manager.md): configuracion declarativa del usuario.
-4. [Features](features.md): resumen de los modulos activables.
-5. [Mantenimiento](maintenance.md): comandos habituales, updates y checks.
-6. [Seguridad y secretos](security.md): que no debe entrar al repo.
+2. [Host desktop](desktop.md): configuracion concreta de la maquina fisica.
+3. [Host WSL](wsl.md): entorno de desarrollo sobre NixOS-WSL.
+4. [Home Manager](home-manager.md): configuracion declarativa del usuario.
+5. [Features](features.md): resumen de los modulos activables.
+6. [Mantenimiento](maintenance.md): comandos habituales, updates y checks.
+7. [Seguridad y secretos](security.md): que no debe entrar al repo.
 
 ## Guias por feature
 

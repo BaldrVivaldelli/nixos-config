@@ -12,7 +12,6 @@ GIT_PROFILES_DIR = HOLODECK_DIR / "git"
 PUBLIC_KEYS_DIR = HOLODECK_DIR / "public-keys"
 GITCONFIG_FILE = HOME / ".gitconfig"
 SSH_CONFIG_FILE = HOME / ".ssh" / "config"
-
 GIT_BEGIN = "# >>> holodeck git"
 GIT_END = "# <<< holodeck git"
 SSH_BEGIN = "# >>> holodeck ssh"
@@ -25,4 +24,3 @@ DEFAULT_PERSONAL_DIR = os.environ.get(
     "$HOME/projects/personal",
 )
 DEFAULT_WORK_DIR = os.environ.get("HOLODECK_DEFAULT_WORK_DIR", "$HOME/projects/work")
-

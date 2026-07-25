@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-07-25 - NixOS-WSL host
+
+### Added
+
+- Added the `nixos-wsl` flake input pinned to the `release-26.05` branch.
+- Added `nixosConfigurations.wsl` and `modules/hosts/wsl/default.nix`.
+- Added Docker Desktop integration for WSL without enabling the native
+  containers/Windows VM feature.
+- Enabled `nix-ld` in WSL for VS Code Remote WSL compatibility.
+- Added `bootstrap-wsl.sh`, `FIRST_RUN_WSL.md` and WSL documentation.
+
+### Changed
+
+- Parameterized Home Manager rebuild aliases so `desktop` targets `#desktop`
+  and WSL targets `#wsl`.
+- Reused Git, Python, Node.js, Lean, Holodeck and the developer Home Manager
+  profile in WSL while omitting physical hardware, bootloader and desktop
+  services.
+
 All notable changes to this repository are documented here.
 
 ## 2026-06-28

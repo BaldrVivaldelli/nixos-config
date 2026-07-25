@@ -100,7 +100,6 @@ def write_local_profile(
         raise HolodeckError("Invalid profile name.")
     if not name or not email:
         raise HolodeckError("Name and email are required.")
-
     ssh_key = ssh_key_file_for(profile, provider)
     generate_ssh_key(ssh_key, email, ssh_mode)
     ssh_key.chmod(0o600)
@@ -113,7 +112,6 @@ def write_local_profile(
     elif fingerprint:
         ui.warn(f"Ignoring invalid GPG fingerprint: {fingerprint}")
         fingerprint = ""
-
     write_git_profile(profile, name, email, fingerprint)
     write_profile_env(profile, provider, host, projects_dir_abs, name, email, ssh_key, fingerprint)
     rebuild_gitconfig_block()
@@ -125,7 +123,6 @@ def write_local_profile(
     )
     if should_upload:
         upload_keys(provider, host, title, ssh_pub, gpg_pub)
-
     print()
     ui.ok(f"Profile configured: {profile}")
     print(f"Projects: {projects_dir_abs}")
@@ -136,12 +133,10 @@ def configure_profile(provider: str, default_profile: str, default_host: str, de
     profile = sanitize_id(prompt("Profile name", default_profile))
     if not profile:
         raise HolodeckError("Invalid profile name.")
-
     host = prompt("Host", default_host)
     projects_dir_abs = expand_path(prompt("Projects directory for this profile", default_dir))
     name = prompt("Git commit name", git_global_value("user.name"))
     email = prompt("Git commit email", git_global_value("user.email"))
-
     auth_ok = False
     if confirm(f"Authenticate {provider} on {host} now?"):
         try:
@@ -156,7 +151,6 @@ def configure_profile(provider: str, default_profile: str, default_host: str, de
 def configure_github_profile() -> None:
     host = DEFAULT_GITHUB_HOST
     login_github(host)
-
     login = github_api_field(host, "login")
     account_id = github_api_field(host, "id")
     name = github_api_field(host, "name")
@@ -170,14 +164,12 @@ def configure_github_profile() -> None:
         email = github_primary_email(host)
     if not email:
         email = github_noreply_email(login, account_id)
-
     profile = sanitize_id(login)
     projects_dir_abs = expand_path(DEFAULT_PERSONAL_DIR)
     print(f"{ui.label('Using GitHub account')}: {login}")
     print(f"{ui.label('Git commit name')}: {name}")
     print(f"{ui.label('Git commit email')}: {email}")
     print(f"{ui.label('Projects directory')}: {projects_dir_abs}")
-
     write_local_profile(
         "github",
         profile,
@@ -225,7 +217,6 @@ def profile_command(provider: str) -> None:
 def doctor() -> None:
     print(f"{ui.label('Holodeck directory')}: {HOLODECK_DIR}")
     print()
-
     loaded_profiles = profiles()
     if not loaded_profiles:
         ui.warn("No Holodeck profiles configured.")
@@ -239,7 +230,6 @@ def doctor() -> None:
             print(f"  SSH key: {profile.get('HOLODECK_SSH_KEY', '')}")
             print(f"  GPG: {profile.get('HOLODECK_GPG_FINGERPRINT') or 'none'}")
             print()
-
     ui.heading("GitHub auth:")
     run(["gh", "auth", "status", "--hostname", DEFAULT_GITHUB_HOST], check=False)
     print()
@@ -277,12 +267,10 @@ def purge() -> None:
     print()
     print("It does not rewrite git history and does not remove uploaded public keys from GitHub/GitLab.")
     print()
-
     purge_prompt = ui.label("Type 'purge holodeck' to continue")
     if input(f"{purge_prompt}: ") != "purge holodeck":
         ui.warn("Cancelled.")
         raise SystemExit(1)
-
     logout_known_hosts()
     delete_tracked_gpg_keys()
     remove_managed_block(GITCONFIG_FILE, GIT_BEGIN, GIT_END)
@@ -294,4 +282,3 @@ def purge() -> None:
             pass
     shutil.rmtree(HOLODECK_DIR, ignore_errors=True)
     ui.ok("Holodeck local state removed.")
-

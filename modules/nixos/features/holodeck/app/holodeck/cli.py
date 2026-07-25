@@ -21,7 +21,6 @@ def usage() -> None:
 
 Recommended first run:
   holodeck setup        Full wizard: auth + SSH/GPG + Git profiles
-
 Commands:
   setup                 Full wizard for GitHub personal and/or GitLab work
   github                Configure GitHub from your authenticated account
@@ -36,7 +35,6 @@ Commands:
   purge                 Remove Holodeck-managed local profiles, keys, and auth
   clean                 Alias for purge
   sanitize              Alias for purge
-
 Holodeck stores generated local state under ~/.config/holodeck and only writes
 managed blocks in ~/.gitconfig and ~/.ssh/config."""
     )
@@ -45,7 +43,6 @@ managed blocks in ~/.gitconfig and ~/.ssh/config."""
 def dispatch(args: list[str]) -> int:
     command = args[0] if args else "help"
     rest = args[1:]
-
     if command == "setup":
         setup()
     elif command == "github":
@@ -82,4 +79,3 @@ def main(argv: list[str] | None = None) -> int:
         print()
         ui.warn("Cancelled.")
         return 130
-

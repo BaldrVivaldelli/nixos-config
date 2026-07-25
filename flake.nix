@@ -8,6 +8,11 @@
       url = "github:nix-community/home-manager/release-26.05";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    nixos-wsl = {
+      url = "github:nix-community/NixOS-WSL/release-26.05";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -57,6 +62,19 @@
         modules = [
           ./modules/parts.nix
           ./modules/hosts/desktop
+        ];
+      };
+
+      nixosConfigurations.wsl = nixpkgs.lib.nixosSystem {
+        inherit system;
+        specialArgs = {
+          inherit inputs;
+        };
+
+        modules = [
+          inputs.nixos-wsl.nixosModules.default
+          ./modules/parts.nix
+          ./modules/hosts/wsl
         ];
       };
     };

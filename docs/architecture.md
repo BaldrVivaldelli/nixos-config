@@ -1,7 +1,7 @@
 # Arquitectura
 
-El repo usa flakes y modulos NixOS. La flake expone una sola configuracion:
-`nixosConfigurations.desktop`.
+El repo usa flakes y modulos NixOS. La flake expone dos configuraciones:
+`nixosConfigurations.desktop` y `nixosConfigurations.wsl`.
 
 ## Import graph
 
@@ -30,6 +30,11 @@ flake.nix
         ./modules/nixos/features/containers
     ./modules/hosts/desktop
       ./modules/hosts/desktop/hardware-configuration.nix
+
+  nixosConfigurations.wsl
+    inputs.nixos-wsl.nixosModules.default
+    ./modules/parts.nix
+    ./modules/hosts/wsl
 ```
 
 NixOS combina todos los modulos importados. Las features se importan siempre,
@@ -44,12 +49,14 @@ se integra como modulo NixOS y declara la configuracion del usuario
 - `description = "Mi configuracion NixOS"`
 - input `nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05"`
 - input `home-manager.url = "github:nix-community/home-manager/release-26.05"`
-- output `nixosConfigurations.desktop`
+- input `nixos-wsl.url = "github:nix-community/NixOS-WSL/release-26.05"`
+- outputs `nixosConfigurations.desktop` y `nixosConfigurations.wsl`
 - sistema `x86_64-linux`
 - `specialArgs.inputs`, para que `modules/parts.nix` pueda importar modulos
   desde inputs de la flake.
 
-El lockfile fija la revision exacta de `nixpkgs` y `home-manager`.
+El lockfile fija las revisiones exactas de `nixpkgs`, `home-manager` y
+`nixos-wsl` despues de ejecutar el bootstrap o `nix flake update`.
 
 ## Modulos base
 
@@ -84,6 +91,11 @@ El host `desktop` define:
 - `system.stateVersion`
 
 `hardware-configuration.nix` queda separado porque es especifico de la maquina.
+
+El host `wsl` reutiliza los modulos comunes y Home Manager, pero importa el
+modulo oficial de NixOS-WSL y omite hardware configuration, bootloader fisico,
+NetworkManager, audio, impresion, GNOME, navegador, drivers, VSCodium Linux y
+la VM Windows anidada.
 
 ## Home Manager
 
@@ -150,7 +162,8 @@ in
 ## Agregar un host
 
 1. Crear `modules/hosts/<nuevo-host>/default.nix`.
-2. Agregar su `hardware-configuration.nix`.
+2. Para una maquina fisica, agregar su `hardware-configuration.nix`; para WSL
+   u otros entornos virtualizados, importar el modulo de plataforma apropiado.
 3. Agregar una salida en `flake.nix`:
 
 ```nix

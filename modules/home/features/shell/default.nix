@@ -14,7 +14,15 @@ in
     ./completions.nix
   ];
 
-  options.homeFeatures.shell.enable = lib.mkEnableOption "zsh shell experience";
+  options.homeFeatures.shell = {
+    enable = lib.mkEnableOption "zsh shell experience";
+
+    rebuildTarget = lib.mkOption {
+      type = lib.types.str;
+      default = "desktop";
+      description = "nixosConfigurations target used by the rebuild aliases.";
+    };
+  };
 
   config = lib.mkIf cfg.enable {
     home.packages = with pkgs; [
@@ -46,8 +54,8 @@ in
         la = "eza -la --group-directories-first";
         ll = "eza -lh --group-directories-first";
         ls = "eza --group-directories-first";
-        nixswitch = "sudo nixos-rebuild switch --flake ~/projects/personal/nixos-config#desktop";
-        nixbuild = "sudo nixos-rebuild build --flake ~/projects/personal/nixos-config#desktop";
+        nixswitch = "sudo nixos-rebuild switch --flake ~/projects/personal/nixos-config#${cfg.rebuildTarget}";
+        nixbuild = "sudo nixos-rebuild build --flake ~/projects/personal/nixos-config#${cfg.rebuildTarget}";
         rebuild = "nixswitch";
         ga = "git add";
         gc = "git commit";

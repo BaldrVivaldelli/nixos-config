@@ -1,0 +1,101 @@
+# Host WSL
+
+El host `wsl` reutiliza la capa comun del repositorio y el perfil Home Manager de
+`avivaldelli`, pero delega a NixOS-WSL todo lo relacionado con kernel,
+bootloader, montajes de Windows, networking e inicio del entorno WSL.
+
+## Import graph
+
+```text
+nixosConfigurations.wsl
+  -> inputs.nixos-wsl.nixosModules.default
+  -> modules/parts.nix
+       -> Home Manager
+       -> modules/home
+       -> modules/nixos/features
+  -> modules/hosts/wsl/default.nix
+```
+
+## Features habilitadas
+
+- `features.git`
+- `features.python`
+- `features.nodejs`
+- `features.lean`
+- `features.holodeck`
+- Home Manager `developer`: zsh, aliases, completions, fzf, zoxide, direnv,
+  starship y helpers AWS.
+- Integracion con Docker Desktop.
+- `nix-ld` para conectar VS Code Remote WSL desde Windows.
+
+## Componentes omitidos intencionalmente
+
+- `hardware-configuration.nix`
+- systemd-boot y configuracion EFI
+- NetworkManager
+- CUPS
+- PipeWire y RTKit
+- GNOME y GDM
+- Chromium
+- drivers graficos del host fisico
+- VSCodium para Linux
+- Docker nativo del modulo `features.containers`
+- `dockurr/windows` y `features.containers.windowsVm`
+
+NixOS-WSL sigue usando systemd para administrar el entorno de la distribucion.
+Lo que se omite es `systemd-boot`, que es el bootloader de la maquina fisica.
+
+## Primera activacion
+
+Usa el script de la raiz:
+
+```bash
+./bootstrap-wsl.sh
+```
+
+El script usa el NixOS-WSL ya fijado en `flake.lock`, valida la flake y ejecuta:
+
+```bash
+sudo nixos-rebuild boot --flake .#wsl
+```
+
+Despues hay que completar el ciclo de reinicio desde PowerShell indicado en
+[`FIRST_RUN_WSL.md`](../FIRST_RUN_WSL.md).
+
+## Actualizaciones posteriores
+
+```bash
+cd ~/projects/personal/nixos-config
+nixswitch
+```
+
+O explicitamente:
+
+```bash
+sudo nixos-rebuild switch --flake .#wsl
+```
+
+## VS Code / Kiro desde Windows
+
+El host habilita:
+
+```nix
+programs.nix-ld.enable = true;
+```
+
+Esto permite ejecutar el servidor remoto de VS Code, que descarga un binario
+Node.js convencional. El editor sigue instalado y ejecutandose en Windows; el
+workspace, terminal y herramientas viven dentro de NixOS-WSL.
+
+## Lockfile y Git
+
+El snapshot conserva las revisiones fijadas de `nixpkgs`, Home Manager y
+NixOS-WSL. No hace falta regenerar el lock para la primera instalacion. Para
+actualizar solamente NixOS-WSL mas adelante:
+
+```bash
+nix flake update nixos-wsl
+git add flake.lock
+git commit -m "Update NixOS-WSL input"
+git push
+```

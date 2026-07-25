@@ -1,8 +1,8 @@
 # NixOS config
 
-Configuracion personal de NixOS basada en flakes. El repo define una maquina
-`desktop` en `x86_64-linux`, usa `nixpkgs` desde la rama `nixos-26.05` y separa
-la configuracion en modulos reutilizables bajo `modules/`.
+Configuracion personal de NixOS basada en flakes. El repo define los hosts
+`desktop` y `wsl` en `x86_64-linux`, usa `nixpkgs` desde la rama `nixos-26.05`
+y separa la configuracion en modulos reutilizables bajo `modules/`.
 
 ## Mapa rapido
 
@@ -28,6 +28,8 @@ modules/
     desktop/
       default.nix
       hardware-configuration.nix
+    wsl/
+      default.nix
   nixos/
     features/
       default.nix
@@ -47,16 +49,30 @@ docs/
 
 ## Uso diario
 
-Aplicar la configuracion del host actual:
+Aplicar la configuracion del desktop fisico:
 
 ```bash
 sudo nixos-rebuild switch --flake .#desktop
 ```
 
-Construir sin activar:
+Aplicar actualizaciones normales dentro de NixOS-WSL:
+
+```bash
+sudo nixos-rebuild switch --flake .#wsl
+```
+
+La primera instalacion de WSL cambia el usuario predeterminado y debe hacerse
+con el procedimiento de [`FIRST_RUN_WSL.md`](FIRST_RUN_WSL.md), usando:
+
+```bash
+./bootstrap-wsl.sh
+```
+
+Construir sin activar, eligiendo el host:
 
 ```bash
 sudo nixos-rebuild build --flake .#desktop
+sudo nixos-rebuild build --flake .#wsl
 ```
 
 Actualizar el lockfile:
@@ -90,6 +106,10 @@ git config core.hooksPath .githooks
 
 - NixOS `desktop` con systemd-boot, GDM, GNOME, NetworkManager, PipeWire,
   Chromium, `wget`, `curl` y usuario `avivaldelli`.
+- NixOS `wsl` con el mismo entorno terminal/developer y Home Manager, sin
+  hardware configuration, bootloader fisico, desktop Linux, audio, impresion,
+  drivers ni la VM Windows anidada; incluye Docker Desktop y `nix-ld` para
+  VS Code Remote WSL.
 - Locale base `en_US.UTF-8` con settings regionales `es_AR.UTF-8`.
 - Zona horaria `America/Argentina/Buenos_Aires`.
 - Feature `browser`: instala Chromium con configuracion minimalista preparada
@@ -116,6 +136,8 @@ git config core.hooksPath .githooks
 - [Indice de docs](docs/index.md)
 - [Arquitectura del repo](docs/architecture.md)
 - [Host desktop](docs/desktop.md)
+- [Host WSL](docs/wsl.md)
+- [Primera instalacion WSL](FIRST_RUN_WSL.md)
 - [Home Manager](docs/home-manager.md)
 - [Features](docs/features.md)
 - [Browser](docs/browser.md)

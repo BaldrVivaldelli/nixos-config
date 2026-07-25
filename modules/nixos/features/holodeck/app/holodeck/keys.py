@@ -41,7 +41,6 @@ def ensure_gpg_key(name: str, email: str, mode: str = "prompt") -> str:
 
     if mode == "prompt" and not confirm(f"Generate a new GPG signing key for {email}?"):
         return ""
-
     user_id = f"{name} <{email}>"
     print(f"Generating GPG key for {user_id}", file=sys.stderr)
     print("GPG may ask for a passphrase in a pinentry dialog.", file=sys.stderr)
@@ -95,11 +94,9 @@ def export_gpg_public_key(fingerprint: str, profile: str) -> Path | None:
         )
     if result.returncode == 0:
         return gpg_pub
-
     ui.error(f"Could not export GPG public key for {fingerprint}.")
     try:
         gpg_pub.unlink()
     except FileNotFoundError:
         pass
     return None
-

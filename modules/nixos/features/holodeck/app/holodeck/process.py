@@ -52,4 +52,3 @@ def format_cmd(cmd: object) -> str:
     if isinstance(cmd, list):
         return shlex.join(str(part) for part in cmd)
     return str(cmd)
-

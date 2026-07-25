@@ -43,4 +43,3 @@ class Ui:
 
 
 ui = Ui()
-

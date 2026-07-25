@@ -48,7 +48,6 @@ def upload_github_gpg_key(host: str, gpg_pub: Path) -> None:
     )
     if result.returncode == 0:
         return
-
     error = result.stderr or ""
     if "insufficient oauth scopes" in error.lower():
         ui.warn("GitHub requires the write:gpg_key scope before Holodeck can upload your GPG key.")
@@ -60,7 +59,6 @@ def upload_github_gpg_key(host: str, gpg_pub: Path) -> None:
         if refreshed.returncode == 0:
             run(["gh", "gpg-key", "add", str(gpg_pub)], check=False)
             return
-
         ui.warn("GitHub did not grant the extra scope automatically.")
         print("Run this when you want to upload the GPG key:")
         print(f"  gh auth refresh --hostname {host} --scopes write:gpg_key")
@@ -84,7 +82,6 @@ def upload_keys(
         if gpg_pub and gpg_pub.exists():
             upload_github_gpg_key(host, gpg_pub)
         return
-
     if provider == "gitlab":
         if ssh_pub.exists():
             run(["glab", "ssh-key", "add", str(ssh_pub), "--title", title], check=False)

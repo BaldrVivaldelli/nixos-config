@@ -64,7 +64,6 @@ def ssh_key_file_for(profile: str, provider: str) -> Path:
 def remove_managed_block(path: Path, begin: str, end: str) -> None:
     if not path.exists():
         return
-
     output: list[str] = []
     skip = False
     for line in path.read_text().splitlines(keepends=True):
@@ -124,7 +123,6 @@ def append_block(path: Path, text: str) -> None:
 def rebuild_gitconfig_block() -> None:
     ensure_dirs()
     remove_managed_block(GITCONFIG_FILE, GIT_BEGIN, GIT_END)
-
     lines = [f"{GIT_BEGIN}\n"]
     has_include = False
     for profile in profiles():
@@ -136,7 +134,6 @@ def rebuild_gitconfig_block() -> None:
             lines.append(f'[includeIf "gitdir:{projects_dir}/**"]\n')
             lines.append(f"  path = {path}\n\n")
     lines.append(f"{GIT_END}\n")
-
     if has_include:
         append_block(GITCONFIG_FILE, "".join(lines))
 
@@ -144,7 +141,6 @@ def rebuild_gitconfig_block() -> None:
 def rebuild_ssh_config_block() -> None:
     ensure_dirs()
     remove_managed_block(SSH_CONFIG_FILE, SSH_BEGIN, SSH_END)
-
     lines = [f"{SSH_BEGIN}\n"]
     has_host = False
     for profile in profiles():
@@ -158,7 +154,6 @@ def rebuild_ssh_config_block() -> None:
             lines.append(f"  IdentityFile {ssh_key}\n")
             lines.append("  IdentitiesOnly yes\n\n")
     lines.append(f"{SSH_END}\n")
-
     if has_host:
         append_block(SSH_CONFIG_FILE, "".join(lines))
         SSH_CONFIG_FILE.chmod(0o600)
@@ -170,4 +165,3 @@ def git_global_value(key: str) -> str:
 
 def holodeck_dir() -> Path:
     return HOLODECK_DIR
-
