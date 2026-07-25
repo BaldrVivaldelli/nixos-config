@@ -5,7 +5,6 @@ blocked_path_regex='(^|/)(\.env(\..*)?|\.ssh|\.gnupg|secrets|private|\.secrets|\
 secret_content_regex='-----BEGIN (RSA |DSA |EC |OPENSSH |PGP )?PRIVATE KEY-----|ghp_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|aws[_-]?secret[_-]?access[_-]?key|xox[baprs]-[A-Za-z0-9-]{20,}'
 
 failed=0
-
 while IFS= read -r file; do
   [ -n "$file" ] || continue
   [ -f "$file" ] || continue
@@ -21,7 +20,6 @@ while IFS= read -r file; do
     failed=1
   fi
 done < <(git diff --cached --name-only --diff-filter=ACMR)
-
 if [ "$failed" -ne 0 ]; then
   echo >&2
   echo "Commit blocked: this repo should never handle secrets." >&2
