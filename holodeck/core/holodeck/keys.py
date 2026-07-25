@@ -1,3 +1,5 @@
+"""Portable SSH and GPG key management."""
+
 from __future__ import annotations
 
 import re

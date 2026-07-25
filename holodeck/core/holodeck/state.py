@@ -1,3 +1,5 @@
+"""Portable user-state management."""
+
 from __future__ import annotations
 
 import re

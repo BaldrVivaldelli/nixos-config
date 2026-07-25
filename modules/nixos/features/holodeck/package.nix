@@ -1,18 +1,13 @@
 {
   lib,
   writeShellApplication,
-  coreutils,
-  findutils,
   gh,
   git,
   glab,
   gnupg,
-  nix,
   openssh,
   python3,
-  sudo,
-  util-linux,
-  xdg-utils,
+  coreSource ? ../../../../holodeck/core,
   githubHost ? "github.com",
   gitlabHost ? "gitlab.com",
   personalProjectsDir ? "$HOME/projects/personal",
@@ -35,18 +30,12 @@ writeShellApplication {
   name = "holodeck";
 
   runtimeInputs = [
-    coreutils
-    findutils
     gh
     git
     glab
     gnupg
-    nix
     openssh
     python3
-    sudo
-    util-linux
-    xdg-utils
   ];
 
   text = ''
@@ -54,7 +43,7 @@ writeShellApplication {
     export HOLODECK_DEFAULT_GITLAB_HOST=${lib.escapeShellArg gitlabHost}
     export HOLODECK_DEFAULT_PERSONAL_DIR=${shellPathDefault personalProjectsDir}
     export HOLODECK_DEFAULT_WORK_DIR=${shellPathDefault workProjectsDir}
-    export PYTHONPATH=${./app}''${PYTHONPATH:+:$PYTHONPATH}
+    export PYTHONPATH=${coreSource}''${PYTHONPATH:+:$PYTHONPATH}
 
     exec python3 -m holodeck "$@"
   '';

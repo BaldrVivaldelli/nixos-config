@@ -51,35 +51,30 @@ detectados para esta maquina.
 > Este procedimiento destruye todas las particiones y datos del disco elegido.
 > No soporta dual boot.
 
-Arranca el instalador NixOS en modo UEFI, clona el repositorio y busca la ruta
-estable del disco fisico:
+Arranca el instalador NixOS en modo UEFI, clona el repositorio y ejecuta:
 
 ```bash
-lsblk
-ls -l /dev/disk/by-id/
+./install.sh nixos desktop
 ```
 
-Ejecuta el bootstrap pasando el ID completo:
+El selector delega en el backend NixOS:
 
 ```bash
-./install-desktop.sh /dev/disk/by-id/ID_DEL_DISCO
+nix run .#holodeck-system-nixos -- install --target desktop
 ```
 
-El script es un wrapper de:
-
-```bash
-nix run .#holodeck -- system install \
-  --host desktop \
-  --disk /dev/disk/by-id/ID_DEL_DISCO
-```
-
-Antes de borrar nada, Holodeck:
+Antes de borrar nada, `holodeck-system-nixos`:
 
 1. exige que el live ISO este iniciado en UEFI
-2. acepta solamente una ruta `/dev/disk/by-id/*` que apunte a un disco completo
-3. rechaza el disco si el o alguna de sus particiones tiene montajes activos
-4. muestra nombre, capacidad, modelo y numero de serie
-5. exige escribir `BORRAR` seguido por el mismo ID
+2. busca discos completos con un ID estable en `/dev/disk/by-id`
+3. descarta cualquiera que tenga montajes activos en el o sus particiones
+4. prefiere discos internos frente a dispositivos removibles
+5. elige automaticamente si queda uno, o muestra un selector si quedan varios
+6. muestra nombre, capacidad, modelo y numero de serie
+7. exige escribir `BORRAR` seguido por el ID seleccionado
+
+El override `--disk /dev/disk/by-id/ID` sigue disponible para recuperacion o
+hardware ambiguo, pero no hace falta en el flujo normal.
 
 Despues Disko crea, formatea y monta todo en `/mnt`. La instalacion se completa
 con `nixos-install --flake .#desktop`, no con `nixos-rebuild`. Durante el flujo

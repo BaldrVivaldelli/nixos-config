@@ -1,3 +1,5 @@
+"""Module entrypoint for portable Holodeck."""
+
 from .cli import main
 
 

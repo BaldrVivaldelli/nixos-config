@@ -1,3 +1,5 @@
+"""Interactive prompt helpers."""
+
 from __future__ import annotations
 
 from .ui import ui

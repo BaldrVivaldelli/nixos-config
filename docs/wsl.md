@@ -50,17 +50,16 @@ Lo que se omite es `systemd-boot`, que es el bootloader de la maquina fisica.
 Usa el script de la raiz:
 
 ```bash
-./install-wsl.sh
+./install.sh nixos wsl
 ```
 
-Es un wrapper de:
+El selector delega en:
 
 ```bash
-nix run .#holodeck -- system install --host wsl
+nix run .#holodeck-system-nixos -- install --target wsl
 ```
 
-`bootstrap-wsl.sh` se conserva como alias compatible. Holodeck usa el NixOS-WSL
-fijado en `flake.lock`, valida la flake y ejecuta:
+El backend usa el NixOS-WSL fijado en `flake.lock`, valida la flake y ejecuta:
 
 ```bash
 sudo nixos-rebuild boot --flake .#wsl

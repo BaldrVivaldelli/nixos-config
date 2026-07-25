@@ -1,3 +1,5 @@
+"""Portable Holodeck paths and defaults."""
+
 from __future__ import annotations
 
 import os

@@ -9,7 +9,9 @@ El repo usa flakes y modulos NixOS. La flake expone dos configuraciones:
 flake.nix
   apps.holodeck
     ./modules/nixos/features/holodeck/package.nix
-    ./modules/nixos/features/holodeck/app
+    ./holodeck/core
+  apps.holodeck-system-nixos
+    ./holodeck/backends/nixos
   apps.disko
   nixosConfigurations.desktop
     inputs.disko.nixosModules.disko
@@ -58,8 +60,9 @@ se integra como modulo NixOS y declara la configuracion del usuario
 - input `disko.url = "github:nix-community/disko/latest"`
 - input `nixos-wsl.url = "github:nix-community/NixOS-WSL/release-26.05"`
 - outputs `nixosConfigurations.desktop` y `nixosConfigurations.wsl`
-- apps `holodeck` y `disko` para instalaciones
-- package `holodeck`, reutilizado por la flake y la feature NixOS
+- app/package `holodeck` para el core portable
+- app/package `holodeck-system-nixos` para instalacion NixOS
+- app `disko`, consumida por el backend NixOS
 - sistema `x86_64-linux`
 - `specialArgs.inputs`, para que `modules/parts.nix` pueda importar modulos
   desde inputs de la flake.
@@ -111,20 +114,29 @@ la VM Windows anidada.
 
 ## Frontera de instalacion y estado personal
 
-Los entrypoints `install-desktop.sh` e `install-wsl.sh` son wrappers de
-`nix run .#holodeck -- system install`. Holodeck selecciona y valida el flujo,
-pero delega los cambios reales:
+`install.sh` es el unico entrypoint. Selecciona un backend de sistema sin
+incorporarlo al core portable:
 
 ```text
-desktop -> Disko -> nixos-install .#desktop
-wsl     -> nixos-rebuild boot .#wsl
+install.sh
+  -> holodeck-system-nixos
+       -> desktop -> Disko -> nixos-install .#desktop
+       -> wsl     -> nixos-rebuild boot .#wsl
+  -> holodeck-system-<otro>
 ```
 
-El layout de disco, bootloader y diferencias de plataforma permanecen en los
-hosts NixOS. La autenticacion, llaves y perfiles permanecen en
-`holodeck setup` y se ejecutan despues de iniciar sesion como usuario normal.
-De este modo un rebuild no regenera credenciales y un onboarding nunca modifica
-`/boot`.
+La dependencia apunta en una sola direccion:
+
+```text
+backend NixOS -> utilidades portables del core
+core Holodeck -X-> backend NixOS
+```
+
+El paquete `holodeck` no contiene `nix`, `sudo`, Disko ni `util-linux`. El
+layout de disco, bootloader y diferencias de plataforma permanecen en los hosts
+NixOS. La autenticacion, llaves y perfiles permanecen en `holodeck setup` y se
+ejecutan despues de iniciar sesion como usuario normal. De este modo un rebuild
+no regenera credenciales y un onboarding nunca modifica `/boot`.
 
 ## Home Manager
 

@@ -37,8 +37,9 @@ sudo nixos-rebuild boot --flake .#desktop
 nix flake check
 ```
 
-Este check tambien ejecuta las pruebas unitarias de Holodeck, incluyendo el
-dispatch desktop/WSL, las validaciones destructivas y la frontera root/usuario.
+Este check ejecuta por separado las pruebas del core portable de Holodeck, las
+del selector de backends y las del backend NixOS, incluyendo dispatch
+desktop/WSL, validaciones destructivas y la frontera root/usuario.
 
 Formatear archivos Nix del repo:
 

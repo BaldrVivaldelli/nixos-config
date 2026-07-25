@@ -1,3 +1,5 @@
+"""Terminal presentation for portable Holodeck commands."""
+
 from __future__ import annotations
 
 import os

@@ -1,12 +1,12 @@
 # Holodeck
 
-Holodeck es la interfaz comun para instalar los hosts declarados por el repo y
-preparar perfiles de desarrollo con Git, GitHub, GitLab, SSH y GPG. Vive en
-`modules/nixos/features/holodeck`.
+Holodeck prepara perfiles de desarrollo con Git, GitHub, GitLab, SSH y GPG. Su
+core es portable y vive en `holodeck/core`; no importa codigo NixOS ni incluye
+`nix`, `sudo`, Disko, `util-linux` o `xdg-open` en su runtime.
 
-El comando esta implementado como un proyecto Python interno en
-`modules/nixos/features/holodeck/app`. Nix solo lo envuelve para inyectar defaults y
-asegurar que existan las herramientas externas.
+La integracion NixOS que instala el comando sigue en
+`modules/nixos/features/holodeck`. Nix solo empaqueta el core, inyecta defaults y
+asegura que existan las herramientas externas.
 
 Cuando esta activa, instala herramientas de desarrollo y publica el comando
 `holodeck`:
@@ -26,13 +26,13 @@ El wrapper del comando incluye `python3` como runtime interno. Para tener
 
 Archivos principales:
 
-- `default.nix`: opciones de la feature y paquetes base.
-- `package.nix`: paquete reutilizable por la feature y por `nix run`.
-- `commands.nix`: wrapper Nix del comando `holodeck`.
-- `app/pyproject.toml`: metadata del proyecto Python interno.
-- `app/holodeck/`: paquete Python con la logica de Holodeck.
-- `app/holodeck/system_install.py`: orquestacion de instalaciones.
-- `app/tests/`: pruebas del parser, dispatch y frontera root/usuario.
+- `holodeck/core/pyproject.toml`: metadata del core portable.
+- `holodeck/core/holodeck/`: identidad, providers y estado de usuario.
+- `holodeck/core/tests/`: pruebas que no requieren NixOS.
+- `modules/nixos/features/holodeck/default.nix`: opciones de la feature NixOS.
+- `modules/nixos/features/holodeck/package.nix`: wrapper Nix del core.
+- `modules/nixos/features/holodeck/commands.nix`: integra el paquete al sistema.
+- `holodeck/backends/nixos/`: backend opcional de instalacion NixOS/Disko.
 
 `commands.nix` exporta estos defaults antes de ejecutar Python:
 
@@ -60,6 +60,8 @@ La flake tambien publica:
 ```bash
 nix run .#holodeck -- --help
 ```
+
+Esto ejecuta solamente el core portable.
 
 ## Opciones
 
@@ -100,8 +102,6 @@ holodeck profile github
 holodeck profile gitlab
 holodeck doctor
 holodeck status
-holodeck system install --host desktop --disk /dev/disk/by-id/ID
-holodeck system install --host wsl
 holodeck purge
 holodeck clean
 holodeck sanitize
@@ -117,27 +117,70 @@ Aliases:
 
 ## Instalacion de sistema
 
-Los wrappers recomendados son:
+La instalacion no forma parte del core. Existe un unico selector:
 
 ```bash
-./install-desktop.sh /dev/disk/by-id/ID_DEL_DISCO
-./install-wsl.sh
+./install.sh
 ```
 
-Ambos delegan en `holodeck system install`. La implementacion compartida:
+NixOS esta implementado como el ejecutable opcional
+`holodeck-system-nixos`:
 
-- valida que el checkout contenga la flake y el host solicitado
+```bash
+./install.sh nixos desktop
+./install.sh nixos wsl
+```
+
+El selector llama la app de la flake:
+
+```bash
+nix run .#holodeck-system-nixos -- install --target desktop
+nix run .#holodeck-system-nixos -- install --target wsl
+```
+
+El backend:
+
+- valida que el checkout contenga la flake y el target solicitado
 - rechaza inputs de instalacion sin seguimiento en Git
 - ejecuta `nix flake check` antes de modificar el sistema
-- para desktop exige UEFI, un disco `/dev/disk/by-id/*` completo, sin montajes
-  activos, y la confirmacion exacta antes de llamar Disko
+- para desktop exige UEFI, detecta discos completos y sin montajes mediante
+  `/dev/disk/by-id`, prefiere los internos y pide elegir si hay varios
+- revalida el disco y exige una confirmacion exacta antes de llamar Disko
 - verifica que Disko haya montado `/mnt` y una ESP `vfat` en `/mnt/boot`
 - para WSL verifica que la sesion sea realmente WSL y prepara `#wsl` con
   `nixos-rebuild boot`
 
-El comando orquesta las herramientas declarativas existentes; el layout sigue
-definido en `modules/hosts/desktop/disko.nix` y la configuracion de cada
-plataforma sigue bajo `modules/hosts`.
+El layout sigue definido en `modules/hosts/desktop/disko.nix` y la
+configuracion de plataforma permanece bajo `modules/hosts`.
+
+`--disk /dev/disk/by-id/ID` queda como override avanzado y no es necesario para
+la instalacion normal.
+
+## Agregar otro sistema
+
+`install.sh` usa el mismo nombre para apps de flake y ejecutables:
+
+```text
+holodeck-system-<backend> install --repo <ruta> [argumentos]
+```
+
+Por ejemplo:
+
+```bash
+./install.sh ubuntu
+```
+
+primero busca `holodeck-system-ubuntu` en `PATH` y, si existe `nix`, intenta la
+app `.#holodeck-system-ubuntu`. Ese backend puede usar apt, cloud-init o
+cualquier mecanismo propio sin agregar dependencias al core de Holodeck.
+
+Todo backend debe:
+
+- aceptar `install --repo <ruta>`
+- manejar sus propios argumentos y selección de targets
+- contener sus dependencias privilegiadas fuera del core
+- no generar credenciales ni identidad del usuario durante la instalacion
+- indicar `holodeck setup` como paso posterior cuando corresponda
 
 La instalacion privilegiada no genera SSH/GPG ni autentica providers. Despues
 del reinicio se ejecuta como usuario normal:

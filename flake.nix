@@ -26,6 +26,7 @@
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
       holodeck = pkgs.callPackage ./modules/nixos/features/holodeck/package.nix { };
+      holodeck-system-nixos = pkgs.callPackage ./holodeck/backends/nixos/package.nix { };
       formatter = pkgs.writeShellApplication {
         name = "nixfmt-tree";
         runtimeInputs = [
@@ -53,10 +54,16 @@
       formatter.${system} = formatter;
 
       packages.${system}.holodeck = holodeck;
+      packages.${system}.holodeck-system-nixos = holodeck-system-nixos;
 
       apps.${system}.holodeck = {
         type = "app";
         program = "${holodeck}/bin/holodeck";
+      };
+
+      apps.${system}.holodeck-system-nixos = {
+        type = "app";
+        program = "${holodeck-system-nixos}/bin/holodeck-system-nixos";
       };
 
       apps.${system}.disko = {
@@ -67,10 +74,32 @@
       checks.${system}.holodeck-tests = pkgs.runCommand "holodeck-tests" {
         nativeBuildInputs = [ pkgs.python3 ];
       } ''
-        cd ${./modules/nixos/features/holodeck/app}
+        cd ${./holodeck/core}
         export PYTHONDONTWRITEBYTECODE=1
         export PYTHONPATH=.
         python3 -m unittest discover -s tests -v
+        touch "$out"
+      '';
+
+      checks.${system}.holodeck-system-nixos-tests =
+        pkgs.runCommand "holodeck-system-nixos-tests"
+          {
+            nativeBuildInputs = [ pkgs.python3 ];
+          }
+          ''
+            cd ${./holodeck/backends/nixos}
+            export PYTHONDONTWRITEBYTECODE=1
+            export PYTHONPATH=${./holodeck/core}:.
+            python3 -m unittest discover -s tests -v
+            touch "$out"
+          '';
+
+      checks.${system}.install-selector-tests = pkgs.runCommand "install-selector-tests" {
+        nativeBuildInputs = [ pkgs.python3 ];
+      } ''
+        cd ${./.}
+        export PYTHONDONTWRITEBYTECODE=1
+        python3 -m unittest discover -s holodeck/tests -v
         touch "$out"
       '';
 

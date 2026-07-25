@@ -8,8 +8,15 @@ y separa la configuracion en modulos reutilizables bajo `modules/`.
 
 ```text
 flake.nix
-install-desktop.sh
-install-wsl.sh
+install.sh
+holodeck/
+  core/
+    holodeck/
+    tests/
+  backends/
+    nixos/
+      holodeck_system_nixos/
+      tests/
 home/
   avivaldelli/
     default.nix
@@ -64,13 +71,12 @@ Aplicar actualizaciones normales dentro de NixOS-WSL:
 sudo nixos-rebuild switch --flake .#wsl
 ```
 
-La primera instalacion de WSL cambia el usuario predeterminado y usa el wrapper:
+La primera instalacion de WSL cambia el usuario predeterminado y usa el
+selector unificado:
 
 ```bash
-./install-wsl.sh
+./install.sh nixos wsl
 ```
-
-`bootstrap-wsl.sh` sigue disponible como alias compatible.
 
 Construir sin activar, eligiendo el host:
 
@@ -105,59 +111,66 @@ El layout del disco fisico se declara con Disko en
 - raiz ext4 en `/dev/mapper/cryptroot`
 - sin UUID de una instalacion anterior
 
-Desde un instalador NixOS iniciado en modo UEFI, clona el repo y localiza el
-disco por su identificador estable:
+Desde un instalador NixOS iniciado en modo UEFI, clona el repo y ejecuta:
 
 ```bash
-lsblk
-ls -l /dev/disk/by-id/
-```
-
-Despues ejecuta:
-
-```bash
-./install-desktop.sh /dev/disk/by-id/ID_DEL_DISCO
+./install.sh nixos desktop
 ```
 
 > [!CAUTION]
-> El script borra por completo el disco indicado. Exige una ruta
-> `/dev/disk/by-id/*`, muestra el modelo y numero de serie, y pide escribir una
-> confirmacion exacta antes de ejecutar Disko.
+> El backend detecta discos completos, sin montajes y con identidad estable en
+> `/dev/disk/by-id`. Prefiere discos internos; si hay mas de uno pide elegir.
+> Siempre muestra modelo y numero de serie y exige una confirmacion exacta
+> antes de ejecutar Disko.
 
 El script crea y monta el layout, instala `#desktop` con `nixos-install` y pide
 las contrasenas LUKS, root y `avivaldelli`. No se debe ejecutar
 `nixos-rebuild` ni `switch-to-configuration` desde el sistema live.
 
-## Instalacion unificada con Holodeck
+## Instalacion unificada
 
-Los dos entrypoints de instalacion son wrappers pequenos:
+Existe un unico entrypoint. Sin argumentos abre un selector:
 
 ```bash
-./install-desktop.sh /dev/disk/by-id/ID_DEL_DISCO
-./install-wsl.sh
+./install.sh
 ```
 
-Ambos ejecutan la misma aplicacion de la flake y solamente fijan el host:
+Tambien admite uso directo:
+
+```bash
+./install.sh nixos desktop
+./install.sh nixos wsl
+```
+
+El selector delega en un backend opcional:
 
 ```text
-install-desktop.sh -> holodeck system install --host desktop
-install-wsl.sh     -> holodeck system install --host wsl
+install.sh
+  -> holodeck-system-nixos
+       -> desktop
+       -> wsl
+  -> holodeck-system-<otro-backend>
 ```
 
-Tambien se puede invocar el orquestador directamente:
+El backend NixOS tambien puede ejecutarse directamente:
 
 ```bash
-nix run .#holodeck -- system install \
-  --host desktop \
-  --disk /dev/disk/by-id/ID_DEL_DISCO
+nix run .#holodeck-system-nixos -- install --target desktop
 
-nix run .#holodeck -- system install --host wsl
+nix run .#holodeck-system-nixos -- install --target wsl
 ```
 
-Holodeck valida el repo y la flake antes de delegar en Disko,
-`nixos-install` o `nixos-rebuild`. Nunca ejecuta el onboarding personal durante
-la instalacion privilegiada. Despues de reiniciar e iniciar sesion como
-`avivaldelli`, se completa sin `sudo`:
+Para recuperacion o hardware ambiguo se puede indicar un disco manualmente con
+`--disk /dev/disk/by-id/ID`, pero no es parte del flujo normal.
+
+Para agregar otro sistema se publica una app de flake o un ejecutable con el
+contrato `holodeck-system-<backend>`. Por ejemplo, `./install.sh ubuntu` busca
+`holodeck-system-ubuntu` en `PATH` y luego `.#holodeck-system-ubuntu`.
+
+El backend NixOS valida el repo y la flake antes de delegar en Disko,
+`nixos-install` o `nixos-rebuild`. El core portable de Holodeck no importa ese
+backend ni depende de Nix. Despues de reiniciar e iniciar sesion como
+`avivaldelli`, el onboarding se completa sin `sudo`:
 
 ```bash
 holodeck setup
@@ -197,8 +210,8 @@ git config core.hooksPath .githooks
 - Feature `graphics`: habilita aceleracion grafica e instala `gpu-doctor` para
   recomendar drivers segun la GPU local.
 - Feature `vscodium`: instala VSCodium y extensiones pinneadas.
-- Feature `holodeck`: instala herramientas de desarrollo y un comando Python
-  con colores para configurar perfiles Git, SSH, GPG, GitHub y GitLab.
+- Feature `holodeck`: instala el core portable para configurar perfiles Git,
+  SSH, GPG, GitHub y GitLab. La instalacion NixOS vive en un backend separado.
 - Feature `containers`: habilita Docker o Podman. En el host actual usa Docker.
 - Feature `windowsVm`: agrega el comando `windowsvm` para correr una VM Windows
   via `dockurr/windows` dentro de Docker.

@@ -45,7 +45,6 @@ let
     "sanitize"
     "setup"
     "status"
-    "system"
   ];
 
   providers = [
@@ -69,13 +68,6 @@ in
         case "$words[2]" in
           auth|login|profile)
             _values "provider" ${zshWords providers}
-            ;;
-          system)
-            _arguments \
-              "2:system command:(install)" \
-              "--host[host to install]:host:(desktop wsl)" \
-              "--disk[stable desktop disk ID]:disk:_files" \
-              "--repo[repository root]:directory:_directories"
             ;;
         esac
       '';

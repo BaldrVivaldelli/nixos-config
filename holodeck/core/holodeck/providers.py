@@ -1,3 +1,5 @@
+"""GitHub and GitLab provider integration."""
+
 from __future__ import annotations
 
 import subprocess
@@ -5,7 +7,8 @@ import sys
 from pathlib import Path
 
 from .errors import HolodeckError
-from .process import command_ok, command_output, run, run_quiet
+from .platform import open_url
+from .process import command_ok, command_output, run
 from .ui import ui
 
 
@@ -89,8 +92,10 @@ def upload_keys(
             if command_ok(["glab", "gpg-key", "add", "--help"]):
                 run(["glab", "gpg-key", "add", str(gpg_pub)], check=False)
             else:
+                settings_url = f"https://{host}/-/user_settings/gpg_keys"
                 ui.warn("glab does not expose gpg-key add here. Opening GitLab GPG settings.")
-                run_quiet(["xdg-open", f"https://{host}/-/user_settings/gpg_keys"])
+                if not open_url(settings_url):
+                    print(f"GitLab GPG settings: {settings_url}")
                 print(f"Public GPG key: {gpg_pub}")
 
 

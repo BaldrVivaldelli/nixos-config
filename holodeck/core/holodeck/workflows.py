@@ -1,3 +1,5 @@
+"""Portable identity and provider workflows."""
+
 from __future__ import annotations
 
 import glob
@@ -57,7 +59,8 @@ from .ui import ui
 
 
 def require_user_context() -> None:
-    if os.geteuid() == 0:
+    get_effective_user_id = getattr(os, "geteuid", None)
+    if get_effective_user_id is not None and get_effective_user_id() == 0:
         raise HolodeckError(
             "Este comando maneja identidad y credenciales personales. "
             "Ejecutalo como tu usuario normal, sin sudo."

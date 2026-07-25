@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-07-25 - Portable Holodeck system backends
+
+### Added
+
+- Added a single interactive and scriptable `install.sh` entrypoint.
+- Added the optional `holodeck-system-nixos` backend with `desktop` and `wsl`
+  targets.
+- Added the `holodeck-system-<backend>` flake-app/executable contract for
+  future operating-system integrations.
+- Split core and backend tests into independent flake checks.
+
+### Changed
+
+- Moved the portable Python core to `holodeck/core`.
+- Moved NixOS/Disko orchestration to `holodeck/backends/nixos`.
+- Made `./install.sh nixos desktop` detect safe stable disk candidates,
+  preferring internal disks and prompting only when multiple candidates remain.
+- Removed Nix, sudo and util-linux from the portable Holodeck runtime.
+- Replaced `install-desktop.sh`, `install-wsl.sh` and `bootstrap-wsl.sh` with
+  the unified selector.
+
 ## 2026-07-25 - Unified Holodeck installation
 
 ### Added

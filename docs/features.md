@@ -16,7 +16,7 @@ Todas se importan automaticamente, pero solo aplican cambios cuando su opcion
 | Lean | `features.lean` | Instala elan para proyectos Lean y Lake. |
 | Graphics | `features.graphics` | Habilita aceleracion grafica y agrega `gpu-doctor`. |
 | VSCodium | `features.vscodium` | Instala VSCodium y extensiones pinneadas. |
-| Holodeck | `features.holodeck` | Publica el orquestador de instalacion y configura Git/GitHub/GitLab/GPG/SSH. |
+| Holodeck | `features.holodeck` | Instala el core portable para Git/GitHub/GitLab/GPG/SSH. |
 | Containers | `features.containers` | Habilita Docker o Podman y opcionalmente carga imagenes declarativas. |
 | Windows VM | `features.containers.windowsVm` | Agrega `windowsvm` para correr Dockurr Windows en Docker. |
 
