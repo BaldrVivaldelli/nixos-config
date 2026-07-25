@@ -50,17 +50,30 @@ Lo que se omite es `systemd-boot`, que es el bootloader de la maquina fisica.
 Usa el script de la raiz:
 
 ```bash
-./bootstrap-wsl.sh
+./install-wsl.sh
 ```
 
-El script usa el NixOS-WSL ya fijado en `flake.lock`, valida la flake y ejecuta:
+Es un wrapper de:
+
+```bash
+nix run .#holodeck -- system install --host wsl
+```
+
+`bootstrap-wsl.sh` se conserva como alias compatible. Holodeck usa el NixOS-WSL
+fijado en `flake.lock`, valida la flake y ejecuta:
 
 ```bash
 sudo nixos-rebuild boot --flake .#wsl
 ```
 
-Despues hay que completar el ciclo de reinicio desde PowerShell indicado en
-[`FIRST_RUN_WSL.md`](../FIRST_RUN_WSL.md).
+Despues hay que salir de WSL y completar el ciclo de reinicio desde PowerShell
+que muestra el propio comando. La nueva sesion debe abrir como
+`avivaldelli@nixos-wsl`; entonces se configura la identidad personal sin
+`sudo`:
+
+```bash
+holodeck setup
+```
 
 ## Actualizaciones posteriores
 

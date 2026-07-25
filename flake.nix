@@ -9,6 +9,11 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    disko = {
+      url = "github:nix-community/disko/latest";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     nixos-wsl = {
       url = "github:nix-community/NixOS-WSL/release-26.05";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -20,6 +25,7 @@
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
+      holodeck = pkgs.callPackage ./modules/nixos/features/holodeck/package.nix { };
       formatter = pkgs.writeShellApplication {
         name = "nixfmt-tree";
         runtimeInputs = [
@@ -46,6 +52,28 @@
     {
       formatter.${system} = formatter;
 
+      packages.${system}.holodeck = holodeck;
+
+      apps.${system}.holodeck = {
+        type = "app";
+        program = "${holodeck}/bin/holodeck";
+      };
+
+      apps.${system}.disko = {
+        type = "app";
+        program = "${inputs.disko.packages.${system}.default}/bin/disko";
+      };
+
+      checks.${system}.holodeck-tests = pkgs.runCommand "holodeck-tests" {
+        nativeBuildInputs = [ pkgs.python3 ];
+      } ''
+        cd ${./modules/nixos/features/holodeck/app}
+        export PYTHONDONTWRITEBYTECODE=1
+        export PYTHONPATH=.
+        python3 -m unittest discover -s tests -v
+        touch "$out"
+      '';
+
       devShells.${system}.default = pkgs.mkShell {
         packages = [
           pkgs.findutils
@@ -60,6 +88,7 @@
         };
 
         modules = [
+          inputs.disko.nixosModules.disko
           ./modules/parts.nix
           ./modules/hosts/desktop
         ];

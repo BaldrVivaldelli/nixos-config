@@ -5,6 +5,7 @@ import sys
 
 from .errors import HolodeckError
 from .process import format_cmd
+from .system_install import install_system
 from .ui import ui
 from .workflows import (
     auth_command,
@@ -21,6 +22,11 @@ def usage() -> None:
 
 Recommended first run:
   holodeck setup        Full wizard: auth + SSH/GPG + Git profiles
+
+System installation (run from the repository):
+  holodeck system install --host desktop --disk /dev/disk/by-id/ID
+  holodeck system install --host wsl
+
 Commands:
   setup                 Full wizard for GitHub personal and/or GitLab work
   github                Configure GitHub from your authenticated account
@@ -32,6 +38,7 @@ Commands:
   profile github        Alias for github
   profile gitlab        Alias for gitlab
   doctor                Show profiles, auth state, and key files
+  system install        Install desktop or WSL through the repository flake
   purge                 Remove Holodeck-managed local profiles, keys, and auth
   clean                 Alias for purge
   sanitize              Alias for purge
@@ -55,6 +62,8 @@ def dispatch(args: list[str]) -> int:
         profile_command(rest[0] if rest else "")
     elif command in {"doctor", "status"}:
         doctor()
+    elif command == "system" and rest[:1] == ["install"]:
+        install_system(rest[1:])
     elif command in {"purge", "clean", "sanitize"}:
         purge()
     elif command in {"help", "-h", "--help"}:

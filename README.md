@@ -8,6 +8,8 @@ y separa la configuracion en modulos reutilizables bajo `modules/`.
 
 ```text
 flake.nix
+install-desktop.sh
+install-wsl.sh
 home/
   avivaldelli/
     default.nix
@@ -27,6 +29,7 @@ modules/
   hosts/
     desktop/
       default.nix
+      disko.nix
       hardware-configuration.nix
     wsl/
       default.nix
@@ -61,12 +64,13 @@ Aplicar actualizaciones normales dentro de NixOS-WSL:
 sudo nixos-rebuild switch --flake .#wsl
 ```
 
-La primera instalacion de WSL cambia el usuario predeterminado y debe hacerse
-con el procedimiento de [`FIRST_RUN_WSL.md`](FIRST_RUN_WSL.md), usando:
+La primera instalacion de WSL cambia el usuario predeterminado y usa el wrapper:
 
 ```bash
-./bootstrap-wsl.sh
+./install-wsl.sh
 ```
+
+`bootstrap-wsl.sh` sigue disponible como alias compatible.
 
 Construir sin activar, eligiendo el host:
 
@@ -90,6 +94,75 @@ nix flake check
 La misma validacion corre en GitHub Actions para pushes a `main` y pull
 requests.
 
+## Instalacion reproducible del desktop
+
+El layout del disco fisico se declara con Disko en
+`modules/hosts/desktop/disko.nix`:
+
+- tabla GPT
+- particion EFI de 1 GiB montada en `/boot`
+- resto del disco cifrado con LUKS
+- raiz ext4 en `/dev/mapper/cryptroot`
+- sin UUID de una instalacion anterior
+
+Desde un instalador NixOS iniciado en modo UEFI, clona el repo y localiza el
+disco por su identificador estable:
+
+```bash
+lsblk
+ls -l /dev/disk/by-id/
+```
+
+Despues ejecuta:
+
+```bash
+./install-desktop.sh /dev/disk/by-id/ID_DEL_DISCO
+```
+
+> [!CAUTION]
+> El script borra por completo el disco indicado. Exige una ruta
+> `/dev/disk/by-id/*`, muestra el modelo y numero de serie, y pide escribir una
+> confirmacion exacta antes de ejecutar Disko.
+
+El script crea y monta el layout, instala `#desktop` con `nixos-install` y pide
+las contrasenas LUKS, root y `avivaldelli`. No se debe ejecutar
+`nixos-rebuild` ni `switch-to-configuration` desde el sistema live.
+
+## Instalacion unificada con Holodeck
+
+Los dos entrypoints de instalacion son wrappers pequenos:
+
+```bash
+./install-desktop.sh /dev/disk/by-id/ID_DEL_DISCO
+./install-wsl.sh
+```
+
+Ambos ejecutan la misma aplicacion de la flake y solamente fijan el host:
+
+```text
+install-desktop.sh -> holodeck system install --host desktop
+install-wsl.sh     -> holodeck system install --host wsl
+```
+
+Tambien se puede invocar el orquestador directamente:
+
+```bash
+nix run .#holodeck -- system install \
+  --host desktop \
+  --disk /dev/disk/by-id/ID_DEL_DISCO
+
+nix run .#holodeck -- system install --host wsl
+```
+
+Holodeck valida el repo y la flake antes de delegar en Disko,
+`nixos-install` o `nixos-rebuild`. Nunca ejecuta el onboarding personal durante
+la instalacion privilegiada. Despues de reiniciar e iniciar sesion como
+`avivaldelli`, se completa sin `sudo`:
+
+```bash
+holodeck setup
+```
+
 Formatear archivos Nix:
 
 ```bash
@@ -105,7 +178,8 @@ git config core.hooksPath .githooks
 ## Que configura hoy
 
 - NixOS `desktop` con systemd-boot, GDM, GNOME, NetworkManager, PipeWire,
-  Chromium, `wget`, `curl` y usuario `avivaldelli`.
+  Chromium, `wget`, `curl`, usuario `avivaldelli` y layout de disco declarativo
+  mediante Disko.
 - NixOS `wsl` con el mismo entorno terminal/developer y Home Manager, sin
   hardware configuration, bootloader fisico, desktop Linux, audio, impresion,
   drivers ni la VM Windows anidada; incluye Docker Desktop y `nix-ld` para
@@ -137,7 +211,6 @@ git config core.hooksPath .githooks
 - [Arquitectura del repo](docs/architecture.md)
 - [Host desktop](docs/desktop.md)
 - [Host WSL](docs/wsl.md)
-- [Primera instalacion WSL](FIRST_RUN_WSL.md)
 - [Home Manager](docs/home-manager.md)
 - [Features](docs/features.md)
 - [Browser](docs/browser.md)

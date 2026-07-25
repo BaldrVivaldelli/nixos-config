@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import glob
+import os
 import shutil
 import socket
 import subprocess
@@ -53,6 +54,14 @@ from .state import (
     ssh_key_file_for,
 )
 from .ui import ui
+
+
+def require_user_context() -> None:
+    if os.geteuid() == 0:
+        raise HolodeckError(
+            "Este comando maneja identidad y credenciales personales. "
+            "Ejecutalo como tu usuario normal, sin sudo."
+        )
 
 
 def write_profile_env(
@@ -185,6 +194,7 @@ def configure_github_profile() -> None:
 
 
 def setup() -> None:
+    require_user_context()
     ui.heading("Holodeck setup")
     print()
     if confirm("Configure GitHub personal profile?"):
@@ -196,6 +206,7 @@ def setup() -> None:
 
 
 def auth_command(provider: str) -> None:
+    require_user_context()
     if provider == "github":
         host = prompt("GitHub host", DEFAULT_GITHUB_HOST)
     elif provider == "gitlab":
@@ -206,6 +217,7 @@ def auth_command(provider: str) -> None:
 
 
 def profile_command(provider: str) -> None:
+    require_user_context()
     if provider == "github":
         configure_github_profile()
     elif provider == "gitlab":
@@ -258,6 +270,7 @@ def delete_tracked_gpg_keys() -> None:
 
 
 def purge() -> None:
+    require_user_context()
     print("This removes local state managed by Holodeck:")
     print("  - managed blocks in ~/.gitconfig and ~/.ssh/config")
     print("  - ~/.config/holodeck")

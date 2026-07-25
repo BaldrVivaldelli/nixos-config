@@ -1,7 +1,8 @@
 # Holodeck
 
-Holodeck es una feature para preparar perfiles de desarrollo con Git, GitHub,
-GitLab, SSH y GPG. Vive en `modules/nixos/features/holodeck`.
+Holodeck es la interfaz comun para instalar los hosts declarados por el repo y
+preparar perfiles de desarrollo con Git, GitHub, GitLab, SSH y GPG. Vive en
+`modules/nixos/features/holodeck`.
 
 El comando esta implementado como un proyecto Python interno en
 `modules/nixos/features/holodeck/app`. Nix solo lo envuelve para inyectar defaults y
@@ -26,9 +27,12 @@ El wrapper del comando incluye `python3` como runtime interno. Para tener
 Archivos principales:
 
 - `default.nix`: opciones de la feature y paquetes base.
+- `package.nix`: paquete reutilizable por la feature y por `nix run`.
 - `commands.nix`: wrapper Nix del comando `holodeck`.
 - `app/pyproject.toml`: metadata del proyecto Python interno.
 - `app/holodeck/`: paquete Python con la logica de Holodeck.
+- `app/holodeck/system_install.py`: orquestacion de instalaciones.
+- `app/tests/`: pruebas del parser, dispatch y frontera root/usuario.
 
 `commands.nix` exporta estos defaults antes de ejecutar Python:
 
@@ -49,6 +53,12 @@ El wrapper ejecuta el paquete con:
 
 ```bash
 python3 -m holodeck
+```
+
+La flake tambien publica:
+
+```bash
+nix run .#holodeck -- --help
 ```
 
 ## Opciones
@@ -90,6 +100,8 @@ holodeck profile github
 holodeck profile gitlab
 holodeck doctor
 holodeck status
+holodeck system install --host desktop --disk /dev/disk/by-id/ID
+holodeck system install --host wsl
 holodeck purge
 holodeck clean
 holodeck sanitize
@@ -102,6 +114,40 @@ Aliases:
 - `profile gitlab` equivale a `gitlab`.
 - `status` equivale a `doctor`.
 - `clean` y `sanitize` equivalen a `purge`.
+
+## Instalacion de sistema
+
+Los wrappers recomendados son:
+
+```bash
+./install-desktop.sh /dev/disk/by-id/ID_DEL_DISCO
+./install-wsl.sh
+```
+
+Ambos delegan en `holodeck system install`. La implementacion compartida:
+
+- valida que el checkout contenga la flake y el host solicitado
+- rechaza inputs de instalacion sin seguimiento en Git
+- ejecuta `nix flake check` antes de modificar el sistema
+- para desktop exige UEFI, un disco `/dev/disk/by-id/*` completo, sin montajes
+  activos, y la confirmacion exacta antes de llamar Disko
+- verifica que Disko haya montado `/mnt` y una ESP `vfat` en `/mnt/boot`
+- para WSL verifica que la sesion sea realmente WSL y prepara `#wsl` con
+  `nixos-rebuild boot`
+
+El comando orquesta las herramientas declarativas existentes; el layout sigue
+definido en `modules/hosts/desktop/disko.nix` y la configuracion de cada
+plataforma sigue bajo `modules/hosts`.
+
+La instalacion privilegiada no genera SSH/GPG ni autentica providers. Despues
+del reinicio se ejecuta como usuario normal:
+
+```bash
+holodeck setup
+```
+
+Los comandos que escriben identidad o credenciales rechazan su ejecucion como
+`root`, para no crear estado accidental en `/root`.
 
 ## Estado que maneja
 

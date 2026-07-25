@@ -25,23 +25,79 @@
 
 ## Boot y hardware
 
-El host usa systemd-boot:
+El host usa systemd-boot y fija explicitamente la ESP en `/boot`:
 
 ```nix
 boot.loader.systemd-boot.enable = true;
 boot.loader.efi.canTouchEfiVariables = true;
+boot.loader.efi.efiSysMountPoint = "/boot";
 ```
 
-`hardware-configuration.nix` fue generado por `nixos-generate-config` y describe:
+Disko declara el layout en `modules/hosts/desktop/disko.nix`:
 
-- root en `ext4` sobre LUKS
-- `/boot` en `vfat`
-- CPU AMD con microcode redistribuible cuando corresponde
-- modulo `kvm-amd`
-- sin swap configurada
+- una tabla GPT sobre un unico disco
+- una ESP de 1 GiB, `vfat`, montada en `/boot`
+- el resto del disco como LUKS interactivo llamado `cryptroot`
+- root `ext4` sobre `/dev/mapper/cryptroot`
 
-Ese archivo es especifico de la maquina. Al migrar a otra computadora, generar
-uno nuevo y revisarlo antes de hacer switch.
+Disko genera `fileSystems` y `boot.initrd.luks.devices` a partir de nombres de
+particion estables. Por eso `hardware-configuration.nix` ya no contiene UUID de
+root ni de EFI; conserva solamente los modulos de kernel y datos de CPU
+detectados para esta maquina.
+
+## Instalacion desde cero
+
+> [!CAUTION]
+> Este procedimiento destruye todas las particiones y datos del disco elegido.
+> No soporta dual boot.
+
+Arranca el instalador NixOS en modo UEFI, clona el repositorio y busca la ruta
+estable del disco fisico:
+
+```bash
+lsblk
+ls -l /dev/disk/by-id/
+```
+
+Ejecuta el bootstrap pasando el ID completo:
+
+```bash
+./install-desktop.sh /dev/disk/by-id/ID_DEL_DISCO
+```
+
+El script es un wrapper de:
+
+```bash
+nix run .#holodeck -- system install \
+  --host desktop \
+  --disk /dev/disk/by-id/ID_DEL_DISCO
+```
+
+Antes de borrar nada, Holodeck:
+
+1. exige que el live ISO este iniciado en UEFI
+2. acepta solamente una ruta `/dev/disk/by-id/*` que apunte a un disco completo
+3. rechaza el disco si el o alguna de sus particiones tiene montajes activos
+4. muestra nombre, capacidad, modelo y numero de serie
+5. exige escribir `BORRAR` seguido por el mismo ID
+
+Despues Disko crea, formatea y monta todo en `/mnt`. La instalacion se completa
+con `nixos-install --flake .#desktop`, no con `nixos-rebuild`. Durante el flujo
+se solicitan la frase LUKS y las contrasenas de root y `avivaldelli`.
+
+La ruta de dispositivo por defecto que aparece en `disko.nix` es un marcador
+invalido a proposito. El script pasa el disco real con `--argstr device`, por lo
+que no queda ningun UUID ni nombre `/dev/nvme*` ligado a una instalacion
+anterior.
+
+Despues del reinicio, el onboarding de identidad y credenciales se ejecuta como
+usuario normal:
+
+```bash
+holodeck setup
+```
+
+El instalador no llama ese comando como `root`.
 
 ## Features activadas
 

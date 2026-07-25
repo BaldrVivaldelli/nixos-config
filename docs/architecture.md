@@ -7,7 +7,12 @@ El repo usa flakes y modulos NixOS. La flake expone dos configuraciones:
 
 ```text
 flake.nix
+  apps.holodeck
+    ./modules/nixos/features/holodeck/package.nix
+    ./modules/nixos/features/holodeck/app
+  apps.disko
   nixosConfigurations.desktop
+    inputs.disko.nixosModules.disko
     ./modules/parts.nix
       inputs.home-manager.nixosModules.home-manager
       ./modules/home/default.nix
@@ -29,6 +34,7 @@ flake.nix
         ./modules/nixos/features/holodeck
         ./modules/nixos/features/containers
     ./modules/hosts/desktop
+      ./modules/hosts/desktop/disko.nix
       ./modules/hosts/desktop/hardware-configuration.nix
 
   nixosConfigurations.wsl
@@ -49,14 +55,17 @@ se integra como modulo NixOS y declara la configuracion del usuario
 - `description = "Mi configuracion NixOS"`
 - input `nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05"`
 - input `home-manager.url = "github:nix-community/home-manager/release-26.05"`
+- input `disko.url = "github:nix-community/disko/latest"`
 - input `nixos-wsl.url = "github:nix-community/NixOS-WSL/release-26.05"`
 - outputs `nixosConfigurations.desktop` y `nixosConfigurations.wsl`
+- apps `holodeck` y `disko` para instalaciones
+- package `holodeck`, reutilizado por la flake y la feature NixOS
 - sistema `x86_64-linux`
 - `specialArgs.inputs`, para que `modules/parts.nix` pueda importar modulos
   desde inputs de la flake.
 
-El lockfile fija las revisiones exactas de `nixpkgs`, `home-manager` y
-`nixos-wsl` despues de ejecutar el bootstrap o `nix flake update`.
+El lockfile fija las revisiones exactas de `nixpkgs`, `home-manager`, `disko` y
+`nixos-wsl`.
 
 ## Modulos base
 
@@ -82,6 +91,7 @@ Los hosts viven en `modules/hosts/<nombre>`.
 El host `desktop` define:
 
 - bootloader
+- layout GPT/EFI/LUKS/ext4 mediante Disko
 - red
 - locale y timezone
 - escritorio
@@ -90,12 +100,31 @@ El host `desktop` define:
 - features activadas
 - `system.stateVersion`
 
-`hardware-configuration.nix` queda separado porque es especifico de la maquina.
+`disko.nix` define los filesystems sin UUID efimeros.
+`hardware-configuration.nix` queda separado porque contiene modulos de kernel y
+datos de CPU especificos de la maquina.
 
 El host `wsl` reutiliza los modulos comunes y Home Manager, pero importa el
 modulo oficial de NixOS-WSL y omite hardware configuration, bootloader fisico,
 NetworkManager, audio, impresion, GNOME, navegador, drivers, VSCodium Linux y
 la VM Windows anidada.
+
+## Frontera de instalacion y estado personal
+
+Los entrypoints `install-desktop.sh` e `install-wsl.sh` son wrappers de
+`nix run .#holodeck -- system install`. Holodeck selecciona y valida el flujo,
+pero delega los cambios reales:
+
+```text
+desktop -> Disko -> nixos-install .#desktop
+wsl     -> nixos-rebuild boot .#wsl
+```
+
+El layout de disco, bootloader y diferencias de plataforma permanecen en los
+hosts NixOS. La autenticacion, llaves y perfiles permanecen en
+`holodeck setup` y se ejecutan despues de iniciar sesion como usuario normal.
+De este modo un rebuild no regenera credenciales y un onboarding nunca modifica
+`/boot`.
 
 ## Home Manager
 

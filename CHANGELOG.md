@@ -1,5 +1,38 @@
 # Changelog
 
+## 2026-07-25 - Unified Holodeck installation
+
+### Added
+
+- Added the flake app/package `holodeck` so it can run before the target system
+  is installed.
+- Added `holodeck system install` with `desktop` and `wsl` dispatch, shared
+  preflight checks and unit tests.
+- Added `install-wsl.sh` as the WSL counterpart to `install-desktop.sh`.
+
+### Changed
+
+- Reduced both installation scripts to thin wrappers around Holodeck.
+- Kept `bootstrap-wsl.sh` as a compatibility alias for `install-wsl.sh`.
+- Separated privileged system installation from `holodeck setup`; personal
+  identity commands now reject execution as `root`.
+
+## 2026-07-25 - Reproducible desktop installation
+
+### Added
+
+- Added Disko as a pinned flake input and NixOS module for `#desktop`.
+- Added a declarative GPT, EFI, LUKS and ext4 layout.
+- Added `install-desktop.sh` with UEFI, stable disk ID and destructive-action
+  confirmation checks.
+
+### Changed
+
+- Removed installation-specific root, LUKS and EFI UUIDs from
+  `hardware-configuration.nix`.
+- Made `/boot` the explicit systemd-boot EFI mountpoint.
+- Documented the destructive but reproducible fresh-install workflow.
+
 ## 2026-07-25 - NixOS-WSL host
 
 ### Added
