@@ -34,6 +34,23 @@ WSL_INSTALL_INPUTS = (
     "modules/hosts/wsl",
     "modules/home/features/shell/default.nix",
 )
+PROTECTED_MOUNTPOINTS = frozenset(
+    {
+        "/",
+        "/boot",
+        "/boot/efi",
+        "/cdrom",
+        "/iso",
+        "/nix/.ro-store",
+        "/nix/store",
+    }
+)
+PROTECTED_MOUNT_PREFIXES = (
+    "/run/archiso/",
+    "/run/initramfs/",
+    "/run/live/",
+    "/run/miso/",
+)
 
 
 class _ArgumentParser(argparse.ArgumentParser):
@@ -56,6 +73,13 @@ class DiskCandidate:
     model: str
     serial: str
     removable: bool
+    active_uses: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class DiskUse:
+    device_path: Path
+    mountpoint: str
 
 
 def parse_install_args(args: list[str]) -> InstallRequest:
@@ -182,24 +206,56 @@ def require_unmounted_disk(resolved_disk: Path, disk_label: str) -> None:
         )
     if mounted.stdout.strip():
         raise HolodeckError(
-            f"{disk_label} o alguna de sus particiones esta montada:\n"
+            f"No se pudo liberar por completo {disk_label}:\n"
             f"{mounted.stdout.strip()}\n"
-            "Desmontala explicitamente antes de continuar."
+            "Se cancela antes de modificar el disco."
         )
 
 
-def _device_tree_has_mounts(device: dict[str, object]) -> bool:
+def _device_tree_uses(device: dict[str, object]) -> tuple[DiskUse, ...]:
+    uses: list[DiskUse] = []
+    path_value = device.get("path")
     mountpoints = device.get("mountpoints")
-    if isinstance(mountpoints, list) and any(mountpoints):
-        return True
+    if isinstance(path_value, str) and isinstance(mountpoints, list):
+        uses.extend(
+            DiskUse(Path(path_value), mountpoint)
+            for mountpoint in mountpoints
+            if isinstance(mountpoint, str) and mountpoint
+        )
 
     children = device.get("children")
-    if not isinstance(children, list):
+    if isinstance(children, list):
+        for child in children:
+            if isinstance(child, dict):
+                uses.extend(_device_tree_uses(child))
+    return tuple(uses)
+
+
+def _is_protected_disk_use(disk_use: DiskUse) -> bool:
+    mountpoint = disk_use.mountpoint
+    if mountpoint == "[SWAP]":
         return False
-    return any(
-        _device_tree_has_mounts(child)
-        for child in children
-        if isinstance(child, dict)
+    return mountpoint in PROTECTED_MOUNTPOINTS or any(
+        mountpoint.startswith(prefix)
+        for prefix in PROTECTED_MOUNT_PREFIXES
+    )
+
+
+def _require_releasable_uses(
+    disk_uses: tuple[DiskUse, ...],
+    disk_label: str,
+) -> None:
+    protected = [use for use in disk_uses if _is_protected_disk_use(use)]
+    if not protected:
+        return
+
+    details = "\n".join(
+        f"  {use.device_path}: {use.mountpoint}" for use in protected
+    )
+    raise HolodeckError(
+        f"{disk_label} sostiene el sistema live o un montaje protegido:\n"
+        f"{details}\n"
+        "Ese disco se excluye para no interrumpir el instalador."
     )
 
 
@@ -253,15 +309,20 @@ def _as_size_bytes(value: object) -> int:
         return 0
 
 
-def discover_desktop_disks() -> list[DiskCandidate]:
+def _read_lsblk_tree(resolved_disk: Path | None = None) -> list[dict[str, object]]:
+    command = [
+        "lsblk",
+        "--json",
+        "--tree",
+        "--bytes",
+        "--output",
+        "NAME,PATH,TYPE,RM,SIZE,MODEL,SERIAL,MOUNTPOINTS",
+    ]
+    if resolved_disk is not None:
+        command.extend(["--", str(resolved_disk)])
+
     result = subprocess.run(
-        [
-            "lsblk",
-            "--json",
-            "--bytes",
-            "--output",
-            "PATH,TYPE,RM,SIZE,MODEL,SERIAL,MOUNTPOINTS",
-        ],
+        command,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
@@ -269,19 +330,36 @@ def discover_desktop_disks() -> list[DiskCandidate]:
     )
     if result.returncode != 0:
         raise HolodeckError(
-            result.stderr.strip() or "No se pudieron detectar los discos."
+            result.stderr.strip() or "No se pudo inspeccionar el arbol de discos."
         )
 
     try:
         devices = json.loads(result.stdout).get("blockdevices", [])
     except (AttributeError, json.JSONDecodeError) as exc:
         raise HolodeckError("lsblk devolvio una lista de discos invalida.") from exc
+    if not isinstance(devices, list):
+        raise HolodeckError("lsblk devolvio una lista de discos invalida.")
+    return [device for device in devices if isinstance(device, dict)]
+
+
+def inspect_desktop_disk_uses(resolved_disk: Path) -> tuple[DiskUse, ...]:
+    devices = _read_lsblk_tree(resolved_disk)
+    return tuple(
+        disk_use
+        for device in devices
+        for disk_use in _device_tree_uses(device)
+    )
+
+
+def discover_desktop_disks() -> list[DiskCandidate]:
+    devices = _read_lsblk_tree()
 
     candidates: list[DiskCandidate] = []
     for device in devices:
-        if not isinstance(device, dict) or device.get("type") != "disk":
+        if device.get("type") != "disk":
             continue
-        if _device_tree_has_mounts(device):
+        disk_uses = _device_tree_uses(device)
+        if any(_is_protected_disk_use(disk_use) for disk_use in disk_uses):
             continue
 
         path_value = device.get("path")
@@ -300,6 +378,9 @@ def discover_desktop_disks() -> list[DiskCandidate]:
                 model=str(device.get("model") or "").strip(),
                 serial=str(device.get("serial") or "").strip(),
                 removable=_is_removable(device.get("rm")),
+                active_uses=tuple(
+                    sorted({disk_use.mountpoint for disk_use in disk_uses})
+                ),
             )
         )
 
@@ -329,6 +410,8 @@ def _describe_disk(candidate: DiskCandidate) -> str:
         details.append(f"serial {candidate.serial}")
     if candidate.removable:
         details.append("removible")
+    if candidate.active_uses:
+        details.append("se libera automaticamente")
     return ", ".join(details)
 
 
@@ -336,8 +419,9 @@ def select_desktop_disk() -> str:
     candidates = discover_desktop_disks()
     if not candidates:
         raise HolodeckError(
-            "No se encontro ningun disco completo, sin montajes y con un ID "
-            "estable en /dev/disk/by-id.\n"
+            "No se encontro ningun disco de destino seguro y con un ID "
+            "estable en /dev/disk/by-id. Los discos del sistema live se "
+            "excluyen automaticamente.\n"
             "Revisa el hardware con 'lsblk' y 'ls -l /dev/disk/by-id/'."
         )
 
@@ -350,7 +434,7 @@ def select_desktop_disk() -> str:
         return selected.stable_id
 
     ui.heading("==> Selecciona el disco de destino")
-    print("Solo se muestran discos completos y sin montajes activos:")
+    print("Los montajes no protegidos se liberaran automaticamente:")
     for index, candidate in enumerate(candidates, start=1):
         print(f"  {index}) {candidate.stable_id}")
         print(f"     {_describe_disk(candidate)}")
@@ -371,7 +455,7 @@ def select_desktop_disk() -> str:
     return selected.stable_id
 
 
-def validate_desktop_disk(disk: str) -> Path:
+def resolve_desktop_disk(disk: str) -> Path:
     if not disk.startswith("/dev/disk/by-id/"):
         raise HolodeckError(
             "Usa una ruta estable /dev/disk/by-id/*, no un nombre como "
@@ -402,8 +486,48 @@ def validate_desktop_disk(disk: str) -> Path:
     if result.stdout.strip() != "disk":
         raise HolodeckError(f"{disk} no apunta a un disco fisico completo.")
 
+    return resolved_disk
+
+
+def validate_desktop_disk(disk: str) -> Path:
+    resolved_disk = resolve_desktop_disk(disk)
     require_unmounted_disk(resolved_disk, disk)
     return resolved_disk
+
+
+def prepare_desktop_disk(resolved_disk: Path, disk_label: str) -> None:
+    disk_uses = inspect_desktop_disk_uses(resolved_disk)
+    _require_releasable_uses(disk_uses, disk_label)
+    if not disk_uses:
+        return
+
+    ui.heading("==> Liberando automaticamente el disco de destino")
+
+    swap_devices = sorted(
+        {
+            str(disk_use.device_path)
+            for disk_use in disk_uses
+            if disk_use.mountpoint == "[SWAP]"
+        }
+    )
+    for device_path in swap_devices:
+        ui.info(f"Desactivando swap: {device_path}")
+        run(["sudo", "swapoff", "--", device_path])
+
+    mountpoints = sorted(
+        {
+            disk_use.mountpoint
+            for disk_use in disk_uses
+            if disk_use.mountpoint != "[SWAP]"
+        },
+        key=lambda mountpoint: (mountpoint.count("/"), len(mountpoint)),
+        reverse=True,
+    )
+    for mountpoint in mountpoints:
+        ui.info(f"Desmontando: {mountpoint}")
+        run(["sudo", "umount", "--", mountpoint])
+
+    require_unmounted_disk(resolved_disk, disk_label)
 
 
 def require_mount(mountpoint: str) -> None:
@@ -413,6 +537,15 @@ def require_mount(mountpoint: str) -> None:
     )
     if result.returncode != 0:
         raise HolodeckError(f"Disko no dejo {mountpoint} montado.")
+
+
+def require_unmounted_mountpoint(mountpoint: str) -> None:
+    result = subprocess.run(
+        ["mountpoint", "-q", mountpoint],
+        check=False,
+    )
+    if result.returncode == 0:
+        raise HolodeckError(f"No se pudo desmontar automaticamente {mountpoint}.")
 
 
 def require_vfat_boot() -> None:
@@ -438,6 +571,9 @@ def install_desktop(repo: Path, disk: str | None) -> None:
             "nixos-enter",
             "nixos-install",
             "sudo",
+            "swapoff",
+            "sync",
+            "umount",
         )
     )
     if not Path("/sys/firmware/efi/efivars").is_dir():
@@ -446,7 +582,9 @@ def install_desktop(repo: Path, disk: str | None) -> None:
     ensure_install_inputs_tracked(repo, DESKTOP_INSTALL_INPUTS)
     check_flake(repo)
     selected_disk = disk or select_desktop_disk()
-    resolved_disk = validate_desktop_disk(selected_disk)
+    resolved_disk = resolve_desktop_disk(selected_disk)
+    disk_uses = inspect_desktop_disk_uses(resolved_disk)
+    _require_releasable_uses(disk_uses, selected_disk)
 
     print()
     ui.warn("Este proceso borrara por completo el siguiente disco:")
@@ -459,6 +597,11 @@ def install_desktop(repo: Path, disk: str | None) -> None:
             str(resolved_disk),
         ]
     )
+    if disk_uses:
+        print()
+        print("El proceso liberara automaticamente estos usos:")
+        for disk_use in disk_uses:
+            print(f"  {disk_use.device_path}: {disk_use.mountpoint}")
     print()
     expected_confirmation = f"BORRAR {selected_disk}"
     print("Escribe exactamente esta confirmacion:")
@@ -467,10 +610,18 @@ def install_desktop(repo: Path, disk: str | None) -> None:
     if confirmation != expected_confirmation:
         raise HolodeckError("Confirmacion incorrecta; no se modifico el disco.")
 
+    pre_release_disk = resolve_desktop_disk(selected_disk)
+    if pre_release_disk != resolved_disk:
+        raise HolodeckError(
+            "El ID seleccionado ahora apunta a otro disco; no se modifico nada."
+        )
+
+    prepare_desktop_disk(pre_release_disk, selected_disk)
     revalidated_disk = validate_desktop_disk(selected_disk)
     if revalidated_disk != resolved_disk:
         raise HolodeckError(
-            "El ID seleccionado ahora apunta a otro disco; no se modifico nada."
+            "El ID seleccionado cambio durante la preparacion; "
+            "no se modifico el disco."
         )
 
     ui.heading("==> Particionando, cifrando y montando con Disko")
@@ -512,11 +663,15 @@ def install_desktop(repo: Path, disk: str | None) -> None:
         ]
     )
 
+    ui.heading("==> Sincronizando y desmontando la instalacion")
+    run(["sync"])
+    run(["sudo", "umount", "-R", "--", "/mnt"])
+    require_unmounted_mountpoint("/mnt")
+
     print(
         """
-Instalacion terminada. Verifica que no haya errores, desmonta y reinicia:
+Instalacion terminada y desmontada. Verifica que no haya errores y reinicia:
 
-  sudo umount -R /mnt
   sudo reboot
 
 Retira el medio de instalacion durante el reinicio. Despues de iniciar sesion

@@ -67,18 +67,21 @@ Antes de borrar nada, `holodeck-system-nixos`:
 
 1. exige que el live ISO este iniciado en UEFI
 2. busca discos completos con un ID estable en `/dev/disk/by-id`
-3. descarta cualquiera que tenga montajes activos en el o sus particiones
+3. excluye cualquier disco que sostenga `/`, el Nix store o el medio live
 4. prefiere discos internos frente a dispositivos removibles
 5. elige automaticamente si queda uno, o muestra un selector si quedan varios
-6. muestra nombre, capacidad, modelo y numero de serie
+6. muestra nombre, capacidad, modelo, numero de serie y usos activos
 7. exige escribir `BORRAR` seguido por el ID seleccionado
+8. desactiva automaticamente su swap y desmonta todas sus particiones
+9. revalida que el disco quedo libre antes de ejecutar Disko
 
 El override `--disk /dev/disk/by-id/ID` sigue disponible para recuperacion o
 hardware ambiguo, pero no hace falta en el flujo normal.
 
 Despues Disko crea, formatea y monta todo en `/mnt`. La instalacion se completa
 con `nixos-install --flake .#desktop`, no con `nixos-rebuild`. Durante el flujo
-se solicitan la frase LUKS y las contrasenas de root y `avivaldelli`.
+se solicitan la frase LUKS y las contrasenas de root y `avivaldelli`. Al
+terminar, el backend sincroniza y desmonta `/mnt` automaticamente.
 
 La ruta de dispositivo por defecto que aparece en `disko.nix` es un marcador
 invalido a proposito. El script pasa el disco real con `--argstr device`, por lo

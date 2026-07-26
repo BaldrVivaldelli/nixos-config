@@ -1,5 +1,6 @@
 {
   writeShellApplication,
+  coreutils,
   git,
   nix,
   python3,
@@ -11,6 +12,7 @@ writeShellApplication {
   name = "holodeck-system-nixos";
 
   runtimeInputs = [
+    coreutils
     git
     nix
     python3

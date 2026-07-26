@@ -143,10 +143,13 @@ El backend:
 - valida que el checkout contenga la flake y el target solicitado
 - rechaza inputs de instalacion sin seguimiento en Git
 - ejecuta `nix flake check` antes de modificar el sistema
-- para desktop exige UEFI, detecta discos completos y sin montajes mediante
-  `/dev/disk/by-id`, prefiere los internos y pide elegir si hay varios
-- revalida el disco y exige una confirmacion exacta antes de llamar Disko
+- para desktop exige UEFI, detecta discos completos mediante `/dev/disk/by-id`,
+  excluye el disco del sistema live, prefiere los internos y pide elegir si hay
+  varios
+- despues de la confirmacion desactiva swap, desmonta el destino y revalida que
+  quedo libre antes de llamar Disko
 - verifica que Disko haya montado `/mnt` y una ESP `vfat` en `/mnt/boot`
+- al terminar sincroniza y desmonta `/mnt` automaticamente
 - para WSL verifica que la sesion sea realmente WSL y prepara `#wsl` con
   `nixos-rebuild boot`
 

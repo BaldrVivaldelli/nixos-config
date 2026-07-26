@@ -13,6 +13,7 @@ import holodeck_system_nixos.installer as system_install
 from holodeck.errors import HolodeckError
 from holodeck_system_nixos.installer import (
     DiskCandidate,
+    DiskUse,
     discover_desktop_disks,
     install_desktop,
     install_nixos,
@@ -130,7 +131,7 @@ class DesktopDiskDiscoveryTests(unittest.TestCase):
             removable=False,
         )
 
-    def test_ignores_mounted_disks_and_prefers_internal_disks(self) -> None:
+    def test_ignores_live_disks_and_prefers_internal_disks(self) -> None:
         lsblk_output = {
             "blockdevices": [
                 {
@@ -165,7 +166,7 @@ class DesktopDiskDiscoveryTests(unittest.TestCase):
                         {
                             "path": "/dev/sdc1",
                             "type": "part",
-                            "mountpoints": ["/run/media/live"],
+                            "mountpoints": ["/iso"],
                         }
                     ],
                 },
@@ -179,7 +180,11 @@ class DesktopDiskDiscoveryTests(unittest.TestCase):
         )
 
         with (
-            patch.object(system_install.subprocess, "run", return_value=completed),
+            patch.object(
+                system_install.subprocess,
+                "run",
+                return_value=completed,
+            ) as run_lsblk,
             patch.object(
                 system_install,
                 "stable_id_for_disk",
@@ -191,6 +196,60 @@ class DesktopDiskDiscoveryTests(unittest.TestCase):
         self.assertEqual(
             [candidate.stable_id for candidate in candidates],
             ["/dev/disk/by-id/id-sda"],
+        )
+        command = run_lsblk.call_args.args[0]
+        self.assertIn("--tree", command)
+        self.assertIn("NAME,PATH,TYPE,RM,SIZE,MODEL,SERIAL,MOUNTPOINTS", command)
+
+    def test_keeps_mounts_that_the_process_can_release(self) -> None:
+        lsblk_output = {
+            "blockdevices": [
+                {
+                    "name": "sda",
+                    "path": "/dev/sda",
+                    "type": "disk",
+                    "rm": False,
+                    "size": 1_000_000_000,
+                    "model": "Target",
+                    "serial": "TARGET",
+                    "mountpoints": [None],
+                    "children": [
+                        {
+                            "name": "sda1",
+                            "path": "/dev/sda1",
+                            "type": "part",
+                            "mountpoints": ["/mnt/old-root"],
+                        },
+                        {
+                            "name": "sda2",
+                            "path": "/dev/sda2",
+                            "type": "part",
+                            "mountpoints": ["[SWAP]"],
+                        },
+                    ],
+                }
+            ]
+        }
+        completed = CompletedProcess(
+            args=[],
+            returncode=0,
+            stdout=json.dumps(lsblk_output),
+            stderr="",
+        )
+        with (
+            patch.object(system_install.subprocess, "run", return_value=completed),
+            patch.object(
+                system_install,
+                "stable_id_for_disk",
+                return_value="/dev/disk/by-id/target",
+            ),
+        ):
+            candidates = discover_desktop_disks()
+
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(
+            candidates[0].active_uses,
+            ("/mnt/old-root", "[SWAP]"),
         )
 
     def test_automatically_uses_the_only_safe_candidate(self) -> None:
@@ -240,13 +299,21 @@ class DesktopSafetyTests(unittest.TestCase):
             patch.object(system_install.Path, "is_dir", return_value=True),
             patch.object(
                 system_install,
+                "resolve_desktop_disk",
+                return_value=self.resolved_disk,
+            ),
+            patch.object(system_install, "inspect_desktop_disk_uses", return_value=()),
+            patch.object(system_install, "ensure_install_inputs_tracked"),
+            patch.object(system_install, "check_flake"),
+            patch.object(system_install, "prepare_desktop_disk"),
+            patch.object(
+                system_install,
                 "validate_desktop_disk",
                 return_value=self.resolved_disk,
             ),
-            patch.object(system_install, "ensure_install_inputs_tracked"),
-            patch.object(system_install, "check_flake"),
             patch.object(system_install, "require_mount"),
             patch.object(system_install, "require_vfat_boot"),
+            patch.object(system_install, "require_unmounted_mountpoint"),
         )
 
     def test_wrong_confirmation_never_runs_sudo(self) -> None:
@@ -258,7 +325,11 @@ class DesktopSafetyTests(unittest.TestCase):
             patches[3],
             patches[4],
             patches[5],
-            patches[6],
+            patches[6] as prepare_disk,
+            patches[7],
+            patches[8],
+            patches[9],
+            patches[10],
             patch("builtins.input", return_value="no"),
             patch.object(system_install, "run") as run_command,
         ):
@@ -268,6 +339,7 @@ class DesktopSafetyTests(unittest.TestCase):
         self.assertFalse(
             any(call.args[0][0] == "sudo" for call in run_command.call_args_list)
         )
+        prepare_disk.assert_not_called()
 
     def test_mounted_disk_is_rejected(self) -> None:
         mounted = CompletedProcess(
@@ -277,8 +349,61 @@ class DesktopSafetyTests(unittest.TestCase):
             stderr="",
         )
         with patch.object(system_install.subprocess, "run", return_value=mounted):
-            with self.assertRaisesRegex(HolodeckError, "esta montada"):
+            with self.assertRaisesRegex(HolodeckError, "No se pudo liberar"):
                 require_unmounted_disk(self.resolved_disk, self.disk)
+
+    def test_finished_install_must_leave_mnt_unmounted(self) -> None:
+        still_mounted = CompletedProcess(args=[], returncode=0)
+        with patch.object(
+            system_install.subprocess,
+            "run",
+            return_value=still_mounted,
+        ):
+            with self.assertRaisesRegex(HolodeckError, "automaticamente /mnt"):
+                system_install.require_unmounted_mountpoint("/mnt")
+
+    def test_preparation_disables_swap_and_unmounts_deepest_first(self) -> None:
+        disk_uses = (
+            DiskUse(Path("/dev/mock-disk2"), "[SWAP]"),
+            DiskUse(Path("/dev/mock-disk1"), "/mnt"),
+            DiskUse(Path("/dev/mock-disk1"), "/mnt/boot"),
+        )
+        with (
+            patch.object(
+                system_install,
+                "inspect_desktop_disk_uses",
+                return_value=disk_uses,
+            ),
+            patch.object(system_install, "require_unmounted_disk") as require_free,
+            patch.object(system_install, "run") as run_command,
+        ):
+            system_install.prepare_desktop_disk(self.resolved_disk, self.disk)
+
+        commands = [call.args[0] for call in run_command.call_args_list]
+        self.assertEqual(
+            commands,
+            [
+                ["sudo", "swapoff", "--", "/dev/mock-disk2"],
+                ["sudo", "umount", "--", "/mnt/boot"],
+                ["sudo", "umount", "--", "/mnt"],
+            ],
+        )
+        require_free.assert_called_once_with(self.resolved_disk, self.disk)
+
+    def test_preparation_never_unmounts_the_live_system(self) -> None:
+        disk_uses = (DiskUse(Path("/dev/mock-disk1"), "/"),)
+        with (
+            patch.object(
+                system_install,
+                "inspect_desktop_disk_uses",
+                return_value=disk_uses,
+            ),
+            patch.object(system_install, "run") as run_command,
+        ):
+            with self.assertRaisesRegex(HolodeckError, "sistema live"):
+                system_install.prepare_desktop_disk(self.resolved_disk, self.disk)
+
+        run_command.assert_not_called()
 
     def test_confirmed_install_delegates_to_disko_and_nixos_install(self) -> None:
         patches = self.desktop_patches()
@@ -289,13 +414,18 @@ class DesktopSafetyTests(unittest.TestCase):
             patches[3],
             patches[4],
             patches[5],
-            patches[6],
+            patches[6] as prepare_disk,
+            patches[7],
+            patches[8],
+            patches[9],
+            patches[10],
             patch("builtins.input", return_value=f"BORRAR {self.disk}"),
             patch.object(system_install, "run") as run_command,
         ):
             install_desktop(Path("/repo"), self.disk)
 
         commands = [call.args[0] for call in run_command.call_args_list]
+        prepare_disk.assert_called_once_with(self.resolved_disk, self.disk)
         self.assertEqual(commands[1][:3], ["sudo", "nix", "--extra-experimental-features"])
         self.assertIn("destroy,format,mount", commands[1])
         self.assertEqual(
@@ -303,6 +433,11 @@ class DesktopSafetyTests(unittest.TestCase):
             ["sudo", "nixos-install", "--flake", ".#desktop"],
         )
         self.assertEqual(commands[3][0:2], ["sudo", "nixos-enter"])
+        self.assertEqual(commands[4], ["sync"])
+        self.assertEqual(
+            commands[5],
+            ["sudo", "umount", "-R", "--", "/mnt"],
+        )
 
     def test_disk_id_change_after_confirmation_aborts_before_disko(self) -> None:
         patches = self.desktop_patches()
@@ -311,13 +446,17 @@ class DesktopSafetyTests(unittest.TestCase):
             patches[1],
             patch.object(
                 system_install,
-                "validate_desktop_disk",
+                "resolve_desktop_disk",
                 side_effect=[Path("/dev/first"), Path("/dev/changed")],
             ),
             patches[3],
             patches[4],
             patches[5],
-            patches[6],
+            patches[6] as prepare_disk,
+            patches[7],
+            patches[8],
+            patches[9],
+            patches[10],
             patch("builtins.input", return_value=f"BORRAR {self.disk}"),
             patch.object(system_install, "run") as run_command,
         ):
@@ -327,6 +466,7 @@ class DesktopSafetyTests(unittest.TestCase):
         self.assertFalse(
             any(call.args[0][0] == "sudo" for call in run_command.call_args_list)
         )
+        prepare_disk.assert_not_called()
 
 
 class WslSafetyTests(unittest.TestCase):

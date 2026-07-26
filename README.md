@@ -118,10 +118,11 @@ Desde un instalador NixOS iniciado en modo UEFI, clona el repo y ejecuta:
 ```
 
 > [!CAUTION]
-> El backend detecta discos completos, sin montajes y con identidad estable en
-> `/dev/disk/by-id`. Prefiere discos internos; si hay mas de uno pide elegir.
-> Siempre muestra modelo y numero de serie y exige una confirmacion exacta
-> antes de ejecutar Disko.
+> El backend detecta discos completos con identidad estable en
+> `/dev/disk/by-id`, excluye el disco que sostiene el sistema live y prefiere
+> discos internos. Si hay mas de uno pide elegir. Despues de la confirmacion,
+> desmonta automaticamente sus filesystems y desactiva su swap antes de
+> ejecutar Disko.
 
 El script crea y monta el layout, instala `#desktop` con `nixos-install` y pide
 las contrasenas LUKS, root y `avivaldelli`. No se debe ejecutar
