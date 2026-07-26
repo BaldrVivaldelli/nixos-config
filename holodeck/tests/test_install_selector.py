@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -11,11 +13,16 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 INSTALLER = REPO / "install.sh"
+BASH = shutil.which("bash")
 
 
 def write_echo_command(directory: Path, name: str) -> None:
     command = directory / name
-    command.write_text('#!/bin/sh\nprintf "%s\\n" "$*"\n')
+    command.write_text(
+        f"#!{sys.executable}\n"
+        "import sys\n"
+        'print(" ".join(sys.argv[1:]))\n'
+    )
     command.chmod(0o755)
 
 
@@ -27,6 +34,9 @@ class InstallSelectorTests(unittest.TestCase):
         input_text: str | None = None,
         extra_commands: tuple[str, ...] = (),
     ) -> subprocess.CompletedProcess:
+        if BASH is None:
+            raise RuntimeError("bash is required to test install.sh")
+
         with tempfile.TemporaryDirectory() as temp_dir:
             command_dir = Path(temp_dir)
             write_echo_command(command_dir, "nix")
@@ -35,7 +45,7 @@ class InstallSelectorTests(unittest.TestCase):
             environment = os.environ.copy()
             environment["PATH"] = f"{command_dir}{os.pathsep}{environment['PATH']}"
             return subprocess.run(
-                [str(INSTALLER), *args],
+                [BASH, str(INSTALLER), *args],
                 input=input_text,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,

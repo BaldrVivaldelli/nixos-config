@@ -99,7 +99,10 @@
             '';
 
         install-selector-tests = pkgs.runCommand "install-selector-tests" {
-          nativeBuildInputs = [ pkgs.python3 ];
+          nativeBuildInputs = [
+            pkgs.bash
+            pkgs.python3
+          ];
         } ''
           cd ${./.}
           export PYTHONDONTWRITEBYTECODE=1
