@@ -61,16 +61,19 @@
         holodeck = {
           type = "app";
           program = "${holodeck}/bin/holodeck";
+          meta.description = "Configure portable developer identity and providers.";
         };
 
         holodeck-system-nixos = {
           type = "app";
           program = "${holodeck-system-nixos}/bin/holodeck-system-nixos";
+          meta.description = "Install the declared NixOS desktop or WSL target.";
         };
 
         disko = {
           type = "app";
           program = "${inputs.disko.packages.${system}.default}/bin/disko";
+          meta.description = "Apply the declarative NixOS desktop disk layout.";
         };
       };
 
