@@ -114,13 +114,15 @@ la VM Windows anidada.
 
 ## Frontera de instalacion y estado personal
 
-`install.sh` es el unico entrypoint. Selecciona un backend de sistema sin
-incorporarlo al core portable:
+Los entrypoints de instalacion seleccionan un backend de sistema sin
+incorporarlo al core portable. Desktop expone un acceso directo sin argumentos
+y `install.sh` conserva el selector extensible:
 
 ```text
+install-desktop.sh
+  -> holodeck-system-nixos -> desktop -> Disko -> nixos-install .#desktop
 install.sh
   -> holodeck-system-nixos
-       -> desktop -> Disko -> nixos-install .#desktop
        -> wsl     -> nixos-rebuild boot .#wsl
   -> holodeck-system-<otro>
 ```

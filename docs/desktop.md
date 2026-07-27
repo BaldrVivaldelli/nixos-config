@@ -54,10 +54,10 @@ detectados para esta maquina.
 Arranca el instalador NixOS en modo UEFI, clona el repositorio y ejecuta:
 
 ```bash
-./install.sh nixos desktop
+./install-desktop.sh
 ```
 
-El selector delega en el backend NixOS:
+El entrypoint delega directamente en el backend NixOS:
 
 ```bash
 nix run .#holodeck-system-nixos -- install --target desktop

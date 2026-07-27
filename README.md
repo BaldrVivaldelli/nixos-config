@@ -8,6 +8,7 @@ y separa la configuracion en modulos reutilizables bajo `modules/`.
 
 ```text
 flake.nix
+install-desktop.sh
 install.sh
 holodeck/
   core/
@@ -114,7 +115,7 @@ El layout del disco fisico se declara con Disko en
 Desde un instalador NixOS iniciado en modo UEFI, clona el repo y ejecuta:
 
 ```bash
-./install.sh nixos desktop
+./install-desktop.sh
 ```
 
 > [!CAUTION]
@@ -128,27 +129,28 @@ El script crea y monta el layout, instala `#desktop` con `nixos-install` y pide
 las contrasenas LUKS, root y `avivaldelli`. No se debe ejecutar
 `nixos-rebuild` ni `switch-to-configuration` desde el sistema live.
 
-## Instalacion unificada
+## Entrypoints de instalacion
 
-Existe un unico entrypoint. Sin argumentos abre un selector:
+Desktop tiene un entrypoint directo, sin argumentos:
+
+```bash
+./install-desktop.sh
+```
+
+El selector generico queda disponible para WSL y futuros backends:
 
 ```bash
 ./install.sh
-```
-
-Tambien admite uso directo:
-
-```bash
-./install.sh nixos desktop
 ./install.sh nixos wsl
 ```
 
-El selector delega en un backend opcional:
+Los entrypoints delegan en backends opcionales:
 
 ```text
+install-desktop.sh
+  -> holodeck-system-nixos -> desktop
 install.sh
   -> holodeck-system-nixos
-       -> desktop
        -> wsl
   -> holodeck-system-<otro-backend>
 ```

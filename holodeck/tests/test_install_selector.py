@@ -13,6 +13,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 INSTALLER = REPO / "install.sh"
+DESKTOP_INSTALLER = REPO / "install-desktop.sh"
 BASH = shutil.which("bash")
 
 
@@ -31,6 +32,7 @@ class InstallSelectorTests(unittest.TestCase):
         self,
         args: list[str],
         *,
+        installer: Path = INSTALLER,
         input_text: str | None = None,
         extra_commands: tuple[str, ...] = (),
     ) -> subprocess.CompletedProcess:
@@ -45,7 +47,7 @@ class InstallSelectorTests(unittest.TestCase):
             environment = os.environ.copy()
             environment["PATH"] = f"{command_dir}{os.pathsep}{environment['PATH']}"
             return subprocess.run(
-                [BASH, str(INSTALLER), *args],
+                [BASH, str(installer), *args],
                 input=input_text,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -53,6 +55,14 @@ class InstallSelectorTests(unittest.TestCase):
                 check=False,
                 env=environment,
             )
+
+    def test_desktop_entrypoint_requires_no_arguments(self) -> None:
+        result = self.run_installer([], installer=DESKTOP_INSTALLER)
+
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("run .#holodeck-system-nixos", result.stdout)
+        self.assertIn("--target desktop", result.stdout)
+        self.assertNotIn("--disk", result.stdout)
 
     def test_routes_nixos_desktop_to_optional_backend(self) -> None:
         result = self.run_installer(["nixos", "desktop"])

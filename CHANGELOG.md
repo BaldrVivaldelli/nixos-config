@@ -15,14 +15,16 @@
 
 - Moved the portable Python core to `holodeck/core`.
 - Moved NixOS/Disko orchestration to `holodeck/backends/nixos`.
-- Made `./install.sh nixos desktop` detect safe stable disk candidates,
-  preferring internal disks and prompting only when multiple candidates remain.
+- Made the NixOS desktop backend detect safe stable disk candidates, preferring
+  internal disks and prompting only when multiple candidates remain.
+- Restored `./install-desktop.sh` as the zero-argument public entrypoint while
+  keeping the NixOS backend as its internal implementation.
 - Made the desktop backend automatically disable swap and unmount the confirmed
   target while protecting the live system disk.
 - Made successful desktop installations sync and unmount `/mnt` automatically.
 - Removed Nix, sudo and util-linux from the portable Holodeck runtime.
-- Replaced `install-desktop.sh`, `install-wsl.sh` and `bootstrap-wsl.sh` with
-  the unified selector.
+- Replaced `install-wsl.sh` and `bootstrap-wsl.sh` with the unified selector
+  while keeping `install-desktop.sh` as the direct desktop entrypoint.
 
 ## 2026-07-25 - Unified Holodeck installation
 

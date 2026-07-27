@@ -23,6 +23,7 @@ COMMON_INSTALL_INPUTS = (
     "flake.nix",
     "flake.lock",
     "install.sh",
+    "install-desktop.sh",
     "holodeck/core",
     "holodeck/backends/nixos",
     "modules/nixos/features/holodeck/package.nix",

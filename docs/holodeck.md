@@ -117,17 +117,16 @@ Aliases:
 
 ## Instalacion de sistema
 
-La instalacion no forma parte del core. Existe un unico selector:
+La instalacion no forma parte del core. Desktop tiene un entrypoint directo:
 
 ```bash
-./install.sh
+./install-desktop.sh
 ```
 
 NixOS esta implementado como el ejecutable opcional
 `holodeck-system-nixos`:
 
 ```bash
-./install.sh nixos desktop
 ./install.sh nixos wsl
 ```
 
