@@ -63,7 +63,7 @@ El entrypoint delega directamente en el backend NixOS:
 nix run .#holodeck-system-nixos -- install --target desktop
 ```
 
-Antes de borrar nada, `holodeck-system-nixos`:
+En el flujo normal, antes de borrar nada, `holodeck-system-nixos`:
 
 1. exige que el live ISO este iniciado en UEFI
 2. busca discos completos con un ID estable en `/dev/disk/by-id`
@@ -77,6 +77,41 @@ Antes de borrar nada, `holodeck-system-nixos`:
 
 El override `--disk /dev/disk/by-id/ID` sigue disponible para recuperacion o
 hardware ambiguo, pero no hace falta en el flujo normal.
+
+### Reinstalar el sistema en ejecucion
+
+La deteccion automatica nunca ofrece el disco que sostiene `/`. Para
+reinstalarlo desde el NixOS instalado hay que elegirlo por su ID estable y
+habilitar la excepcion de forma explicita:
+
+```bash
+./install-desktop.sh \
+  --disk /dev/disk/by-id/nvme-ID_DEL_DISCO \
+  --allow-running-system-disk
+```
+
+El flag no permite nombres variables como `/dev/nvme0n1`, particiones ni el
+dispositivo que sostiene `/iso`, `/cdrom` o los montajes propios del medio de
+instalacion. Tampoco modifica el comportamiento de la deteccion automatica.
+
+El flujo avanzado:
+
+1. resuelve el symlink y comprueba con `lsblk` que sea un disco fisico completo
+2. muestra que el disco contiene `/`, `/boot` o el Nix store activos
+3. construye `.#reinstaller-kexec`, un NixOS efimero cuyo root y Nix store viven
+   en RAM
+4. exige literalmente
+   `REINSTALAR SISTEMA EN EJECUCION /dev/disk/by-id/ID`
+5. exige tambien la confirmacion normal
+   `BORRAR /dev/disk/by-id/ID`
+6. revalida que el ID siga apuntando al mismo disco y arranca el entorno con
+   `kexec`
+7. desde el entorno efimero vuelve a validar el disco y a pedir `BORRAR` antes
+   de Disko
+
+Si la construccion o `kexec` fallan —por ejemplo, porque el firmware o Secure
+Boot impiden cargar otro kernel— el disco todavia no fue desmontado,
+particionado ni formateado. La consola virtual `tty1` muestra la segunda fase.
 
 Despues Disko crea, formatea y monta todo en `/mnt`. La instalacion se completa
 con `nixos-install --flake .#desktop`, no con `nixos-rebuild`. Durante el flujo

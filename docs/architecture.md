@@ -120,7 +120,8 @@ y `install.sh` conserva el selector extensible:
 
 ```text
 install-desktop.sh
-  -> holodeck-system-nixos -> desktop -> Disko -> nixos-install .#desktop
+  -> holodeck-system-nixos -> desktop seguro -> Disko -> nixos-install
+  -> modo disco raiz -> kexec NixOS en RAM -> revalidar -> Disko -> instalar
 install.sh
   -> holodeck-system-nixos
        -> wsl     -> nixos-rebuild boot .#wsl

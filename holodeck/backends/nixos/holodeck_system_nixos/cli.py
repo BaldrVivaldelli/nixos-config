@@ -24,7 +24,8 @@ Commands:
 This optional backend owns NixOS/Disko installation. The portable `holodeck`
 command remains responsible only for user identity and provider setup.
 Desktop detects safe disk candidates automatically; --disk is an advanced
-override."""
+override. Reinstalling the running system disk additionally requires
+--allow-running-system-disk and transitions to an ephemeral kexec installer."""
     )
 
 

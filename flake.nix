@@ -21,12 +21,24 @@
   };
 
   outputs =
-    inputs@{ nixpkgs, ... }:
+    inputs@{
+      self,
+      nixpkgs,
+      ...
+    }:
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
       holodeck = pkgs.callPackage ./modules/nixos/features/holodeck/package.nix { };
       holodeck-system-nixos = pkgs.callPackage ./holodeck/backends/nixos/package.nix { };
+      reinstaller = nixpkgs.lib.nixosSystem {
+        inherit system;
+        specialArgs = {
+          holodeckSystemNixos = holodeck-system-nixos;
+          repoSource = self;
+        };
+        modules = [ ./modules/hosts/reinstaller ];
+      };
       formatter = pkgs.writeShellApplication {
         name = "nixfmt-tree";
         runtimeInputs = [
@@ -55,6 +67,7 @@
 
       packages.${system} = {
         inherit holodeck holodeck-system-nixos;
+        reinstaller-kexec = reinstaller.config.system.build.kexecTree;
       };
 
       apps.${system} = {
@@ -135,6 +148,8 @@
           ./modules/hosts/desktop
         ];
       };
+
+      nixosConfigurations.reinstaller = reinstaller;
 
       nixosConfigurations.wsl = nixpkgs.lib.nixosSystem {
         inherit system;

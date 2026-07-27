@@ -120,10 +120,10 @@ Desde un instalador NixOS iniciado en modo UEFI, clona el repo y ejecuta:
 
 > [!CAUTION]
 > El backend detecta discos completos con identidad estable en
-> `/dev/disk/by-id`, excluye el disco que sostiene el sistema live y prefiere
-> discos internos. Si hay mas de uno pide elegir. Despues de la confirmacion,
-> desmonta automaticamente sus filesystems y desactiva su swap antes de
-> ejecutar Disko.
+> `/dev/disk/by-id`, excluye el disco que sostiene el sistema en ejecucion y
+> prefiere discos internos. Si hay mas de uno pide elegir. Despues de la
+> confirmacion, desmonta automaticamente los filesystems liberables y desactiva
+> su swap antes de ejecutar Disko.
 
 El script crea y monta el layout, instala `#desktop` con `nixos-install` y pide
 las contrasenas LUKS, root y `avivaldelli`. No se debe ejecutar
@@ -131,7 +131,8 @@ las contrasenas LUKS, root y `avivaldelli`. No se debe ejecutar
 
 ## Entrypoints de instalacion
 
-Desktop tiene un entrypoint directo, sin argumentos:
+Desktop tiene un entrypoint directo. Sin argumentos conserva la deteccion
+automatica segura:
 
 ```bash
 ./install-desktop.sh
@@ -165,6 +166,21 @@ nix run .#holodeck-system-nixos -- install --target wsl
 
 Para recuperacion o hardware ambiguo se puede indicar un disco manualmente con
 `--disk /dev/disk/by-id/ID`, pero no es parte del flujo normal.
+
+La reinstalacion del mismo disco que sostiene el NixOS activo requiere las dos
+opciones explicitas:
+
+```bash
+./install-desktop.sh \
+  --disk /dev/disk/by-id/ID \
+  --allow-running-system-disk
+```
+
+Ese modo muestra los montajes protegidos, construye un NixOS efimero en RAM,
+exige `REINSTALAR SISTEMA EN EJECUCION <ID>` ademas de `BORRAR <ID>` y hace la
+transicion con `kexec`. Disko nunca se ejecuta desde el sistema raiz que sera
+borrado. Tras arrancar el entorno efimero, el disco y su ID se validan otra vez
+y se vuelve a pedir `BORRAR <ID>`.
 
 Para agregar otro sistema se publica una app de flake o un ejecutable con el
 contrato `holodeck-system-<backend>`. Por ejemplo, `./install.sh ubuntu` busca

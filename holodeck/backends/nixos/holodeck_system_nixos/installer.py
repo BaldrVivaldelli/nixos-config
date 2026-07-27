@@ -30,22 +30,28 @@ COMMON_INSTALL_INPUTS = (
 )
 DESKTOP_INSTALL_INPUTS = (
     "modules/hosts/desktop",
+    "modules/hosts/reinstaller",
 )
 WSL_INSTALL_INPUTS = (
     "modules/hosts/wsl",
     "modules/home/features/shell/default.nix",
 )
-PROTECTED_MOUNTPOINTS = frozenset(
+RUNNING_SYSTEM_MOUNTPOINTS = frozenset(
     {
         "/",
         "/boot",
         "/boot/efi",
-        "/cdrom",
-        "/iso",
         "/nix/.ro-store",
         "/nix/store",
     }
 )
+INSTALLER_MOUNTPOINTS = frozenset(
+    {
+        "/cdrom",
+        "/iso",
+    }
+)
+PROTECTED_MOUNTPOINTS = RUNNING_SYSTEM_MOUNTPOINTS | INSTALLER_MOUNTPOINTS
 PROTECTED_MOUNT_PREFIXES = (
     "/run/archiso/",
     "/run/initramfs/",
@@ -64,6 +70,7 @@ class InstallRequest:
     target: str
     repo: Path
     disk: str | None
+    allow_running_system_disk: bool
 
 
 @dataclass(frozen=True)
@@ -81,6 +88,27 @@ class DiskCandidate:
 class DiskUse:
     device_path: Path
     mountpoint: str
+
+
+@dataclass(frozen=True)
+class DiskExclusion:
+    resolved_path: Path
+    stable_id: str | None
+    reasons: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class DiskDiscovery:
+    candidates: tuple[DiskCandidate, ...]
+    excluded: tuple[DiskExclusion, ...]
+
+
+@dataclass(frozen=True)
+class ValidatedDisk:
+    stable_id: str
+    resolved_path: Path
+    active_uses: tuple[DiskUse, ...]
+    contains_running_system: bool
 
 
 def parse_install_args(args: list[str]) -> InstallRequest:
@@ -101,15 +129,30 @@ def parse_install_args(args: list[str]) -> InstallRequest:
             "automaticamente si se omite"
         ),
     )
+    parser.add_argument(
+        "--allow-running-system-disk",
+        action="store_true",
+        help=(
+            "permite preparar mediante kexec la reinstalacion del disco que "
+            "sostiene el NixOS en ejecucion; requiere --disk"
+        ),
+    )
     parsed = parser.parse_args(args)
 
     if parsed.target == "wsl" and parsed.disk:
         parser.error("--disk no se acepta para --target wsl")
+    if parsed.target == "wsl" and parsed.allow_running_system_disk:
+        parser.error(
+            "--allow-running-system-disk no se acepta para --target wsl"
+        )
+    if parsed.allow_running_system_disk and not parsed.disk:
+        parser.error("--allow-running-system-disk requiere --disk")
 
     return InstallRequest(
         target=parsed.target,
         repo=Path(parsed.repo).expanduser().resolve(),
         disk=parsed.disk,
+        allow_running_system_disk=parsed.allow_running_system_disk,
     )
 
 
@@ -242,6 +285,18 @@ def _is_protected_disk_use(disk_use: DiskUse) -> bool:
     )
 
 
+def _is_installer_disk_use(disk_use: DiskUse) -> bool:
+    mountpoint = disk_use.mountpoint
+    return mountpoint in INSTALLER_MOUNTPOINTS or any(
+        mountpoint.startswith(prefix)
+        for prefix in PROTECTED_MOUNT_PREFIXES
+    )
+
+
+def _contains_running_system(disk_uses: tuple[DiskUse, ...]) -> bool:
+    return any(disk_use.mountpoint == "/" for disk_use in disk_uses)
+
+
 def _require_releasable_uses(
     disk_uses: tuple[DiskUse, ...],
     disk_label: str,
@@ -254,7 +309,8 @@ def _require_releasable_uses(
         f"  {use.device_path}: {use.mountpoint}" for use in protected
     )
     raise HolodeckError(
-        f"{disk_label} sostiene el sistema live o un montaje protegido:\n"
+        f"{disk_label} sostiene el sistema live, en ejecucion o un montaje "
+        "protegido:\n"
         f"{details}\n"
         "Ese disco se excluye para no interrumpir el instalador."
     )
@@ -352,15 +408,21 @@ def inspect_desktop_disk_uses(resolved_disk: Path) -> tuple[DiskUse, ...]:
     )
 
 
-def discover_desktop_disks() -> list[DiskCandidate]:
+def _protected_use_reasons(disk_uses: tuple[DiskUse, ...]) -> tuple[str, ...]:
+    return tuple(
+        f"{disk_use.device_path} esta montado en {disk_use.mountpoint}"
+        for disk_use in disk_uses
+        if _is_protected_disk_use(disk_use)
+    )
+
+
+def inspect_desktop_disks() -> DiskDiscovery:
     devices = _read_lsblk_tree()
 
     candidates: list[DiskCandidate] = []
+    excluded: list[DiskExclusion] = []
     for device in devices:
         if device.get("type") != "disk":
-            continue
-        disk_uses = _device_tree_uses(device)
-        if any(_is_protected_disk_use(disk_use) for disk_use in disk_uses):
             continue
 
         path_value = device.get("path")
@@ -368,7 +430,20 @@ def discover_desktop_disks() -> list[DiskCandidate]:
             continue
         resolved_path = Path(path_value)
         stable_id = stable_id_for_disk(resolved_path)
+        disk_uses = _device_tree_uses(device)
+
+        reasons = list(_protected_use_reasons(disk_uses))
         if stable_id is None:
+            reasons.append("no tiene un ID estable en /dev/disk/by-id")
+
+        if reasons:
+            excluded.append(
+                DiskExclusion(
+                    resolved_path=resolved_path,
+                    stable_id=stable_id,
+                    reasons=tuple(reasons),
+                )
+            )
             continue
 
         candidates.append(
@@ -387,8 +462,41 @@ def discover_desktop_disks() -> list[DiskCandidate]:
 
     internal = [candidate for candidate in candidates if not candidate.removable]
     if internal:
+        for candidate in candidates:
+            if candidate.removable:
+                excluded.append(
+                    DiskExclusion(
+                        resolved_path=candidate.resolved_path,
+                        stable_id=candidate.stable_id,
+                        reasons=(
+                            "se omitio porque hay un disco interno seguro",
+                        ),
+                    )
+                )
         candidates = internal
-    return sorted(candidates, key=lambda candidate: candidate.stable_id)
+    return DiskDiscovery(
+        candidates=tuple(
+            sorted(candidates, key=lambda candidate: candidate.stable_id)
+        ),
+        excluded=tuple(
+            sorted(
+                excluded,
+                key=lambda disk: disk.stable_id or str(disk.resolved_path),
+            )
+        ),
+    )
+
+
+def discover_desktop_disks(
+    *,
+    include_excluded: bool = False,
+) -> list[DiskCandidate] | DiskDiscovery:
+    """Return only candidates that are safe for automatic selection."""
+
+    discovery = inspect_desktop_disks()
+    if include_excluded:
+        return discovery
+    return list(discovery.candidates)
 
 
 def _format_size(size_bytes: int) -> str:
@@ -416,15 +524,59 @@ def _describe_disk(candidate: DiskCandidate) -> str:
     return ", ".join(details)
 
 
-def select_desktop_disk() -> str:
-    candidates = discover_desktop_disks()
-    if not candidates:
-        raise HolodeckError(
-            "No se encontro ningun disco de destino seguro y con un ID "
-            "estable en /dev/disk/by-id. Los discos del sistema live se "
-            "excluyen automaticamente.\n"
-            "Revisa el hardware con 'lsblk' y 'ls -l /dev/disk/by-id/'."
+def _no_safe_disks_message(discovery: DiskDiscovery) -> str:
+    lines = [
+        "No se encontro ningun disco de destino seguro y con un ID estable "
+        "en /dev/disk/by-id.",
+    ]
+    if discovery.excluded:
+        lines.extend(("", "Discos fisicos detectados y excluidos:"))
+        for disk in discovery.excluded:
+            label = disk.stable_id or str(disk.resolved_path)
+            lines.append(f"  {label} -> {disk.resolved_path}")
+            lines.extend(f"    - {reason}" for reason in disk.reasons)
+    else:
+        lines.extend(("", "lsblk no detecto ningun disco fisico completo."))
+
+    running_disks = [
+        disk
+        for disk in discovery.excluded
+        if any(reason.endswith("montado en /") for reason in disk.reasons)
+        and disk.stable_id is not None
+    ]
+    if running_disks:
+        example = running_disks[0].stable_id
+        lines.extend(
+            (
+                "",
+                "Para reinstalar explicitamente el NixOS en ejecucion, usa:",
+                "  ./install-desktop.sh "
+                f"--disk {example} --allow-running-system-disk",
+                "El modo avanzado arrancara un instalador efimero en RAM y "
+                "pedira una confirmacion adicional.",
+            )
         )
+    else:
+        lines.extend(
+            (
+                "",
+                "Revisa el hardware con 'lsblk' y "
+                "'ls -l /dev/disk/by-id/'.",
+            )
+        )
+    return "\n".join(lines)
+
+
+def select_desktop_disk() -> str:
+    discovered = discover_desktop_disks(include_excluded=True)
+    if isinstance(discovered, DiskDiscovery):
+        discovery = discovered
+    else:
+        # Keeps selection easy to isolate in callers and older integrations.
+        discovery = DiskDiscovery(tuple(discovered), ())
+    candidates = list(discovery.candidates)
+    if not candidates:
+        raise HolodeckError(_no_safe_disks_message(discovery))
 
     if len(candidates) == 1:
         selected = candidates[0]
@@ -457,13 +609,17 @@ def select_desktop_disk() -> str:
 
 
 def resolve_desktop_disk(disk: str) -> Path:
-    if not disk.startswith("/dev/disk/by-id/"):
+    disk_path = Path(disk)
+    if disk_path.parent != Path("/dev/disk/by-id") or not disk_path.name:
         raise HolodeckError(
             "Usa una ruta estable /dev/disk/by-id/*, no un nombre como "
             "/dev/nvme0n1."
         )
+    if re.search(r"-part\d+$", disk_path.name):
+        raise HolodeckError(
+            f"{disk} apunta a una particion, no al disco completo."
+        )
 
-    disk_path = Path(disk)
     try:
         resolved_disk = disk_path.resolve(strict=True)
         mode = resolved_disk.stat().st_mode
@@ -488,6 +644,67 @@ def resolve_desktop_disk(disk: str) -> Path:
         raise HolodeckError(f"{disk} no apunta a un disco fisico completo.")
 
     return resolved_disk
+
+
+def validate_desktop_disk_selection(
+    disk: str,
+    *,
+    allow_running_system_disk: bool,
+) -> ValidatedDisk:
+    """Validate a manual or automatic choice before any destructive action."""
+
+    resolved_disk = resolve_desktop_disk(disk)
+    disk_uses = inspect_desktop_disk_uses(resolved_disk)
+    protected = tuple(
+        disk_use
+        for disk_use in disk_uses
+        if _is_protected_disk_use(disk_use)
+    )
+    contains_running_system = _contains_running_system(disk_uses)
+
+    installer_uses = tuple(
+        disk_use for disk_use in protected if _is_installer_disk_use(disk_use)
+    )
+    if installer_uses:
+        details = "\n".join(
+            f"  {use.device_path}: {use.mountpoint}" for use in installer_uses
+        )
+        raise HolodeckError(
+            f"{disk} sostiene el medio o entorno de instalacion:\n"
+            f"{details}\n"
+            "Ni siquiera --allow-running-system-disk permite borrar el "
+            "instalador que esta ejecutando este proceso."
+        )
+
+    if protected and not allow_running_system_disk:
+        details = "\n".join(
+            f"  {use.device_path}: {use.mountpoint}" for use in protected
+        )
+        hint = (
+            "\n\nSi realmente queres reinstalar este sistema, repeti el "
+            "comando con el mismo --disk y --allow-running-system-disk."
+            if contains_running_system
+            else ""
+        )
+        raise HolodeckError(
+            f"{disk} contiene el sistema actualmente en ejecucion o un "
+            f"montaje protegido:\n{details}\n"
+            "Se cancela antes de modificar el disco."
+            f"{hint}"
+        )
+
+    if allow_running_system_disk and not contains_running_system:
+        raise HolodeckError(
+            "--allow-running-system-disk solo se acepta cuando el disco "
+            "seleccionado sostiene '/' del sistema actualmente en ejecucion."
+        )
+
+    return ValidatedDisk(
+        stable_id=disk,
+        resolved_path=resolved_disk,
+        active_uses=disk_uses,
+        contains_running_system=contains_running_system,
+    )
 
 
 def validate_desktop_disk(disk: str) -> Path:
@@ -561,20 +778,97 @@ def require_vfat_boot() -> None:
         raise HolodeckError("/mnt/boot no es una particion vfat.")
 
 
-def install_desktop(repo: Path, disk: str | None) -> None:
+def build_reinstaller_kexec(repo: Path) -> Path:
+    ui.heading("==> Construyendo el instalador efimero en RAM")
+    result = subprocess.run(
+        [
+            "nix",
+            "--extra-experimental-features",
+            "nix-command flakes",
+            "build",
+            "--no-link",
+            "--print-out-paths",
+            ".#reinstaller-kexec",
+        ],
+        cwd=repo,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise HolodeckError(
+            result.stderr.strip()
+            or "No se pudo construir el instalador efimero para kexec."
+        )
+
+    output_paths = [Path(line) for line in result.stdout.splitlines() if line]
+    if (
+        len(output_paths) != 1
+        or not output_paths[0].is_dir()
+        or not (output_paths[0] / "kexec-boot").is_file()
+    ):
+        raise HolodeckError(
+            "Nix no devolvio un unico arbol kexec valido; no se reinicio."
+        )
+    return output_paths[0]
+
+
+def _confirm_running_system_reinstall(disk: str) -> None:
+    expected = f"REINSTALAR SISTEMA EN EJECUCION {disk}"
+    print("Confirmacion adicional obligatoria para abandonar el sistema activo:")
+    print(expected)
+    try:
+        confirmation = input("> ")
+    except EOFError as exc:
+        raise HolodeckError(
+            "No se recibio la confirmacion adicional; no se modifico el disco."
+        ) from exc
+    if confirmation != expected:
+        raise HolodeckError(
+            "Confirmacion adicional incorrecta; no se modifico el disco."
+        )
+
+
+def _confirm_disk_erasure(disk: str) -> None:
+    expected = f"BORRAR {disk}"
+    print("Escribe exactamente esta confirmacion:")
+    print(expected)
+    try:
+        confirmation = input("> ")
+    except EOFError as exc:
+        raise HolodeckError(
+            "No se recibio la confirmacion; no se modifico el disco."
+        ) from exc
+    if confirmation != expected:
+        raise HolodeckError("Confirmacion incorrecta; no se modifico el disco.")
+
+
+def boot_reinstaller_kexec(kexec_tree: Path, selected_disk: str) -> None:
+    ui.heading("==> Arrancando el instalador efimero con kexec")
+    ui.warn(
+        "La sesion actual terminara ahora. Tras el arranque se volvera a "
+        "pedir la confirmacion BORRAR antes de ejecutar Disko."
+    )
+    run(["sync"])
+    run(["sudo", str(kexec_tree / "kexec-boot"), selected_disk])
+    raise HolodeckError(
+        "kexec devolvio el control inesperadamente; no se modifico el disco."
+    )
+
+
+def install_desktop(
+    repo: Path,
+    disk: str | None,
+    allow_running_system_disk: bool = False,
+) -> None:
     require_commands(
         (
-            "findmnt",
             "git",
             "lsblk",
-            "mountpoint",
             "nix",
-            "nixos-enter",
-            "nixos-install",
             "sudo",
-            "swapoff",
             "sync",
-            "umount",
         )
     )
     if not Path("/sys/firmware/efi/efivars").is_dir():
@@ -583,9 +877,28 @@ def install_desktop(repo: Path, disk: str | None) -> None:
     ensure_install_inputs_tracked(repo, DESKTOP_INSTALL_INPUTS)
     check_flake(repo)
     selected_disk = disk or select_desktop_disk()
-    resolved_disk = resolve_desktop_disk(selected_disk)
-    disk_uses = inspect_desktop_disk_uses(resolved_disk)
-    _require_releasable_uses(disk_uses, selected_disk)
+    validated = validate_desktop_disk_selection(
+        selected_disk,
+        allow_running_system_disk=allow_running_system_disk,
+    )
+    resolved_disk = validated.resolved_path
+    disk_uses = validated.active_uses
+    kexec_tree = (
+        build_reinstaller_kexec(repo)
+        if validated.contains_running_system
+        else None
+    )
+    if not validated.contains_running_system:
+        require_commands(
+            (
+                "findmnt",
+                "mountpoint",
+                "nixos-enter",
+                "nixos-install",
+                "swapoff",
+                "umount",
+            )
+        )
 
     print()
     ui.warn("Este proceso borrara por completo el siguiente disco:")
@@ -600,24 +913,45 @@ def install_desktop(repo: Path, disk: str | None) -> None:
     )
     if disk_uses:
         print()
-        print("El proceso liberara automaticamente estos usos:")
+        if validated.contains_running_system:
+            print("Usos protegidos detectados en el sistema actual:")
+        else:
+            print("El proceso liberara automaticamente estos usos:")
         for disk_use in disk_uses:
             print(f"  {disk_use.device_path}: {disk_use.mountpoint}")
     print()
-    expected_confirmation = f"BORRAR {selected_disk}"
-    print("Escribe exactamente esta confirmacion:")
-    print(expected_confirmation)
-    confirmation = input("> ")
-    if confirmation != expected_confirmation:
-        raise HolodeckError("Confirmacion incorrecta; no se modifico el disco.")
+    if validated.contains_running_system:
+        ui.warn(
+            "PELIGRO: el disco seleccionado contiene '/' y el NixOS que "
+            "esta ejecutando este instalador."
+        )
+        print(
+            "No se intentara desmontar el sistema activo. Primero se arrancara "
+            "un NixOS efimero enteramente en RAM mediante kexec."
+        )
+        print()
+        _confirm_running_system_reinstall(selected_disk)
+        print()
+    _confirm_disk_erasure(selected_disk)
 
-    pre_release_disk = resolve_desktop_disk(selected_disk)
-    if pre_release_disk != resolved_disk:
+    pre_release = validate_desktop_disk_selection(
+        selected_disk,
+        allow_running_system_disk=allow_running_system_disk,
+    )
+    if pre_release.resolved_path != resolved_disk:
         raise HolodeckError(
             "El ID seleccionado ahora apunta a otro disco; no se modifico nada."
         )
 
-    prepare_desktop_disk(pre_release_disk, selected_disk)
+    if pre_release.contains_running_system:
+        if kexec_tree is None:
+            raise HolodeckError(
+                "No se preparo el entorno efimero; no se modifico el disco."
+            )
+        boot_reinstaller_kexec(kexec_tree, selected_disk)
+        return
+
+    prepare_desktop_disk(pre_release.resolved_path, selected_disk)
     revalidated_disk = validate_desktop_disk(selected_disk)
     if revalidated_disk != resolved_disk:
         raise HolodeckError(
@@ -767,6 +1101,10 @@ def install_nixos(args: list[str]) -> None:
     repo = validate_repo(request.repo, request.target)
 
     if request.target == "desktop":
-        install_desktop(repo, request.disk)
+        install_desktop(
+            repo,
+            request.disk,
+            request.allow_running_system_disk,
+        )
         return
     install_wsl(repo)

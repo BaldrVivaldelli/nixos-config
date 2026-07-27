@@ -143,8 +143,11 @@ El backend:
 - rechaza inputs de instalacion sin seguimiento en Git
 - ejecuta `nix flake check` antes de modificar el sistema
 - para desktop exige UEFI, detecta discos completos mediante `/dev/disk/by-id`,
-  excluye el disco del sistema live, prefiere los internos y pide elegir si hay
-  varios
+  excluye el disco del sistema activo, prefiere los internos y pide elegir si
+  hay varios
+- permite seleccionar el disco raiz solamente combinando `--disk` con
+  `--allow-running-system-disk`; exige dos confirmaciones y salta con `kexec` a
+  un instalador en RAM antes de tocarlo
 - despues de la confirmacion desactiva swap, desmonta el destino y revalida que
   quedo libre antes de llamar Disko
 - verifica que Disko haya montado `/mnt` y una ESP `vfat` en `/mnt/boot`
@@ -156,7 +159,8 @@ El layout sigue definido en `modules/hosts/desktop/disko.nix` y la
 configuracion de plataforma permanece bajo `modules/hosts`.
 
 `--disk /dev/disk/by-id/ID` queda como override avanzado y no es necesario para
-la instalacion normal.
+la instalacion normal. Por si solo no autoriza el disco raiz; esa excepcion
+requiere tambien `--allow-running-system-disk`.
 
 ## Agregar otro sistema
 

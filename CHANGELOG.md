@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-07-27 - Safe running-system reinstall
+
+### Added
+
+- Added the explicit `--allow-running-system-disk` desktop mode, requiring a
+  manually selected `/dev/disk/by-id` disk and an extra exact confirmation.
+- Added a NixOS kexec installer that runs from RAM before Disko touches the
+  disk that held the previous running system.
+- Added exclusion diagnostics that list detected disks, their protected
+  mounts and the command for intentionally reinstalling the current system.
+- Added tests for live installation, external targets, default root-disk
+  rejection, advanced acceptance and failed-confirmation aborts.
+
+### Changed
+
+- Kept automatic disk discovery safe by default and separated it from manual
+  selection and the destructive preflight revalidation.
+
 ## 2026-07-25 - Portable Holodeck system backends
 
 ### Added

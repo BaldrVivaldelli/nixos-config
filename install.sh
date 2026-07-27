@@ -12,7 +12,9 @@ Uso:
   ./install.sh BACKEND [argumentos del backend]
 
 Sin argumentos abre un selector interactivo.
-Desktop detecta el disco automaticamente; --disk queda como override avanzado.
+Desktop detecta el disco automaticamente. Para reinstalar el sistema activo:
+  ./install.sh nixos desktop --disk /dev/disk/by-id/ID \
+    --allow-running-system-disk
 
 Backends:
   nixos   Incluido en este repo; targets: desktop y wsl.

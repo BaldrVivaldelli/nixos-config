@@ -56,13 +56,27 @@ class InstallSelectorTests(unittest.TestCase):
                 env=environment,
             )
 
-    def test_desktop_entrypoint_requires_no_arguments(self) -> None:
+    def test_desktop_entrypoint_uses_safe_detection_without_arguments(self) -> None:
         result = self.run_installer([], installer=DESKTOP_INSTALLER)
 
         self.assertEqual(result.returncode, 0)
         self.assertIn("run .#holodeck-system-nixos", result.stdout)
         self.assertIn("--target desktop", result.stdout)
         self.assertNotIn("--disk", result.stdout)
+
+    def test_desktop_entrypoint_forwards_running_system_mode(self) -> None:
+        result = self.run_installer(
+            [
+                "--disk",
+                "/dev/disk/by-id/example",
+                "--allow-running-system-disk",
+            ],
+            installer=DESKTOP_INSTALLER,
+        )
+
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("--disk /dev/disk/by-id/example", result.stdout)
+        self.assertIn("--allow-running-system-disk", result.stdout)
 
     def test_routes_nixos_desktop_to_optional_backend(self) -> None:
         result = self.run_installer(["nixos", "desktop"])
