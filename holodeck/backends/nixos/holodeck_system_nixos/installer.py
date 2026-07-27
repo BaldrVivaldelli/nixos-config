@@ -983,8 +983,8 @@ def install_desktop(
     require_mount("/mnt/boot")
     require_vfat_boot()
 
-    ui.heading("==> Instalando #desktop")
-    run(["sudo", "nixos-install", "--flake", ".#desktop"], cwd=repo)
+    ui.heading("==> Instalando #desktop-disko")
+    run(["sudo", "nixos-install", "--flake", ".#desktop-disko"], cwd=repo)
 
     ui.heading("==> Configurando la contrasena de avivaldelli")
     run(

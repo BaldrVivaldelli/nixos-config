@@ -2,12 +2,16 @@
 # your system.  Help is available in the configuration.nix(5) man page
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
-{ config, pkgs, ... }:
+{
+  config,
+  pkgs,
+  rebuildTarget ? "desktop",
+  ...
+}:
 
 {
   imports = [
     # Include the results of the hardware scan.
-    ./disko.nix
     ./hardware-configuration.nix
   ];
 
@@ -104,6 +108,9 @@
       enable = true;
     };
   };
+
+  # Keep rebuild aliases on the storage profile that installed this system.
+  home-manager.users.avivaldelli.homeFeatures.shell.rebuildTarget = rebuildTarget;
 
   # Allow unfree packages
   nixpkgs.config.allowUnfree = true;

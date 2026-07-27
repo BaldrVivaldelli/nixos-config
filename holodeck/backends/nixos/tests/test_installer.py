@@ -794,7 +794,7 @@ class DesktopSafetyTests(unittest.TestCase):
         self.assertIn("destroy,format,mount", commands[1])
         self.assertEqual(
             commands[2],
-            ["sudo", "nixos-install", "--flake", ".#desktop"],
+            ["sudo", "nixos-install", "--flake", ".#desktop-disko"],
         )
         self.assertEqual(commands[3][0:2], ["sudo", "nixos-enter"])
         self.assertEqual(commands[4], ["sync"])

@@ -33,17 +33,18 @@ boot.loader.efi.canTouchEfiVariables = true;
 boot.loader.efi.efiSysMountPoint = "/boot";
 ```
 
-Disko declara el layout en `modules/hosts/desktop/disko.nix`:
+El repo separa dos perfiles de almacenamiento:
 
-- una tabla GPT sobre un unico disco
-- una ESP de 1 GiB, `vfat`, montada en `/boot`
-- el resto del disco como LUKS interactivo llamado `cryptroot`
-- root `ext4` sobre `/dev/mapper/cryptroot`
+- `#desktop` describe la instalacion actual mediante los UUID ya existentes en
+  `hardware-configuration.nix`
+- `#desktop-disko` describe las instalaciones creadas por el instalador
+  declarativo de `modules/hosts/desktop/disko.nix`
 
-Disko genera `fileSystems` y `boot.initrd.luks.devices` a partir de nombres de
-particion estables. Por eso `hardware-configuration.nix` ya no contiene UUID de
-root ni de EFI; conserva solamente los modulos de kernel y datos de CPU
-detectados para esta maquina.
+El segundo perfil usa una tabla GPT, una ESP `vfat` de 1 GiB en `/boot`, LUKS
+interactivo `cryptroot` y una raiz `ext4`. La flake desactiva expresamente los
+UUID actuales al evaluar `desktop-disko`, mientras que `desktop` ni siquiera
+importa el modulo Disko. Por eso un rebuild cotidiano no puede cambiar por
+accidente el root o la ESP al layout reservado para una instalacion nueva.
 
 ## Instalacion desde cero
 
@@ -114,8 +115,8 @@ Boot impiden cargar otro kernel— el disco todavia no fue desmontado,
 particionado ni formateado. La consola virtual `tty1` muestra la segunda fase.
 
 Despues Disko crea, formatea y monta todo en `/mnt`. La instalacion se completa
-con `nixos-install --flake .#desktop`, no con `nixos-rebuild`. Durante el flujo
-se solicitan la frase LUKS y las contrasenas de root y `avivaldelli`. Al
+con `nixos-install --flake .#desktop-disko`, no con `nixos-rebuild`. Durante el
+flujo se solicitan la frase LUKS y las contrasenas de root y `avivaldelli`. Al
 terminar, el backend sincroniza y desmonta `/mnt` automaticamente.
 
 La ruta de dispositivo por defecto que aparece en `disko.nix` es un marcador
@@ -180,11 +181,17 @@ home/avivaldelli/
 ```
 
 Como Home Manager esta integrado al sistema, los cambios se aplican con el mismo
-comando:
+perfil que instalo la maquina:
 
 ```bash
+# Instalacion fisica existente
 sudo nixos-rebuild switch --flake .#desktop
+
+# Instalacion creada por install-desktop.sh
+sudo nixos-rebuild switch --flake .#desktop-disko
 ```
+
+Los aliases de shell quedan configurados con el perfil correcto en cada caso.
 
 ## Cambios comunes
 
@@ -226,6 +233,9 @@ users.users."avivaldelli".packages = with pkgs; [
 ```bash
 sudo nixos-rebuild switch --flake .#desktop
 ```
+
+En una instalacion creada por Disko, reemplaza el target por
+`#desktop-disko` o usa `nixswitch`.
 
 Para probar hasta el proximo reboot:
 

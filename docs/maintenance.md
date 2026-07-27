@@ -17,7 +17,10 @@ sudo nixos-rebuild switch --flake .#desktop
 ```
 
 Esto tambien aplica la configuracion de Home Manager integrada para
-`avivaldelli`.
+`avivaldelli`. Estos ejemplos usan `#desktop`, el perfil de la instalacion
+fisica existente. En una maquina creada por `install-desktop.sh`, usa
+`#desktop-disko`; los aliases `nixbuild`, `nixswitch` y `rebuild` ya seleccionan
+ese target automaticamente.
 
 Probar hasta el proximo reboot:
 
@@ -38,8 +41,9 @@ nix flake check
 ```
 
 Este check ejecuta por separado las pruebas del core portable de Holodeck, las
-del selector de backends y las del backend NixOS, incluyendo dispatch
-desktop/WSL, validaciones destructivas y la frontera root/usuario.
+del selector de backends y las del backend NixOS. Tambien evalua que `desktop`
+mantenga sus UUID actuales y que `desktop-disko` use exclusivamente el layout
+de Disko.
 
 Formatear archivos Nix del repo:
 

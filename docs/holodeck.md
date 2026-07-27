@@ -156,7 +156,9 @@ El backend:
   `nixos-rebuild boot`
 
 El layout sigue definido en `modules/hosts/desktop/disko.nix` y la
-configuracion de plataforma permanece bajo `modules/hosts`.
+configuracion de plataforma permanece bajo `modules/hosts`. El backend instala
+`#desktop-disko`; `#desktop` queda reservado para el layout del sistema fisico
+anterior y no importa Disko.
 
 `--disk /dev/disk/by-id/ID` queda como override avanzado y no es necesario para
 la instalacion normal. Por si solo no autoriza el disco raiz; esa excepcion

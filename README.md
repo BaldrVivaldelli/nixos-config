@@ -1,8 +1,9 @@
 # NixOS config
 
-Configuracion personal de NixOS basada en flakes. El repo define los hosts
-`desktop` y `wsl` en `x86_64-linux`, usa `nixpkgs` desde la rama `nixos-26.05`
-y separa la configuracion en modulos reutilizables bajo `modules/`.
+Configuracion personal de NixOS basada en flakes. El repo define `desktop`
+para la instalacion fisica actual, `desktop-disko` para instalaciones nuevas y
+`wsl`, todos en `x86_64-linux`. Usa `nixpkgs` desde la rama `nixos-26.05` y
+separa la configuracion en modulos reutilizables bajo `modules/`.
 
 ## Mapa rapido
 
@@ -66,6 +67,11 @@ Aplicar la configuracion del desktop fisico:
 sudo nixos-rebuild switch --flake .#desktop
 ```
 
+`desktop` conserva intencionalmente los UUID del sistema instalado antes de
+Disko. Una maquina creada por `install-desktop.sh` usa `desktop-disko`; sus
+aliases `nixswitch`, `nixbuild` y `rebuild` apuntan automaticamente a ese
+perfil.
+
 Aplicar actualizaciones normales dentro de NixOS-WSL:
 
 ```bash
@@ -125,8 +131,8 @@ Desde un instalador NixOS iniciado en modo UEFI, clona el repo y ejecuta:
 > confirmacion, desmonta automaticamente los filesystems liberables y desactiva
 > su swap antes de ejecutar Disko.
 
-El script crea y monta el layout, instala `#desktop` con `nixos-install` y pide
-las contrasenas LUKS, root y `avivaldelli`. No se debe ejecutar
+El script crea y monta el layout, instala `#desktop-disko` con `nixos-install`
+y pide las contrasenas LUKS, root y `avivaldelli`. No se debe ejecutar
 `nixos-rebuild` ni `switch-to-configuration` desde el sistema live.
 
 ## Entrypoints de instalacion
@@ -210,8 +216,10 @@ git config core.hooksPath .githooks
 ## Que configura hoy
 
 - NixOS `desktop` con systemd-boot, GDM, GNOME, NetworkManager, PipeWire,
-  Chromium, `wget`, `curl`, usuario `avivaldelli` y layout de disco declarativo
-  mediante Disko.
+  Chromium, `wget`, `curl`, usuario `avivaldelli` y los UUID del sistema fisico
+  existente.
+- NixOS `desktop-disko` con la misma configuracion funcional y el layout
+  GPT/EFI/LUKS/ext4 usado por instalaciones nuevas.
 - NixOS `wsl` con el mismo entorno terminal/developer y Home Manager, sin
   hardware configuration, bootloader fisico, desktop Linux, audio, impresion,
   drivers ni la VM Windows anidada; incluye Docker Desktop y `nix-ld` para

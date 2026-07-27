@@ -31,6 +31,32 @@
       pkgs = nixpkgs.legacyPackages.${system};
       holodeck = pkgs.callPackage ./modules/nixos/features/holodeck/package.nix { };
       holodeck-system-nixos = pkgs.callPackage ./holodeck/backends/nixos/package.nix { };
+      desktop = nixpkgs.lib.nixosSystem {
+        inherit system;
+        specialArgs = {
+          inherit inputs;
+          rebuildTarget = "desktop";
+          useCurrentStorage = true;
+        };
+        modules = [
+          ./modules/parts.nix
+          ./modules/hosts/desktop
+        ];
+      };
+      desktop-disko = nixpkgs.lib.nixosSystem {
+        inherit system;
+        specialArgs = {
+          inherit inputs;
+          rebuildTarget = "desktop-disko";
+          useCurrentStorage = false;
+        };
+        modules = [
+          inputs.disko.nixosModules.disko
+          ./modules/parts.nix
+          ./modules/hosts/desktop
+          ./modules/hosts/desktop/disko.nix
+        ];
+      };
       reinstaller = nixpkgs.lib.nixosSystem {
         inherit system;
         specialArgs = {
@@ -125,6 +151,30 @@
           python3 -m unittest discover -s holodeck/tests -v
           touch "$out"
         '';
+
+        storage-profile-tests =
+          assert !(desktop.config ? disko);
+          assert desktop.config.fileSystems."/".device
+            == "/dev/mapper/luks-7bc1af0e-bc6b-401e-81fa-57a07cb9e7f6";
+          assert
+            desktop.config.boot.initrd.luks.devices."luks-7bc1af0e-bc6b-401e-81fa-57a07cb9e7f6".device
+              == "/dev/disk/by-uuid/7bc1af0e-bc6b-401e-81fa-57a07cb9e7f6";
+          assert desktop.config.fileSystems."/boot".device == "/dev/disk/by-uuid/F844-5814";
+          assert
+            desktop.config.home-manager.users.avivaldelli.homeFeatures.shell.rebuildTarget
+              == "desktop";
+          assert desktop-disko.config ? disko;
+          assert desktop-disko.config.fileSystems."/".device == "/dev/mapper/cryptroot";
+          assert desktop-disko.config.boot.initrd.luks.devices.cryptroot.device
+            == "/dev/disk/by-partlabel/disk-main-cryptroot";
+          assert desktop-disko.config.fileSystems."/boot".device
+            == "/dev/disk/by-partlabel/disk-main-ESP";
+          assert
+            desktop-disko.config.home-manager.users.avivaldelli.homeFeatures.shell.rebuildTarget
+              == "desktop-disko";
+          pkgs.runCommand "storage-profile-tests" { } ''
+            touch "$out"
+          '';
       };
 
       devShells.${system} = {
@@ -136,19 +186,8 @@
         };
       };
 
-      nixosConfigurations.desktop = nixpkgs.lib.nixosSystem {
-        inherit system;
-        specialArgs = {
-          inherit inputs;
-        };
-
-        modules = [
-          inputs.disko.nixosModules.disko
-          ./modules/parts.nix
-          ./modules/hosts/desktop
-        ];
-      };
-
+      nixosConfigurations.desktop = desktop;
+      nixosConfigurations.desktop-disko = desktop-disko;
       nixosConfigurations.reinstaller = reinstaller;
 
       nixosConfigurations.wsl = nixpkgs.lib.nixosSystem {

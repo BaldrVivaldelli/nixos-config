@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-07-27 - Safe rebuild storage profiles
+
+### Fixed
+
+- Restored the existing desktop's root, LUKS and EFI identifiers so a normal
+  `#desktop` rebuild no longer generates an initrd for a different disk layout.
+- Separated fresh Disko installations into `#desktop-disko`; the installer and
+  the installed shell aliases keep using that profile after installation.
+- Added flake assertions preventing the existing and Disko storage profiles
+  from being mixed again.
+
 ## 2026-07-27 - Safe running-system reinstall
 
 ### Added

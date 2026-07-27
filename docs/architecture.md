@@ -1,7 +1,8 @@
 # Arquitectura
 
-El repo usa flakes y modulos NixOS. La flake expone dos configuraciones:
-`nixosConfigurations.desktop` y `nixosConfigurations.wsl`.
+El repo usa flakes y modulos NixOS. La flake expone configuraciones separadas
+para el desktop actual, instalaciones nuevas con Disko, el reinstalador
+efimero y WSL.
 
 ## Import graph
 
@@ -14,7 +15,6 @@ flake.nix
     ./holodeck/backends/nixos
   apps.disko
   nixosConfigurations.desktop
-    inputs.disko.nixosModules.disko
     ./modules/parts.nix
       inputs.home-manager.nixosModules.home-manager
       ./modules/home/default.nix
@@ -36,8 +36,16 @@ flake.nix
         ./modules/nixos/features/holodeck
         ./modules/nixos/features/containers
     ./modules/hosts/desktop
-      ./modules/hosts/desktop/disko.nix
       ./modules/hosts/desktop/hardware-configuration.nix
+        storage actual habilitado
+
+  nixosConfigurations.desktop-disko
+    inputs.disko.nixosModules.disko
+    ./modules/parts.nix
+    ./modules/hosts/desktop
+      ./modules/hosts/desktop/hardware-configuration.nix
+        storage actual deshabilitado
+    ./modules/hosts/desktop/disko.nix
 
   nixosConfigurations.wsl
     inputs.nixos-wsl.nixosModules.default
@@ -59,7 +67,8 @@ se integra como modulo NixOS y declara la configuracion del usuario
 - input `home-manager.url = "github:nix-community/home-manager/release-26.05"`
 - input `disko.url = "github:nix-community/disko/latest"`
 - input `nixos-wsl.url = "github:nix-community/NixOS-WSL/release-26.05"`
-- outputs `nixosConfigurations.desktop` y `nixosConfigurations.wsl`
+- outputs `nixosConfigurations.desktop`, `desktop-disko`, `reinstaller` y
+  `wsl`
 - app/package `holodeck` para el core portable
 - app/package `holodeck-system-nixos` para instalacion NixOS
 - app `disko`, consumida por el backend NixOS
@@ -94,7 +103,6 @@ Los hosts viven en `modules/hosts/<nombre>`.
 El host `desktop` define:
 
 - bootloader
-- layout GPT/EFI/LUKS/ext4 mediante Disko
 - red
 - locale y timezone
 - escritorio
@@ -103,9 +111,11 @@ El host `desktop` define:
 - features activadas
 - `system.stateVersion`
 
-`disko.nix` define los filesystems sin UUID efimeros.
-`hardware-configuration.nix` queda separado porque contiene modulos de kernel y
-datos de CPU especificos de la maquina.
+`desktop` activa en `hardware-configuration.nix` los UUID de la instalacion que
+ya existe. `desktop-disko` desactiva ese bloque e importa `disko.nix`, que
+define los filesystems por nombres de particion estables. Ambos comparten los
+modulos de kernel y datos de CPU de la maquina, pero nunca mezclan sus dos
+layouts.
 
 El host `wsl` reutiliza los modulos comunes y Home Manager, pero importa el
 modulo oficial de NixOS-WSL y omite hardware configuration, bootloader fisico,
@@ -120,7 +130,7 @@ y `install.sh` conserva el selector extensible:
 
 ```text
 install-desktop.sh
-  -> holodeck-system-nixos -> desktop seguro -> Disko -> nixos-install
+  -> holodeck-system-nixos -> desktop seguro -> Disko -> instalar #desktop-disko
   -> modo disco raiz -> kexec NixOS en RAM -> revalidar -> Disko -> instalar
 install.sh
   -> holodeck-system-nixos
