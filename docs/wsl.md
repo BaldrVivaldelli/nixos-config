@@ -78,12 +78,6 @@ holodeck setup
 
 ```bash
 cd ~/projects/personal/nixos-config
-nixswitch
-```
-
-O explicitamente:
-
-```bash
 sudo nixos-rebuild switch --flake .#wsl
 ```
 
@@ -106,7 +100,7 @@ NixOS-WSL. No hace falta regenerar el lock para la primera instalacion. Para
 actualizar solamente NixOS-WSL mas adelante:
 
 ```bash
-nix flake update nixos-wsl
+nix --extra-experimental-features "nix-command flakes" flake update nixos-wsl
 git add flake.lock
 git commit -m "Update NixOS-WSL input"
 git push

@@ -15,9 +15,9 @@ perfiles, SSH y GPG siguen siendo responsabilidad de Holodeck.
 | `features.git.delta.enable` | bool | `true` | Instala delta para diffs enriquecidos. |
 | `features.git.lazygit.enable` | bool | `true` | Instala lazygit. |
 
-## Uso en desktop
+## Ejemplo de uso
 
-El host `desktop` activa:
+Un host puede activar:
 
 ```nix
 features.git.enable = true;

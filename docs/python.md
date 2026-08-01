@@ -10,9 +10,9 @@ La feature vive en `modules/nixos/features/python`.
 | `features.python.package` | package | `pkgs.python3` | Interprete Python a instalar. |
 | `features.python.uv.enable` | bool | `true` | Instala `uv` junto con Python. |
 
-## Uso en desktop
+## Ejemplo de uso
 
-El host `desktop` activa:
+Un host puede activar:
 
 ```nix
 features.python.enable = true;

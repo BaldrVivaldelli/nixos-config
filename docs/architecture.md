@@ -1,247 +1,66 @@
 # Arquitectura
 
-El repo usa flakes y modulos NixOS. La flake expone configuraciones separadas
-para el desktop actual, instalaciones nuevas con Disko, el reinstalador
-efimero y WSL.
-
-## Import graph
+La flake expone Home Manager standalone, NixOS-WSL y dos comandos Holodeck.
 
 ```text
 flake.nix
-  apps.holodeck
-    ./modules/nixos/features/holodeck/package.nix
-    ./holodeck/core
-  apps.holodeck-system-nixos
-    ./holodeck/backends/nixos
-  apps.disko
-  nixosConfigurations.desktop
-    ./modules/parts.nix
-      inputs.home-manager.nixosModules.home-manager
-      ./modules/home/default.nix
-        ./home/avivaldelli
-          ./modules/home/profiles/developer
-            ./modules/home/features/shell
-              ./modules/home/features/shell/completions.nix
-            ./modules/home/features/starship
-            ./modules/home/features/aws
-      ./modules/nixos/features/default.nix
-        ./modules/nixos/features/browser
-        ./modules/nixos/features/desktop
-        ./modules/nixos/features/git
-        ./modules/nixos/features/python
-        ./modules/nixos/features/nodejs
-        ./modules/nixos/features/lean
-        ./modules/nixos/features/graphics
-        ./modules/nixos/features/vscodium
-        ./modules/nixos/features/holodeck
-        ./modules/nixos/features/containers
-    ./modules/hosts/desktop
-      ./modules/hosts/desktop/hardware-configuration.nix
-        storage actual habilitado
-
-  nixosConfigurations.desktop-disko
-    inputs.disko.nixosModules.disko
-    ./modules/parts.nix
-    ./modules/hosts/desktop
-      ./modules/hosts/desktop/hardware-configuration.nix
-        storage actual deshabilitado
-    ./modules/hosts/desktop/disko.nix
-
-  nixosConfigurations.wsl
-    inputs.nixos-wsl.nixosModules.default
-    ./modules/parts.nix
-    ./modules/hosts/wsl
+├── homeConfigurations.avivaldelli
+│   └── home/avivaldelli
+│       └── modules/home/profiles/developer
+├── nixosConfigurations.wsl
+│   ├── nixos-wsl.nixosModules.default
+│   ├── modules/parts.nix
+│   │   ├── modules/home
+│   │   └── modules/nixos/features
+│   └── modules/hosts/wsl
+├── apps.holodeck
+│   └── packages/holodeck
+│       └── holodeck/core
+└── apps.holodeck-system-nixos
+    └── holodeck/backends/nixos
 ```
-
-NixOS combina todos los modulos importados. Las features se importan siempre,
-pero su configuracion efectiva queda detras de opciones `enable`. Home Manager
-se integra como modulo NixOS y declara la configuracion del usuario
-`avivaldelli`.
-
-## Flake
-
-`flake.nix` define:
-
-- `description = "Mi configuracion NixOS"`
-- input `nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05"`
-- input `home-manager.url = "github:nix-community/home-manager/release-26.05"`
-- input `disko.url = "github:nix-community/disko/latest"`
-- input `nixos-wsl.url = "github:nix-community/NixOS-WSL/release-26.05"`
-- outputs `nixosConfigurations.desktop`, `desktop-disko`, `reinstaller` y
-  `wsl`
-- app/package `holodeck` para el core portable
-- app/package `holodeck-system-nixos` para instalacion NixOS
-- app `disko`, consumida por el backend NixOS
-- sistema `x86_64-linux`
-- `specialArgs.inputs`, para que `modules/parts.nix` pueda importar modulos
-  desde inputs de la flake.
-
-El lockfile fija las revisiones exactas de `nixpkgs`, `home-manager`, `disko` y
-`nixos-wsl`.
-
-## Modulos base
-
-`modules/parts.nix` agrupa las partes comunes del sistema:
-
-- `inputs.home-manager.nixosModules.home-manager`
-- `./home`
-- `./nixos/features`
-
-`modules/nixos/features/default.nix` descubre modulos automaticamente dentro de
-`modules/nixos/features`:
-
-- archivos `.nix` regulares, excepto `default.nix`
-- directorios que tengan `default.nix`
-
-Esto permite agregar una feature nueva creando un directorio con `default.nix`
-sin editar el indice manualmente.
-
-## Hosts
-
-Los hosts viven en `modules/hosts/<nombre>`.
-
-El host `desktop` define:
-
-- bootloader
-- red
-- locale y timezone
-- escritorio
-- usuario
-- paquetes base
-- features activadas
-- `system.stateVersion`
-
-`desktop` activa en `hardware-configuration.nix` los UUID de la instalacion que
-ya existe. `desktop-disko` desactiva ese bloque e importa `disko.nix`, que
-define los filesystems por nombres de particion estables. Ambos comparten los
-modulos de kernel y datos de CPU de la maquina, pero nunca mezclan sus dos
-layouts.
-
-El host `wsl` reutiliza los modulos comunes y Home Manager, pero importa el
-modulo oficial de NixOS-WSL y omite hardware configuration, bootloader fisico,
-NetworkManager, audio, impresion, GNOME, navegador, drivers, VSCodium Linux y
-la VM Windows anidada.
-
-## Frontera de instalacion y estado personal
-
-Los entrypoints de instalacion seleccionan un backend de sistema sin
-incorporarlo al core portable. Desktop expone un acceso directo sin argumentos
-y `install.sh` conserva el selector extensible:
-
-```text
-install-desktop.sh
-  -> holodeck-system-nixos -> desktop seguro -> Disko -> instalar #desktop-disko
-  -> modo disco raiz -> kexec NixOS en RAM -> revalidar -> Disko -> instalar
-install.sh
-  -> holodeck-system-nixos
-       -> wsl     -> nixos-rebuild boot .#wsl
-  -> holodeck-system-<otro>
-```
-
-La dependencia apunta en una sola direccion:
-
-```text
-backend NixOS -> utilidades portables del core
-core Holodeck -X-> backend NixOS
-```
-
-El paquete `holodeck` no contiene `nix`, `sudo`, Disko ni `util-linux`. El
-layout de disco, bootloader y diferencias de plataforma permanecen en los hosts
-NixOS. La autenticacion, llaves y perfiles permanecen en `holodeck setup` y se
-ejecutan despues de iniciar sesion como usuario normal. De este modo un rebuild
-no regenera credenciales y un onboarding nunca modifica `/boot`.
 
 ## Home Manager
 
-La configuracion interactiva del usuario se arma desde `home/avivaldelli`,
-que funciona como identidad local y elige un perfil Home Manager.
+`homeConfigurations.avivaldelli` permite construir y activar únicamente el
+perfil del usuario. La configuración base también se integra en `#wsl`
+mediante `modules/home/default.nix`; WSL desactiva las aplicaciones gráficas
+de `developerTools`.
 
-- `default.nix`: datos del usuario, `home.stateVersion` e import del perfil.
+## NixOS-WSL
 
-`modules/home/default.nix` es el puente NixOS hacia Home Manager: define
-`home-manager.useGlobalPkgs`, `home-manager.useUserPackages`, backups y el
-perfil `home-manager.users.avivaldelli`.
+`nixosConfigurations.wsl` importa el módulo oficial de NixOS-WSL, las
+features reutilizables y `modules/hosts/wsl`. Este host administra su usuario,
+locales, shell e integración con Windows y Docker Desktop.
 
-Los perfiles Home Manager viven en `modules/home/profiles`.
+## Backends
 
-- `developer`: shell, starship y AWS. Es el perfil default de `avivaldelli`.
-- `minimal`: shell y starship, sin helpers cloud.
+`install.sh` centraliza Home Manager para NixOS existentes, conserva el
+selector extensible y delega instalaciones de sistema a backends. El backend
+incluido `holodeck-system-nixos` sólo implementa `--target wsl`; otros
+sistemas pueden aportar un ejecutable o una app con el nombre
+`holodeck-system-<backend>`.
 
-Los modulos reutilizables de Home Manager viven en `modules/home/features`.
+## Límite del desktop físico
 
-- `modules/home/features/shell/default.nix`: zsh, aliases, fzf, zoxide y
-  direnv. Se activa con `homeFeatures.shell.enable`.
-- `modules/home/features/shell/completions.nix`: completions declarativas para
-  comandos propios.
-- `modules/home/features/starship/default.nix`: prompt. Se activa con
-  `homeFeatures.starship.enable`.
-- `modules/home/features/aws/default.nix`: `awscli2`, helpers interactivos y
-  completions AWS. Se activa con `homeFeatures.aws.enable`.
+Se eliminaron:
 
-La diferencia de responsabilidades es:
+- `modules/hosts/desktop`;
+- el layout Disko;
+- el instalador directo del desktop;
+- el reinstalador kexec;
+- toda selección, montaje, particionado y formateo de discos.
 
-- NixOS/system: paquetes base, usuarios, servicios, Docker, shells disponibles.
-- Home Manager/user: dotfiles, aliases, funciones de shell, prompt y tooling
-  interactivo del usuario.
+`verify-no-desktop.sh` impide que esas rutas y patrones vuelvan a entrar. Los
+módulos de features permanecen porque son reutilizables y no declaran el layout
+de ningún host.
 
-Home Manager usa `useGlobalPkgs = true`, por lo que comparte el mismo `pkgs`
-del sistema.
+## Extender
 
-## Features
+Las preferencias de usuario viven bajo `modules/home/features`. Las features
+de sistema viven bajo `modules/nixos/features` y quedan deshabilitadas por
+default. Un nuevo backend debe respetar:
 
-Convencion actual:
-
-- Las opciones viven bajo `features.<nombre>`.
-- Cada feature tiene `enable = lib.mkEnableOption ...`.
-- La configuracion se aplica con `lib.mkIf cfg.enable`.
-- Los submodulos de una feature viven junto a ella.
-
-Ejemplo minimo:
-
-```nix
-{ config, lib, pkgs, ... }:
-
-let
-  cfg = config.features.example;
-in
-{
-  options.features.example.enable = lib.mkEnableOption "example feature";
-
-  config = lib.mkIf cfg.enable {
-    environment.systemPackages = [ pkgs.hello ];
-  };
-}
+```text
+holodeck-system-BACKEND install --repo RUTA [argumentos]
 ```
-
-## Agregar un host
-
-1. Crear `modules/hosts/<nuevo-host>/default.nix`.
-2. Para una maquina fisica, agregar su `hardware-configuration.nix`; para WSL
-   u otros entornos virtualizados, importar el modulo de plataforma apropiado.
-3. Agregar una salida en `flake.nix`:
-
-```nix
-nixosConfigurations.<nuevo-host> = nixpkgs.lib.nixosSystem {
-  system = "x86_64-linux";
-  specialArgs = {
-    inherit inputs;
-  };
-  modules = [
-    ./modules/parts.nix
-    ./modules/hosts/<nuevo-host>
-  ];
-};
-```
-
-## Agregar una feature
-
-1. Crear `modules/nixos/features/<feature>/default.nix`.
-2. Definir opciones bajo `features.<feature>`.
-3. Encapsular efectos con `lib.mkIf cfg.enable`.
-4. Activarla desde el host:
-
-```nix
-features.<feature>.enable = true;
-```
-
-Si la feature necesita archivos auxiliares, dejarlos dentro de su directorio.

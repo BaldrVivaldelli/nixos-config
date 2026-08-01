@@ -1,4 +1,4 @@
-"""Smoke tests for the single installation entrypoint."""
+"""Smoke tests for the portable installation selector."""
 
 from __future__ import annotations
 
@@ -13,7 +13,6 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 INSTALLER = REPO / "install.sh"
-DESKTOP_INSTALLER = REPO / "install-desktop.sh"
 BASH = shutil.which("bash")
 
 
@@ -32,7 +31,6 @@ class InstallSelectorTests(unittest.TestCase):
         self,
         args: list[str],
         *,
-        installer: Path = INSTALLER,
         input_text: str | None = None,
         extra_commands: tuple[str, ...] = (),
     ) -> subprocess.CompletedProcess:
@@ -47,7 +45,7 @@ class InstallSelectorTests(unittest.TestCase):
             environment = os.environ.copy()
             environment["PATH"] = f"{command_dir}{os.pathsep}{environment['PATH']}"
             return subprocess.run(
-                [BASH, str(installer), *args],
+                [BASH, str(INSTALLER), *args],
                 input=input_text,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -56,68 +54,59 @@ class InstallSelectorTests(unittest.TestCase):
                 env=environment,
             )
 
-    def test_desktop_entrypoint_uses_safe_detection_without_arguments(self) -> None:
-        result = self.run_installer([], installer=DESKTOP_INSTALLER)
-
-        self.assertEqual(result.returncode, 0)
-        self.assertIn("run .#holodeck-system-nixos", result.stdout)
-        self.assertIn("--target desktop", result.stdout)
-        self.assertNotIn("--disk", result.stdout)
-
-    def test_desktop_entrypoint_forwards_running_system_mode(self) -> None:
-        result = self.run_installer(
-            [
-                "--disk",
-                "/dev/disk/by-id/example",
-                "--allow-running-system-disk",
-            ],
-            installer=DESKTOP_INSTALLER,
-        )
-
-        self.assertEqual(result.returncode, 0)
-        self.assertIn("--disk /dev/disk/by-id/example", result.stdout)
-        self.assertIn("--allow-running-system-disk", result.stdout)
-
-    def test_routes_nixos_desktop_to_optional_backend(self) -> None:
-        result = self.run_installer(["nixos", "desktop"])
-
-        self.assertEqual(result.returncode, 0)
-        self.assertIn("run .#holodeck-system-nixos", result.stdout)
-        self.assertIn("--target desktop", result.stdout)
-        self.assertNotIn("--disk", result.stdout)
-
-    def test_desktop_accepts_an_explicit_disk_override(self) -> None:
-        result = self.run_installer(
-            [
-                "nixos",
-                "desktop",
-                "--disk",
-                "/dev/disk/by-id/example",
-            ]
-        )
-
-        self.assertEqual(result.returncode, 0)
-        self.assertIn("--disk /dev/disk/by-id/example", result.stdout)
-
-    def test_routes_nixos_wsl_to_optional_backend(self) -> None:
+    def test_routes_explicit_nixos_wsl(self) -> None:
         result = self.run_installer(["nixos", "wsl"])
 
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("run .#holodeck-system-nixos", result.stdout)
+        self.assertIn("--target wsl", result.stdout)
+
+    def test_installs_home_manager_with_verify_build_and_switch(self) -> None:
+        result = self.run_installer(["home-manager"])
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(
+            "OK: la configuración standalone de Home Manager",
+            result.stdout,
+        )
+        self.assertIn("-- build --flake", result.stdout)
+        self.assertIn("-- switch --flake", result.stdout)
+        self.assertLess(
+            result.stdout.index("-- build --flake"),
+            result.stdout.index("-- switch --flake"),
+        )
+
+    def test_nixos_home_manager_alias_uses_same_flow(self) -> None:
+        result = self.run_installer(["nixos", "home-manager"])
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("-- build --flake", result.stdout)
+        self.assertIn("-- switch --flake", result.stdout)
+
+    def test_nixos_defaults_to_wsl(self) -> None:
+        result = self.run_installer(["nixos"])
+
         self.assertEqual(result.returncode, 0)
         self.assertIn("--target wsl", result.stdout)
-        self.assertNotIn("--disk", result.stdout)
+
+    def test_interactive_selector_can_choose_home_manager(self) -> None:
+        result = self.run_installer([], input_text="1\n")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("-- build --flake", result.stdout)
+        self.assertIn("-- switch --flake", result.stdout)
 
     def test_interactive_selector_can_choose_wsl(self) -> None:
-        result = self.run_installer([], input_text="1\n2\n")
+        result = self.run_installer([], input_text="2\n")
 
         self.assertEqual(result.returncode, 0)
         self.assertIn("--target wsl", result.stdout)
 
-    def test_interactive_selector_can_choose_desktop_without_disk_prompt(self) -> None:
-        result = self.run_installer([], input_text="1\n1\n")
+    def test_rejects_removed_desktop_target(self) -> None:
+        result = self.run_installer(["nixos", "desktop"])
 
-        self.assertEqual(result.returncode, 0)
-        self.assertIn("--target desktop", result.stdout)
-        self.assertNotIn("--disk", result.stdout)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("usá home-manager o wsl", result.stderr)
 
     def test_routes_external_backend_by_executable_contract(self) -> None:
         result = self.run_installer(

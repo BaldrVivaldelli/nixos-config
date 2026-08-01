@@ -26,9 +26,9 @@ modules/nixos/features/desktop/
 | `features.desktop.keyboard.layout` | string | `us` | Layout XKB. |
 | `features.desktop.keyboard.variant` | string | `""` | Variante XKB. |
 
-## Uso en desktop
+## Ejemplo de uso
 
-El host `desktop` activa:
+Un host gráfico puede activar:
 
 ```nix
 features.desktop.enable = true;

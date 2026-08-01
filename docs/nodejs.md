@@ -11,9 +11,9 @@ La feature vive en `modules/nixos/features/nodejs`.
 | `features.nodejs.pnpm.enable` | bool | `false` | Instala `pnpm` junto con Node.js. |
 | `features.nodejs.yarn.enable` | bool | `false` | Instala `yarn` junto con Node.js. |
 
-## Uso en desktop
+## Ejemplo de uso
 
-El host `desktop` activa:
+Un host puede activar:
 
 ```nix
 features.nodejs.enable = true;

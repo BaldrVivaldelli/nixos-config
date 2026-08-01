@@ -1,4 +1,4 @@
-"""CLI for the optional NixOS system backend."""
+"""CLI for the optional NixOS-WSL backend."""
 
 from __future__ import annotations
 
@@ -17,15 +17,11 @@ def usage() -> None:
         """Usage: holodeck-system-nixos <command>
 
 Commands:
-  install --target desktop
   install --target wsl
   help
 
-This optional backend owns NixOS/Disko installation. The portable `holodeck`
-command remains responsible only for user identity and provider setup.
-Desktop detects safe disk candidates automatically; --disk is an advanced
-override. Reinstalling the running system disk additionally requires
---allow-running-system-disk and transitions to an ephemeral kexec installer."""
+This optional backend installs the declared NixOS-WSL target. It does not
+inspect, partition, format or mount physical disks."""
     )
 
 

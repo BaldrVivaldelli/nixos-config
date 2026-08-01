@@ -1,165 +1,48 @@
 # Mantenimiento
 
-Comandos y flujos comunes para operar el repo.
-
-## Construir y aplicar
-
-Construir sin activar:
+## Home Manager standalone
 
 ```bash
-sudo nixos-rebuild build --flake .#desktop
+./install.sh home-manager
 ```
 
-Aplicar ahora:
+Este comando verifica, construye y activa el perfil. Se ejecuta como usuario
+normal. Para validar sin activar todavía se puede usar
+`./apply-home.sh build`.
+
+## NixOS-WSL
 
 ```bash
-sudo nixos-rebuild switch --flake .#desktop
+sudo nixos-rebuild build --flake .#wsl
+sudo nixos-rebuild switch --flake .#wsl
 ```
 
-Esto tambien aplica la configuracion de Home Manager integrada para
-`avivaldelli`. Estos ejemplos usan `#desktop`, el perfil de la instalacion
-fisica existente. En una maquina creada por `install-desktop.sh`, usa
-`#desktop-disko`; los aliases `nixbuild`, `nixswitch` y `rebuild` ya seleccionan
-ese target automaticamente.
+La primera preparación puede hacerse con `./install.sh nixos wsl`.
 
-Probar hasta el proximo reboot:
+## Checks
 
 ```bash
-sudo nixos-rebuild test --flake .#desktop
+./verify-user-only.sh
+./verify-no-desktop.sh
+nix --extra-experimental-features "nix-command flakes" \
+  flake check --print-build-logs
 ```
 
-Crear una generacion para el proximo boot:
+El primer script comprueba el límite de la configuración Home Manager. El
+segundo rechaza hosts físicos, Disko y patrones de almacenamiento. El check de
+la flake evalúa además `#wsl` y ejecuta las pruebas de Holodeck e instaladores.
+
+## Formato
 
 ```bash
-sudo nixos-rebuild boot --flake .#desktop
+nix --extra-experimental-features "nix-command flakes" fmt
 ```
 
-## Validar
+## Actualizar inputs
 
 ```bash
-nix flake check
+nix --extra-experimental-features "nix-command flakes" flake update
+nix --extra-experimental-features "nix-command flakes" flake check
 ```
 
-Este check ejecuta por separado las pruebas del core portable de Holodeck, las
-del selector de backends y las del backend NixOS. Tambien evalua que `desktop`
-mantenga sus UUID actuales y que `desktop-disko` use exclusivamente el layout
-de Disko.
-
-Formatear archivos Nix del repo:
-
-```bash
-nix fmt
-```
-
-Entrar a un shell con el formatter:
-
-```bash
-nix develop
-```
-
-Si hay archivos nuevos sin trackear y queres validar antes de agregarlos a Git:
-
-```bash
-nix eval --offline path:$PWD#nixosConfigurations.desktop.config.system.build.toplevel.drvPath
-```
-
-Tambien es util revisar espacios o conflictos de patch:
-
-```bash
-git diff --check
-```
-
-## CI
-
-GitHub Actions corre `nix flake check` en pushes a `main` y en pull requests:
-
-```text
-.github/workflows/flake-check.yml
-```
-
-## Actualizar nixpkgs
-
-Actualizar todos los inputs:
-
-```bash
-nix flake update
-```
-
-Actualizar solo `nixpkgs`:
-
-```bash
-nix flake lock --update-input nixpkgs
-```
-
-Despues:
-
-```bash
-sudo nixos-rebuild build --flake .#desktop
-sudo nixos-rebuild switch --flake .#desktop
-```
-
-## Revisar cambios
-
-```bash
-git status --short
-git diff
-```
-
-Ver generaciones:
-
-```bash
-sudo nix-env --list-generations --profile /nix/var/nix/profiles/system
-```
-
-Volver a la generacion anterior desde bootloader sigue disponible mientras no se
-eliminen generaciones viejas.
-
-## Hooks
-
-El repo trae `.githooks/pre-commit` para bloquear secretos obvios en archivos
-stageados. Activarlo una vez:
-
-```bash
-git config core.hooksPath .githooks
-```
-
-El hook revisa:
-
-- paths como `.env`, `.ssh`, `.gnupg`, `secrets`, `private`
-- llaves privadas
-- extensiones sensibles como `.pem`, `.key`, `.p12`, `.gpg`, `.age`, `.kdbx`
-- patrones comunes de tokens de GitHub, GitLab, AWS y Slack
-
-## Cuando cambia hardware
-
-Si esta configuracion se mueve a otra maquina:
-
-1. Generar hardware config con `nixos-generate-config`.
-2. Comparar contra `modules/hosts/desktop/hardware-configuration.nix`.
-3. Reemplazar solo despues de revisar discos, LUKS, boot y CPU.
-4. Construir antes de hacer switch.
-
-## Cuando falla una imagen o extension
-
-Si Nix falla por hash incorrecto:
-
-1. Confirmar que la version o digest sea la que queres.
-2. Leer el hash esperado que muestra Nix.
-3. Reemplazar el hash en `images.json` o `extensions.json`.
-4. Volver a construir.
-
-## Limpieza
-
-Recolectar generaciones viejas:
-
-```bash
-sudo nix-collect-garbage --delete-older-than 14d
-```
-
-Optimizar store:
-
-```bash
-nix store optimise
-```
-
-No borrar manualmente contenido de `/nix/store`.
+Revisar siempre `flake.lock` antes de activar el perfil o el sistema WSL.

@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-08-01 - Home Manager and WSL split
+
+### Changed
+
+- Kept the personal profile available through standalone Home Manager.
+- Centralized verification, build and activation of that profile under
+  `./install.sh home-manager`.
+- Kept the NixOS-WSL host and the portable system-backend contract.
+- Limited the NixOS backend included in this repo to the WSL target.
+- Made CI reject physical-desktop and disk-management logic.
+
+### Removed
+
+- Removed the physical NixOS desktop host, Disko layout, destructive desktop
+  installer and kexec reinstaller.
+
 ## 2026-07-27 - Safe rebuild storage profiles
 
 ### Fixed

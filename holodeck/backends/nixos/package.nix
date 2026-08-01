@@ -5,7 +5,6 @@
   nix,
   python3,
   sudo,
-  util-linux,
 }:
 
 writeShellApplication {
@@ -17,7 +16,6 @@ writeShellApplication {
     nix
     python3
     sudo
-    util-linux
   ];
 
   text = ''

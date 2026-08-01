@@ -22,9 +22,9 @@ host declara que driver quiere usar, y `gpu-doctor` ayuda a elegirlo.
 | `features.graphics.nvidia.settings.enable` | bool | `true` | Instala `nvidia-settings`. |
 | `features.graphics.nvidia.package` | package | `stable` | Paquete de driver NVIDIA a usar. |
 
-## Uso en desktop
+## Ejemplo de uso
 
-El host `desktop` activa:
+Un host gráfico puede activar:
 
 ```nix
 # >>> gpu-doctor graphics
@@ -50,17 +50,17 @@ gpu-doctor
 El comando muestra GPUs detectadas por `lspci` y propone un bloque Nix para el
 host.
 
-Si se ejecuta desde la raiz del repo, pregunta si queres aplicar la
-recomendacion al host y correr:
+Si el repo vuelve a incorporar un host gráfico, se puede indicar explícitamente
+su nombre para aplicar la recomendación:
 
 ```bash
-sudo nixos-rebuild switch --flake .#desktop
+gpu-doctor --host <host>
 ```
 
 Para aplicar sin correr rebuild:
 
 ```bash
-gpu-doctor --yes --no-rebuild
+gpu-doctor --host <host> --yes --no-rebuild
 ```
 
 Para recomendar librerias graficas de 32 bits, util para Steam, Wine o juegos

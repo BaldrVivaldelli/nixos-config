@@ -13,9 +13,9 @@ suele declarar la version por proyecto con un archivo `lean-toolchain`.
 | `features.lean.package` | package | `pkgs.elan` | Toolchain manager de Lean. |
 | `features.lean.lean4.enable` | bool | `false` | Instala tambien `pkgs.lean4` desde nixpkgs. |
 
-## Uso en desktop
+## Ejemplo de uso
 
-El host `desktop` activa:
+Un host puede activar:
 
 ```nix
 features.lean.enable = true;

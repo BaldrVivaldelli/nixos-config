@@ -1,7 +1,7 @@
 # Contenedores y Windows VM
 
 La feature vive en `modules/nixos/features/containers` y puede habilitar Docker o
-Podman. En el host `desktop` esta activa con Docker.
+Podman. Se conserva como módulo reutilizable y ningún host actual la activa.
 
 ## Opciones principales
 

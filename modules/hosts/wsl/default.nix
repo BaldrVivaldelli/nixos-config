@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ lib, pkgs, ... }:
 
 {
   # NixOS-WSL manages the kernel, initrd, bootloader, Windows mounts,
@@ -30,7 +30,7 @@
   };
 
   # wsl.defaultUser defines the normal user and grants wheel access. These
-  # extra properties keep it aligned with the physical desktop host.
+  # These extra properties define the interactive user environment.
   users.users.avivaldelli = {
     description = "avivaldelli";
     shell = pkgs.zsh;
@@ -42,16 +42,16 @@
   # the conventional dynamic loader path that this server expects.
   programs.nix-ld.enable = true;
 
-  # Reuse the terminal/developer capabilities already enabled by #desktop.
+  # Reuse the terminal/developer features available in this repository.
   features.git.enable = true;
   features.python.enable = true;
   features.nodejs.enable = true;
   features.lean.enable = true;
   features.holodeck.enable = true;
 
-  # Home Manager is imported globally by modules/parts.nix. Make its rebuild
-  # aliases target this host instead of the physical desktop.
-  home-manager.users.avivaldelli.homeFeatures.shell.rebuildTarget = "wsl";
+  # Keep graphical/user applications in the standalone Home Manager profile.
+  home-manager.users.avivaldelli.homeFeatures.developerTools.enable =
+    lib.mkForce false;
 
   # Intentionally omitted in WSL:
   # - hardware-configuration.nix and physical bootloader settings

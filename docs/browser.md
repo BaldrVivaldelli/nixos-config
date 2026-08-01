@@ -22,9 +22,9 @@ navegador mas adelante.
 | `features.browser.search.suggestUrl` | string | Google | URL de sugerencias. |
 | `features.browser.defaultBrowser.enable` | bool | `true` | Usa Chromium para links web y HTML. |
 
-## Uso en desktop
+## Ejemplo de uso
 
-El host `desktop` activa:
+Un host gráfico puede activar:
 
 ```nix
 features.browser.enable = true;

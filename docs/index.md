@@ -1,41 +1,29 @@
-# Documentacion
+# Documentación
 
-Este directorio explica como esta armado el repo, como operarlo y donde tocar
-cuando quieras agregar o cambiar algo.
+El repositorio combina Home Manager standalone con un único host de sistema:
+NixOS-WSL. No administra un desktop físico ni discos.
 
 ## Lectura recomendada
 
-1. [Arquitectura](architecture.md): import graph, convenciones y como agregar
-   hosts o features.
-2. [Host desktop](desktop.md): configuracion concreta de la maquina fisica.
-3. [Host WSL](wsl.md): entorno de desarrollo sobre NixOS-WSL.
-4. [Home Manager](home-manager.md): configuracion declarativa del usuario.
-5. [Features](features.md): resumen de los modulos activables.
-6. [Mantenimiento](maintenance.md): comandos habituales, updates y checks.
-7. [Seguridad y secretos](security.md): que no debe entrar al repo.
+1. [Arquitectura](architecture.md): outputs, imports y límites.
+2. [Home Manager](home-manager.md): perfil personal y aplicación.
+3. [NixOS-WSL](wsl.md): host e instalación conservados.
+4. [Holodeck](holodeck.md): core portable y backends.
+5. [Mantenimiento](maintenance.md): checks y actualizaciones.
+6. [Seguridad y secretos](security.md): estado que queda fuera de Git.
 
-## Guias por feature
+## Módulos reutilizables
 
 - [Browser](browser.md)
 - [Desktop feature](desktop-feature.md)
+- [Features](features.md)
 - [Git](git.md)
 - [Python](python.md)
 - [Node.js](nodejs.md)
 - [Lean](lean.md)
-- [Graficos y GPU](graphics.md)
+- [Gráficos y GPU](graphics.md)
 - [VSCodium](vscodium.md)
-- [Holodeck](holodeck.md)
 - [Contenedores y Windows VM](containers.md)
 
-## Estado local fuera del repo
-
-Algunas features generan estado en el sistema:
-
-- Holodeck usa `~/.config/holodeck`, `~/.ssh`, `~/.gitconfig`, `~/.ssh/config`
-  y el keyring de GPG.
-- Docker mantiene imagenes, contenedores y volumenes en el estado local del
-  daemon.
-- `windowsvm` usa por defecto `~/containers/windows/storage` y
-  `~/containers/windows/shared`.
-
-Ese estado no debe versionarse.
+Estos módulos se conservan como biblioteca, aunque el repo ya no publique un
+host de desktop físico que los active.

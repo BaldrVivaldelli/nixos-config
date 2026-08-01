@@ -1,7 +1,7 @@
 [project]
 name = "holodeck-system-nixos"
-version = "0.1.0"
-description = "Optional NixOS and Disko installation backend for Holodeck"
+version = "0.2.0"
+description = "Optional NixOS-WSL installation backend for Holodeck"
 requires-python = ">=3.11"
 dependencies = []
 
