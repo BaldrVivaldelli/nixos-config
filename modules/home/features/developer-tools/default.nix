@@ -8,13 +8,16 @@
 let
   cfg = config.homeFeatures.developerTools;
 
+  vscodiumExtensions = pkgs.vscode-utils.extensionsFromVscodeMarketplace (
+    builtins.fromJSON (builtins.readFile ../../../nixos/features/vscodium/extensions.json)
+  );
+
   holodeck = pkgs.callPackage ../../../../packages/holodeck {
     coreSource = ../../../../holodeck/core;
   };
 in
 {
-  options.homeFeatures.developerTools.enable =
-    lib.mkEnableOption "herramientas y aplicaciones personales de desarrollo";
+  options.homeFeatures.developerTools.enable = lib.mkEnableOption "herramientas y aplicaciones personales de desarrollo";
 
   config = lib.mkIf cfg.enable {
     home.packages = with pkgs; [
@@ -38,7 +41,6 @@ in
 
       # Aplicaciones gráficas instalables en el perfil del usuario.
       chromium
-      vscodium
 
       # Identidad, SSH y utilidades de escritorio.
       gnupg
@@ -54,6 +56,35 @@ in
       BROWSER = "chromium";
       EDITOR = "codium";
       VISUAL = "codium";
+    };
+
+    xdg.mimeApps = {
+      enable = true;
+      defaultApplications = {
+        "text/html" = "chromium-browser.desktop";
+        "text/xml" = "chromium-browser.desktop";
+        "application/xhtml+xml" = "chromium-browser.desktop";
+        "application/xml" = "chromium-browser.desktop";
+        "application/pdf" = "chromium-browser.desktop";
+        "x-scheme-handler/http" = "chromium-browser.desktop";
+        "x-scheme-handler/https" = "chromium-browser.desktop";
+        "x-scheme-handler/about" = "chromium-browser.desktop";
+        "x-scheme-handler/unknown" = "chromium-browser.desktop";
+      };
+    };
+
+    programs.vscodium = {
+      enable = true;
+      package = pkgs.vscodium;
+
+      profiles.default = {
+        extensions = vscodiumExtensions;
+        userSettings = {
+          "git.autofetch" = true;
+          "workbench.colorTheme" = "Catppuccin Frappé";
+          "workbench.iconTheme" = "catppuccin-mocha";
+        };
+      };
     };
   };
 }

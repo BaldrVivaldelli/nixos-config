@@ -101,6 +101,29 @@
       checks.${system} = {
         home-profile =
           assert homeProfile.config.home.username == "avivaldelli";
+          assert homeProfile.config.home.sessionVariables.BROWSER == "chromium";
+          assert homeProfile.config.home.sessionVariables.SHELL == "${pkgs.zsh}/bin/zsh";
+          assert
+            homeProfile.config.xdg.mimeApps.defaultApplications."x-scheme-handler/https"
+            == [ "chromium-browser.desktop" ];
+          assert homeProfile.config.programs.bash.enable;
+          assert homeProfile.config.programs.zsh.enable;
+          assert homeProfile.config.programs.vscodium.enable;
+          assert
+            homeProfile.config.programs.vscodium.profiles.default.userSettings == {
+              "git.autofetch" = true;
+              "workbench.colorTheme" = "Catppuccin Frappé";
+              "workbench.iconTheme" = "catppuccin-mocha";
+            };
+          assert
+            map (
+              extension: extension.vscodeExtUniqueId
+            ) homeProfile.config.programs.vscodium.profiles.default.extensions == [
+              "catppuccin.catppuccin-vsc"
+              "catppuccin.catppuccin-vsc-icons"
+              "catppuccin.catppuccin-vsc-pack"
+              "openai.chatgpt"
+            ];
           pkgs.runCommand "home-profile-check" { } ''
             touch "$out"
           '';

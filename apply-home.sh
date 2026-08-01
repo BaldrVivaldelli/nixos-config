@@ -54,14 +54,20 @@ if [[ "$mode" == "build" ]]; then
   echo "Nota: build no instala los programas. Luego ejecuta: ./apply-home.sh switch" >&2
 else
   echo "Instalando y activando los programas del usuario..." >&2
+  echo "Los archivos previos en conflicto se conservaran con extension .hm-bak." >&2
 fi
 
 cd "$repo_dir"
 
 # El flag explicito habilita las features para este primer `nix run` incluso si
 # la configuracion global de NixOS las tiene deshabilitadas.
+home_manager_args=("$mode")
+if [[ "$mode" == "switch" ]]; then
+  home_manager_args+=( -b hm-bak )
+fi
+home_manager_args+=(--flake "path:$repo_dir#avivaldelli")
+
 exec nix \
   --extra-experimental-features "$required_nix_features" \
   run "path:$repo_dir#home-manager" -- \
-  "$mode" \
-  --flake "path:$repo_dir#avivaldelli"
+  "${home_manager_args[@]}"

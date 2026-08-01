@@ -1,6 +1,8 @@
 # VSCodium
 
-La feature vive en `modules/nixos/features/vscodium`.
+La lista compartida de extensiones vive en
+`modules/nixos/features/vscodium/extensions.json`. La consumen tanto la feature
+NixOS como el perfil `developer` de Home Manager.
 
 ## Opciones
 
@@ -28,6 +30,7 @@ Las extensiones se leen desde `modules/nixos/features/vscodium/extensions.json`.
 
 - `catppuccin.catppuccin-vsc`
 - `catppuccin.catppuccin-vsc-icons`
+- `catppuccin.catppuccin-vsc-pack`
 - `openai.chatgpt`
 
 Cada extension queda pinneada por:
@@ -37,6 +40,19 @@ Cada extension queda pinneada por:
 - `version`
 - `sha256`
 - opcionalmente `arch`
+
+## Home Manager
+
+El perfil `developer` instala VSCodium y esas mismas extensiones mediante
+`programs.vscodium`. También declara los ajustes personales actuales:
+
+- Git auto-fetch habilitado;
+- tema `Catppuccin Frappé`;
+- iconos `catppuccin-mocha`.
+
+La extensión de Codex queda instalada, pero su SSO, tokens, `globalStorage` y
+demás estado autenticado no se guardan en Nix ni en el repositorio. Una
+instalación nueva seguirá solicitando autenticación.
 
 ## Agregar o actualizar extensiones
 

@@ -12,6 +12,12 @@
     "sha256": "0ggz024rf69awnkx66fjyc2bpk48dj3bxrdn1q28vfm8s0v62mjp"
   },
   {
+    "publisher": "catppuccin",
+    "name": "catppuccin-vsc-pack",
+    "version": "1.0.2",
+    "sha256": "sha256-jAoT3lmE2CGaahe2G2FF5bToM7sF9G1duEYO1a6+KS4="
+  },
+  {
     "publisher": "openai",
     "name": "chatgpt",
     "version": "26.623.31443",

@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-08-01 - Reproducible Home Manager defaults
+
+### Added
+
+- Declared the installed VSCodium extensions and personal editor settings in
+  Home Manager, sharing the pinned extension list with the reusable NixOS
+  module.
+- Added the Catppuccin extension pack alongside its color and icon themes.
+- Added flake assertions for the browser, shell and VSCodium defaults.
+
+### Changed
+
+- Made Chromium the default XDG handler for web links, HTML, XML and PDF in
+  the personal profile.
+- Made Zsh the default interactive terminal experience, including a safe Bash
+  bridge for standalone Home Manager installations.
+- Made standalone Home Manager preserve conflicting manual files with the
+  `.hm-bak` extension during activation.
+
 ## 2026-08-01 - Home Manager and WSL split
 
 ### Changed

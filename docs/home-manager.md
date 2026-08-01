@@ -14,6 +14,15 @@ El perfil personal puede usarse de dos formas:
 - AWS CLI y helpers;
 - herramientas de desarrollo, aplicaciones y Holodeck.
 
+El perfil publica Zsh en `SHELL` y redirige a Zsh las terminales interactivas
+que todavía arranquen Bash. Esto permite usarlo también en instalaciones donde
+Home Manager no puede cambiar el login shell de `/etc/passwd`. Para abrir Bash
+de forma explícita se puede ejecutar `HM_KEEP_BASH=1 bash`; scripts y
+`bash -c` no se redirigen.
+
+Chromium se instala en el perfil y queda como navegador predeterminado para
+links web, documentos HTML/XML y PDF mediante asociaciones XDG.
+
 El perfil `minimal` conserva únicamente shell y Starship.
 
 ## Instalación centralizada
@@ -25,6 +34,11 @@ El perfil `minimal` conserva únicamente shell y Starship.
 `install.sh` ejecuta primero `verify-user-only.sh`, después
 `apply-home.sh build` y finalmente `apply-home.sh switch`. Si un paso falla,
 los siguientes no se ejecutan.
+
+Durante el primer `switch`, cualquier archivo manual que entre en conflicto
+con uno administrado por Home Manager se conserva junto al original con
+extensión `.hm-bak`. Esto permite migrar, por ejemplo, el `settings.json`
+existente de VSCodium sin perderlo.
 
 El flujo se ejecuta sin `sudo` y habilita `nix-command` y `flakes` sólo
 para sus procesos. Los scripts individuales siguen disponibles para construir

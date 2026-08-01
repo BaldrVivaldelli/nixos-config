@@ -27,6 +27,20 @@ in
       ripgrep
     ];
 
+    home.sessionVariables.SHELL = "${pkgs.zsh}/bin/zsh";
+
+    # Home Manager cannot update the login shell in /etc/passwd by itself.
+    # Redirect terminal sessions that still start Bash while leaving scripts,
+    # `bash -c` and explicitly requested Bash sessions untouched.
+    programs.bash = {
+      enable = true;
+      initExtra = ''
+        if [[ $- == *i* && -z "''${BASH_EXECUTION_STRING:-}" && -z "''${HM_KEEP_BASH:-}" ]]; then
+          exec ${pkgs.zsh}/bin/zsh
+        fi
+      '';
+    };
+
     programs.zsh = {
       enable = true;
       autocd = true;

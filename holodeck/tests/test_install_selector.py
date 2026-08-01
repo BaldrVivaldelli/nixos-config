@@ -70,10 +70,10 @@ class InstallSelectorTests(unittest.TestCase):
             result.stdout,
         )
         self.assertIn("-- build --flake", result.stdout)
-        self.assertIn("-- switch --flake", result.stdout)
+        self.assertIn("-- switch -b hm-bak --flake", result.stdout)
         self.assertLess(
             result.stdout.index("-- build --flake"),
-            result.stdout.index("-- switch --flake"),
+            result.stdout.index("-- switch -b hm-bak --flake"),
         )
 
     def test_nixos_home_manager_alias_uses_same_flow(self) -> None:
@@ -81,7 +81,7 @@ class InstallSelectorTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("-- build --flake", result.stdout)
-        self.assertIn("-- switch --flake", result.stdout)
+        self.assertIn("-- switch -b hm-bak --flake", result.stdout)
 
     def test_nixos_defaults_to_wsl(self) -> None:
         result = self.run_installer(["nixos"])
@@ -94,7 +94,7 @@ class InstallSelectorTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("-- build --flake", result.stdout)
-        self.assertIn("-- switch --flake", result.stdout)
+        self.assertIn("-- switch -b hm-bak --flake", result.stdout)
 
     def test_interactive_selector_can_choose_wsl(self) -> None:
         result = self.run_installer([], input_text="2\n")
