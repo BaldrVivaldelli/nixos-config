@@ -10,6 +10,7 @@ from unittest.mock import patch
 import holodeck_system_nixos.installer as system_install
 from holodeck.errors import HolodeckError
 from holodeck_system_nixos.installer import (
+    check_flake,
     install_nixos,
     is_wsl_environment,
     parse_install_args,
@@ -33,6 +34,9 @@ class InstallDispatchTests(unittest.TestCase):
     @staticmethod
     def make_repo(root: Path) -> Path:
         (root / "flake.nix").touch()
+        (root / "inventory.nix").touch()
+        (root / "home").mkdir()
+        (root / "home" / "default.nix").touch()
         (root / "modules" / "hosts" / "wsl").mkdir(parents=True)
         (root / "modules" / "hosts" / "wsl" / "default.nix").touch()
         return root
@@ -70,6 +74,15 @@ class WslSafetyTests(unittest.TestCase):
             patch.object(system_install.Path, "exists", return_value=False),
         ):
             self.assertFalse(is_wsl_environment())
+
+
+class FlakeCheckTests(unittest.TestCase):
+    def test_uses_path_flake_so_local_inventory_is_visible(self) -> None:
+        with patch.object(system_install, "run") as run:
+            check_flake(Path("/tmp/repo"))
+
+        command = run.call_args.args[0]
+        self.assertEqual(command[-1], "path:.")
 
 
 if __name__ == "__main__":

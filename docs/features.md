@@ -9,7 +9,7 @@ Todas se importan automaticamente, pero solo aplican cambios cuando su opcion
 | Feature | Opcion | Que hace |
 | --- | --- | --- |
 | Browser | `features.browser` | Instala Chromium y deja lista su configuracion declarativa. |
-| Desktop | `features.desktop` | Habilita el entorno de escritorio elegido; hoy GNOME con GDM. |
+| Desktop | `features.desktop` | Habilita GNOME/GDM o Niri/SDDM; Niri puede quedar como sesión predeterminada. |
 | Git | `features.git` | Instala Git, Git LFS, delta y lazygit. |
 | Python | `features.python` | Instala Python y uv para desarrollo. |
 | Node.js | `features.nodejs` | Instala Node.js con npm y npx para desarrollo. |

@@ -14,7 +14,7 @@ in
 
     repoPath = lib.mkOption {
       type = lib.types.str;
-      default = "/home/avivaldelli/projects/personal/nixos-config";
+      default = "${config.home.homeDirectory}/projects/personal/nixos-config";
       description = "Ruta del repositorio personal de Home Manager";
     };
   };

@@ -15,7 +15,7 @@ El backend incluido vive en `nixos/` y expone sólo el target `wsl`:
 
 ```bash
 ./install.sh nixos wsl
-nix run .#holodeck-system-nixos -- install --target wsl
+nix run path:.#holodeck-system-nixos -- install --target wsl
 ```
 
 La instalación del desktop físico y toda lógica de discos fueron retiradas.

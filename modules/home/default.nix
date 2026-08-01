@@ -1,8 +1,22 @@
 {
+  hostConfig,
+  inputs,
+  users,
+  ...
+}:
+
+let
+  user = users.${hostConfig.user};
+in
+
+{
   home-manager = {
     useGlobalPkgs = true;
     useUserPackages = true;
     backupFileExtension = "hm-bak";
-    users.avivaldelli = import ../../home/avivaldelli;
+    extraSpecialArgs = {
+      inherit inputs user;
+    };
+    users.${user.username} = import ../../home;
   };
 }

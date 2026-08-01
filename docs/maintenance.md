@@ -13,8 +13,8 @@ normal. Para validar sin activar todavía se puede usar
 ## NixOS-WSL
 
 ```bash
-sudo nixos-rebuild build --flake .#wsl
-sudo nixos-rebuild switch --flake .#wsl
+sudo nixos-rebuild build --flake path:.#wsl
+sudo nixos-rebuild switch --flake path:.#wsl
 ```
 
 La primera preparación puede hacerse con `./install.sh nixos wsl`.
@@ -25,7 +25,7 @@ La primera preparación puede hacerse con `./install.sh nixos wsl`.
 ./verify-user-only.sh
 ./verify-no-desktop.sh
 nix --extra-experimental-features "nix-command flakes" \
-  flake check --print-build-logs
+  flake check path:. --print-build-logs
 ```
 
 El primer script comprueba el límite de la configuración Home Manager. El
@@ -42,7 +42,7 @@ nix --extra-experimental-features "nix-command flakes" fmt
 
 ```bash
 nix --extra-experimental-features "nix-command flakes" flake update
-nix --extra-experimental-features "nix-command flakes" flake check
+nix --extra-experimental-features "nix-command flakes" flake check path:.
 ```
 
 Revisar siempre `flake.lock` antes de activar el perfil o el sistema WSL.

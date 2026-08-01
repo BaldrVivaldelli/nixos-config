@@ -3,13 +3,17 @@
 {
   imports = [
     ./gnome.nix
+    ./niri.nix
   ];
 
   options.features.desktop = {
     enable = lib.mkEnableOption "desktop environment";
 
     environment = lib.mkOption {
-      type = lib.types.enum [ "gnome" ];
+      type = lib.types.enum [
+        "gnome"
+        "niri"
+      ];
       default = "gnome";
       description = "Desktop environment to enable.";
     };

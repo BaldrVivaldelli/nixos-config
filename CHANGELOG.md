@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Added a confirmable machine preflight that detects user, home, repository,
+  hostname, architecture, time zone and WSL before installation, while keeping
+  the generated `inventory.local.nix` outside Git.
+- Added a central inventory that separates logical users, real usernames,
+  Home Manager profiles and host assignments.
+- Added a portable-profile check that evaluates the same Home Manager modules
+  with a different username, home directory, repository path and profile.
+- Added Noctalia v5 as an optional Home Manager feature with a dark Catppuccin
+  theme, while keeping it disabled on NixOS-WSL.
+- Added a Home Manager Niri feature that starts Noctalia, wires its launcher
+  and lock screen, and validates the generated Niri configuration at build
+  time.
+- Added a reusable disk-independent NixOS profile that registers Niri in SDDM,
+  selects it by default and enables the services used by Noctalia.
+
+### Changed
+
+- Made local installation commands evaluate `path:.` so the Git-ignored
+  machine inventory participates without affecting CI or the repository.
+- Replaced the user-specific Home Manager directory and installer target with
+  generic `home/default.nix` and `homeConfigurations.default` entrypoints.
+- Made NixOS-WSL and its installer derive user, hostname and repository path
+  from the shared inventory.
+
 ## 2026-08-01 - Reproducible Home Manager defaults
 
 ### Added

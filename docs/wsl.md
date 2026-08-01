@@ -1,8 +1,8 @@
 # Host WSL
 
-El host `wsl` reutiliza la capa comun del repositorio y el perfil Home Manager de
-`avivaldelli`, pero delega a NixOS-WSL todo lo relacionado con kernel,
-bootloader, montajes de Windows, networking e inicio del entorno WSL.
+El host `wsl` reutiliza la capa común del repositorio y el usuario lógico
+asignado en `inventory.hosts.wsl`, pero delega a NixOS-WSL todo lo relacionado
+con kernel, bootloader, montajes de Windows, networking e inicio del entorno.
 
 ## Import graph
 
@@ -56,18 +56,18 @@ Usa el script de la raiz:
 El selector delega en:
 
 ```bash
-nix run .#holodeck-system-nixos -- install --target wsl
+nix run path:.#holodeck-system-nixos -- install --target wsl
 ```
 
 El backend usa el NixOS-WSL fijado en `flake.lock`, valida la flake y ejecuta:
 
 ```bash
-sudo nixos-rebuild boot --flake .#wsl
+sudo nixos-rebuild boot --flake path:.#wsl
 ```
 
 Despues hay que salir de WSL y completar el ciclo de reinicio desde PowerShell
-que muestra el propio comando. La nueva sesion debe abrir como
-`avivaldelli@nixos-wsl`; entonces se configura la identidad personal sin
+que muestra el propio comando. La nueva sesión debe usar el username y hostname
+declarados en el inventario efectivo; entonces se configura la identidad personal sin
 `sudo`:
 
 ```bash
@@ -77,8 +77,8 @@ holodeck setup
 ## Actualizaciones posteriores
 
 ```bash
-cd ~/projects/personal/nixos-config
-sudo nixos-rebuild switch --flake .#wsl
+cd /ruta/detectada/al/nixos-config
+sudo nixos-rebuild switch --flake path:.#wsl
 ```
 
 ## VS Code / Kiro desde Windows

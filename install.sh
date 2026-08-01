@@ -7,6 +7,7 @@ usage() {
   cat <<'MSG'
 Uso:
   ./install.sh
+  ./install.sh configure [--print|--yes|--force]
   ./install.sh home-manager
   ./install.sh nixos
   ./install.sh nixos home-manager
@@ -16,7 +17,8 @@ Uso:
 Sin argumentos abre un selector interactivo.
 
 Targets incluidos:
-  home-manager  Configura el usuario sobre un NixOS existente.
+  configure     Detecta esta máquina y crea inventory.local.nix.
+  home-manager  Configura el usuario default de inventory.nix sobre NixOS.
   nixos wsl     Prepara el host NixOS-WSL declarado por la flake.
   otro          Una app de flake o ejecutable holodeck-system-BACKEND.
 MSG
@@ -33,8 +35,9 @@ Seleccioná qué querés instalar:
   1) Home Manager sobre un NixOS existente
   2) NixOS-WSL
   3) Otro backend instalado
+  4) Sólo detectar y configurar esta máquina
 MSG
-  printf "Opción [1-3]: " >&2
+  printf "Opción [1-4]: " >&2
   IFS= read -r selection
   case "$selection" in
     1) printf "home-manager" ;;
@@ -44,11 +47,28 @@ MSG
       IFS= read -r custom_backend
       printf "%s" "$custom_backend"
       ;;
+    4) printf "configure" ;;
     *) fail "opción de sistema inválida" ;;
   esac
 }
 
+configure_inventory_if_needed() {
+  if [[ -e "$repo_dir/inventory.local.nix" ]]; then
+    return
+  fi
+
+  if [[ -t 0 ]]; then
+    echo "==> No hay un inventario para esta máquina; voy a detectar sus características." >&2
+    bash "$repo_dir/configure-inventory.sh"
+  else
+    echo "==> Sin terminal interactiva: se usan los defaults de inventory.nix." >&2
+    echo "    Para autocompletar esta máquina: ./install.sh configure --yes" >&2
+  fi
+}
+
 install_home_manager() {
+  configure_inventory_if_needed
+
   echo "==> Verificando que Home Manager no administre el sistema..." >&2
   bash "$repo_dir/verify-user-only.sh"
 
@@ -74,6 +94,9 @@ else
 fi
 
 case "$backend" in
+  configure|config|detect)
+    exec bash "$repo_dir/configure-inventory.sh" "$@"
+    ;;
   home|home-manager|existing-nixos)
     if [[ $# -ne 0 ]]; then
       fail "home-manager no acepta argumentos adicionales"
@@ -103,11 +126,13 @@ case "$backend" in
       fail "el backend NixOS requiere el comando nix"
     fi
 
+    configure_inventory_if_needed
+
     cd "$repo_dir"
     nix_command=(
       nix
       --extra-experimental-features "nix-command flakes"
-      run .#holodeck-system-nixos --
+      run "path:$repo_dir#holodeck-system-nixos" --
       install
       --target wsl
       --repo "$repo_dir"
@@ -130,7 +155,7 @@ case "$backend" in
       nix_command=(
         nix
         --extra-experimental-features "nix-command flakes"
-        run ".#$backend_command" --
+        run "path:$repo_dir#$backend_command" --
         install
         --repo "$repo_dir"
         "$@"

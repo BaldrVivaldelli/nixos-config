@@ -14,7 +14,7 @@ Uso:
 
 Este flujo usa Home Manager standalone. No particiona discos, no modifica el
 bootloader, el kernel, los filesystems, los usuarios del sistema ni servicios
-de NixOS.
+de NixOS. La identidad activa es `defaultHomeUser` en el inventario efectivo.
 MSG
 }
 
@@ -65,7 +65,7 @@ home_manager_args=("$mode")
 if [[ "$mode" == "switch" ]]; then
   home_manager_args+=( -b hm-bak )
 fi
-home_manager_args+=(--flake "path:$repo_dir#avivaldelli")
+home_manager_args+=(--flake "path:$repo_dir#default")
 
 exec nix \
   --extra-experimental-features "$required_nix_features" \

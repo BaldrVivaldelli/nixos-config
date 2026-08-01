@@ -1,20 +1,30 @@
-{ lib, pkgs, ... }:
+{
+  hostConfig,
+  lib,
+  pkgs,
+  users,
+  ...
+}:
+
+let
+  user = users.${hostConfig.user};
+in
 
 {
   # NixOS-WSL manages the kernel, initrd, bootloader, Windows mounts,
   # networking integration and WSL's systemd startup.
   wsl = {
     enable = true;
-    defaultUser = "avivaldelli";
+    defaultUser = user.username;
 
     # Use the Docker daemon supplied by Docker Desktop rather than starting
     # a second Docker daemon inside this distribution.
     docker-desktop.enable = true;
   };
 
-  networking.hostName = "nixos-wsl";
+  networking.hostName = hostConfig.hostName;
 
-  time.timeZone = "America/Argentina/Buenos_Aires";
+  time.timeZone = hostConfig.timeZone;
 
   i18n.defaultLocale = "en_US.UTF-8";
   i18n.extraLocaleSettings = {
@@ -30,9 +40,9 @@
   };
 
   # wsl.defaultUser defines the normal user and grants wheel access. These
-  # These extra properties define the interactive user environment.
-  users.users.avivaldelli = {
-    description = "avivaldelli";
+  # extra properties define the interactive user environment.
+  users.users.${user.username} = {
+    description = user.description;
     shell = pkgs.zsh;
   };
 
@@ -50,13 +60,16 @@
   features.holodeck.enable = true;
 
   # Keep graphical/user applications in the standalone Home Manager profile.
-  home-manager.users.avivaldelli.homeFeatures.developerTools.enable =
-    lib.mkForce false;
+  home-manager.users.${user.username}.homeFeatures = {
+    developerTools.enable = lib.mkForce false;
+    noctalia.enable = lib.mkForce false;
+    niri.enable = lib.mkForce false;
+  };
 
   # Intentionally omitted in WSL:
   # - hardware-configuration.nix and physical bootloader settings
   # - NetworkManager, CUPS and PipeWire
-  # - GNOME/GDM, Chromium, graphics drivers and VSCodium for Linux
+  # - GNOME/GDM, Niri, Chromium, graphics drivers, Noctalia and VSCodium for Linux
   # - the native containers module and its dockurr/windows VM
 
   nixpkgs.config.allowUnfree = true;

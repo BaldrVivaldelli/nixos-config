@@ -13,6 +13,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 INSTALLER = REPO / "install.sh"
+CONFIGURATOR = REPO / "configure-inventory.sh"
 BASH = shutil.which("bash")
 
 
@@ -33,6 +34,7 @@ class InstallSelectorTests(unittest.TestCase):
         *,
         input_text: str | None = None,
         extra_commands: tuple[str, ...] = (),
+        extra_environment: dict[str, str] | None = None,
     ) -> subprocess.CompletedProcess:
         if BASH is None:
             raise RuntimeError("bash is required to test install.sh")
@@ -44,6 +46,7 @@ class InstallSelectorTests(unittest.TestCase):
                 write_echo_command(command_dir, command)
             environment = os.environ.copy()
             environment["PATH"] = f"{command_dir}{os.pathsep}{environment['PATH']}"
+            environment.update(extra_environment or {})
             return subprocess.run(
                 [BASH, str(INSTALLER), *args],
                 input=input_text,
@@ -58,7 +61,8 @@ class InstallSelectorTests(unittest.TestCase):
         result = self.run_installer(["nixos", "wsl"])
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("run .#holodeck-system-nixos", result.stdout)
+        self.assertIn("run path:", result.stdout)
+        self.assertIn("#holodeck-system-nixos", result.stdout)
         self.assertIn("--target wsl", result.stdout)
 
     def test_installs_home_manager_with_verify_build_and_switch(self) -> None:
@@ -66,11 +70,12 @@ class InstallSelectorTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(
-            "OK: la configuración standalone de Home Manager",
+            "OK: Home Manager no administra el sistema",
             result.stdout,
         )
         self.assertIn("-- build --flake", result.stdout)
         self.assertIn("-- switch -b hm-bak --flake", result.stdout)
+        self.assertIn("#default", result.stdout)
         self.assertLess(
             result.stdout.index("-- build --flake"),
             result.stdout.index("-- switch -b hm-bak --flake"),
@@ -122,9 +127,71 @@ class InstallSelectorTests(unittest.TestCase):
         result = self.run_installer(["macos", "--profile", "developer"])
 
         self.assertEqual(result.returncode, 0)
-        self.assertIn("run .#holodeck-system-macos", result.stdout)
+        self.assertIn("#holodeck-system-macos", result.stdout)
         self.assertIn("install --repo", result.stdout)
         self.assertIn("--profile developer", result.stdout)
+
+    def test_help_explains_machine_configuration(self) -> None:
+        result = self.run_installer(["--help"])
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("./install.sh configure", result.stdout)
+        self.assertIn("inventory.local.nix", result.stdout)
+
+    def test_configure_print_uses_detected_overrides(self) -> None:
+        result = self.run_installer(
+            ["configure", "--print"],
+            extra_environment={
+                "NIXOS_CONFIG_USERNAME": "portable-user",
+                "NIXOS_CONFIG_HOME": "/srv/portable-user",
+                "NIXOS_CONFIG_REPO": str(REPO),
+                "NIXOS_CONFIG_HOSTNAME": "portable-host",
+                "NIXOS_CONFIG_SYSTEM": "aarch64-linux",
+                "NIXOS_CONFIG_ARCHITECTURE": "aarch64",
+                "NIXOS_CONFIG_TIME_ZONE": "Europe/Madrid",
+                "NIXOS_CONFIG_OS": "nixos",
+                "NIXOS_CONFIG_IS_WSL": "false",
+            },
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('username = "portable-user";', result.stdout)
+        self.assertIn('hostName = "portable-host";', result.stdout)
+        self.assertIn('system = "aarch64-linux";', result.stdout)
+        self.assertIn('timeZone = "Europe/Madrid";', result.stdout)
+        self.assertIn("isWsl = false;", result.stdout)
+
+    def test_configurator_does_not_overwrite_without_force(self) -> None:
+        if BASH is None:
+            raise RuntimeError("bash is required to test configure-inventory.sh")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output = Path(temp_dir) / "inventory.local.nix"
+            environment = os.environ.copy()
+            environment.update(
+                {
+                    "NIXOS_CONFIG_USERNAME": "portable-user",
+                    "NIXOS_CONFIG_HOME": "/home/portable-user",
+                    "NIXOS_CONFIG_REPO": str(REPO),
+                    "NIXOS_CONFIG_HOSTNAME": "portable-host",
+                    "NIXOS_CONFIG_IS_WSL": "false",
+                }
+            )
+            command = [
+                BASH,
+                str(CONFIGURATOR),
+                "--yes",
+                "--output",
+                str(output),
+            ]
+
+            first = subprocess.run(command, text=True, capture_output=True, env=environment)
+            second = subprocess.run(command, text=True, capture_output=True, env=environment)
+
+            self.assertEqual(first.returncode, 0, first.stderr)
+            self.assertTrue(output.exists())
+            self.assertNotEqual(second.returncode, 0)
+            self.assertIn("--force", second.stderr)
 
 
 if __name__ == "__main__":

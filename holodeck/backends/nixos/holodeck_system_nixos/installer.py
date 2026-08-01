@@ -15,14 +15,24 @@ from holodeck.ui import ui
 
 
 SUPPORTED_TARGETS = ("wsl",)
-EXPECTED_WSL_REPO = Path("/home/avivaldelli/projects/personal/nixos-config")
+DEFAULT_WSL_USER = os.environ.get("HOLODECK_NIXOS_WSL_USER", "nixos")
+DEFAULT_WSL_HOST_NAME = os.environ.get(
+    "HOLODECK_NIXOS_WSL_HOST_NAME", "nixos-wsl"
+)
+DEFAULT_REPO_PATH = os.environ.get(
+    "HOLODECK_NIXOS_REPO_PATH",
+    f"/home/{DEFAULT_WSL_USER}/projects/personal/nixos-config",
+)
 COMMON_INSTALL_INPUTS = (
     "flake.nix",
     "flake.lock",
+    "inventory.nix",
+    "configure-inventory.sh",
     "install.sh",
+    "lib",
     "holodeck/core",
     "holodeck/backends/nixos",
-    "home/avivaldelli",
+    "home",
     "modules/home",
     "modules/nixos",
 )
@@ -61,6 +71,8 @@ def parse_install_args(args: list[str]) -> InstallRequest:
 def validate_repo(repo: Path) -> Path:
     required = (
         repo / "flake.nix",
+        repo / "inventory.nix",
+        repo / "home" / "default.nix",
         repo / "modules" / "hosts" / "wsl" / "default.nix",
     )
     missing = [str(path) for path in required if not path.exists()]
@@ -129,6 +141,7 @@ def check_flake(repo: Path) -> None:
             "nix-command flakes",
             "flake",
             "check",
+            "path:.",
         ],
         cwd=repo,
     )
@@ -154,21 +167,12 @@ def install_wsl(repo: Path) -> None:
         )
     ensure_install_inputs_tracked(repo)
 
-    if repo != EXPECTED_WSL_REPO:
-        ui.warn(f"El repo está en {repo}.")
-        print(
-            "La ruta recomendada es:\n"
-            f"  {EXPECTED_WSL_REPO}\n\n"
-            "La primera instalación puede continuar desde la ruta actual."
-        )
-        print()
-
     check_flake(repo)
 
     ui.heading("==> Preparando la primera generación de #wsl")
     print(
         "Se usa 'boot' porque cambia el usuario predeterminado de nixos "
-        "a avivaldelli."
+        f"a {DEFAULT_WSL_USER}."
     )
     run(
         [
@@ -176,7 +180,7 @@ def install_wsl(repo: Path) -> None:
             "nixos-rebuild",
             "boot",
             "--flake",
-            ".#wsl",
+            "path:.#wsl",
             "--option",
             "experimental-features",
             "nix-command flakes",
@@ -185,7 +189,7 @@ def install_wsl(repo: Path) -> None:
     )
 
     print(
-        """
+        f"""
 La generación fue preparada. Ahora salí de NixOS-WSL:
 
   exit
@@ -199,11 +203,11 @@ otro nombre:
   wsl --terminate NixOS
   wsl -d NixOS
 
-La nueva sesión debería abrir como avivaldelli@nixos-wsl. Las actualizaciones
-siguientes se aplican con:
+La nueva sesión debería abrir como {DEFAULT_WSL_USER}@{DEFAULT_WSL_HOST_NAME}.
+Las actualizaciones siguientes se aplican con:
 
-  cd ~/projects/personal/nixos-config
-  sudo nixos-rebuild switch --flake .#wsl
+  cd {DEFAULT_REPO_PATH}
+  sudo nixos-rebuild switch --flake path:.#wsl
 """.strip()
     )
 

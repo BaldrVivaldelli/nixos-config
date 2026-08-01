@@ -57,4 +57,38 @@ if ! grep -Fq -- '>/dev/null 2>&1 &' packages/holodeck/default.nix; then
   exit 1
 fi
 
-echo "OK: la configuración standalone de Home Manager no administra el sistema."
+identity_patterns=(
+  'homeConfigurations[.][[:alnum:]_-]+'
+  'home-manager[.]users[.][[:alnum:]_-]+'
+  'users[.]users[.][[:alnum:]_-]+'
+  '"/home/[[:alnum:]_]'
+  'home/[[:alnum:]_-]+/default[.]nix'
+)
+
+identity_roots=(
+  flake.nix
+  apply-home.sh
+  home
+  lib
+  modules/home
+  modules/hosts/wsl
+  holodeck/backends/nixos
+)
+
+mapfile -d '' identity_files < <(
+  find "${identity_roots[@]}" -type f \( -name '*.nix' -o -name '*.sh' -o -name '*.py' \) -print0
+)
+
+for pattern in "${identity_patterns[@]}"; do
+  if grep -En -- "$pattern" "${identity_files[@]}"; then
+    echo "Error: una identidad de usuario quedó acoplada fuera de inventory.nix: $pattern" >&2
+    exit 1
+  fi
+done
+
+if ! grep -Fq -- '--flake "path:$repo_dir#default"' apply-home.sh; then
+  echo "Error: apply-home.sh no usa el alias portable homeConfigurations.default." >&2
+  exit 1
+fi
+
+echo "OK: Home Manager no administra el sistema y deriva la identidad desde inventory.nix."
