@@ -20,11 +20,11 @@ def usage() -> None:
         """Usage: holodeck <command>
 
 Recommended first run:
-  holodeck setup        Full wizard: auth + SSH/GPG + Git profiles
+  holodeck setup        Full wizard: auth + verified SSH + Git profiles
 
 Commands:
   setup                 Full wizard for GitHub personal and/or GitLab work
-  github                Configure GitHub from your authenticated account
+  github                Configure and verify GitHub SSH/Git end to end
   gitlab                Configure one GitLab profile
   login github          Only authenticate GitHub; does not configure Git
   login gitlab          Only authenticate GitLab; does not configure Git

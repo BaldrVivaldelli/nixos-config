@@ -148,13 +148,18 @@ def rebuild_ssh_config_block() -> None:
     for profile in profiles():
         host = profile.get("HOLODECK_HOST", "")
         ssh_key = profile.get("HOLODECK_SSH_KEY", "")
+        ssh_hostname = profile.get("HOLODECK_SSH_HOSTNAME", "") or host
+        ssh_port = profile.get("HOLODECK_SSH_PORT", "")
         if host and ssh_key:
             has_host = True
             lines.append(f"Host {host}\n")
-            lines.append(f"  HostName {host}\n")
+            lines.append(f"  HostName {ssh_hostname}\n")
+            if ssh_port:
+                lines.append(f"  Port {ssh_port}\n")
             lines.append("  User git\n")
             lines.append(f"  IdentityFile {ssh_key}\n")
-            lines.append("  IdentitiesOnly yes\n\n")
+            lines.append("  IdentitiesOnly yes\n")
+            lines.append("  AddKeysToAgent yes\n\n")
     lines.append(f"{SSH_END}\n")
     if has_host:
         append_block(SSH_CONFIG_FILE, "".join(lines))

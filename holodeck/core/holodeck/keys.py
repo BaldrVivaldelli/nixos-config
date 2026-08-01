@@ -1,4 +1,4 @@
-"""Portable SSH and GPG key management."""
+"""Portable SSH and optional GPG key management."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 from .config import PUBLIC_KEYS_DIR
+from .errors import HolodeckError
 from .process import run
 from .prompts import confirm
 from .state import git_profile_file_for
@@ -36,6 +37,11 @@ def is_gpg_fingerprint(value: str) -> bool:
 
 
 def ensure_gpg_key(name: str, email: str, mode: str = "prompt") -> str:
+    # SSH/Git connectivity must never depend on GPG or pinentry. In 'off' mode
+    # Holodeck configures GitHub fully without signing and leaves GPG untouched.
+    if mode == "off":
+        return ""
+
     fingerprint = find_gpg_fingerprint(email)
     if fingerprint:
         print(f"Using existing GPG key for {email}: {fingerprint}", file=sys.stderr)
@@ -50,14 +56,54 @@ def ensure_gpg_key(name: str, email: str, mode: str = "prompt") -> str:
     return find_gpg_fingerprint(email)
 
 
-def write_git_profile(profile: str, name: str, email: str, fingerprint: str) -> None:
-    lines = ["[user]\n", f"  name = {name}\n", f"  email = {email}\n"]
-    if fingerprint:
-        lines.append(f"  signingKey = {fingerprint}\n")
-    lines.extend(["\n", "[init]\n", "  defaultBranch = main\n"])
+def write_git_profile(
+    profile: str,
+    provider: str,
+    host: str,
+    name: str,
+    email: str,
+    ssh_key: Path,
+    fingerprint: str,
+) -> None:
+    lines = [
+        "[user]\n",
+        f"  name = {name}\n",
+        f"  email = {email}\n",
+        "\n",
+        "[init]\n",
+        "  defaultBranch = main\n",
+        "\n",
+        "[core]\n",
+        f"  sshCommand = ssh -i {ssh_key} -o IdentitiesOnly=yes\n",
+    ]
+
+    # Existing HTTPS remotes inside a Holodeck-managed repository are
+    # transparently routed through the SSH identity configured above.
+    if provider == "github":
+        lines.extend(
+            [
+                "\n",
+                f'[url "git@{host}:"]\n',
+                f"  insteadOf = https://{host}/\n",
+                f"  insteadOf = http://{host}/\n",
+            ]
+        )
+    elif provider == "gitlab":
+        lines.extend(
+            [
+                "\n",
+                f'[url "git@{host}:"]\n',
+                f"  insteadOf = https://{host}/\n",
+                f"  insteadOf = http://{host}/\n",
+            ]
+        )
+
     if fingerprint:
         lines.extend(
             [
+                "\n",
+                "[user]\n",
+                f"  signingKey = {fingerprint}\n",
                 "\n",
                 "[commit]\n",
                 "  gpgSign = true\n",
@@ -74,6 +120,8 @@ def write_git_profile(profile: str, name: str, email: str, fingerprint: str) -> 
 
 def generate_ssh_key(ssh_key: Path, email: str, mode: str = "prompt") -> None:
     if ssh_key.exists():
+        if not Path(f"{ssh_key}.pub").exists():
+            raise HolodeckError(f"SSH private key exists but public key is missing: {ssh_key}.pub")
         ui.ok(f"Using existing SSH key: {ssh_key}")
         return
 

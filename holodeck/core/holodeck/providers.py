@@ -13,10 +13,28 @@ from .ui import ui
 
 
 def login_github(host: str) -> None:
+    """Authenticate gh without letting it choose or upload an unrelated SSH key."""
     if command_ok(["gh", "auth", "status", "--hostname", host]):
         ui.ok(f"GitHub is already authenticated on {host}.")
-        return
-    run(["gh", "auth", "login", "--hostname", host, "--web", "--git-protocol", "ssh"])
+    else:
+        run(
+            [
+                "gh",
+                "auth",
+                "login",
+                "--hostname",
+                host,
+                "--web",
+                "--git-protocol",
+                "ssh",
+                "--skip-ssh-key",
+                "--scopes",
+                "write:public_key,read:public_key",
+            ]
+        )
+
+    # Keep gh clone/repo operations on SSH as well. This does not upload keys.
+    run(["gh", "config", "set", "git_protocol", "ssh", "--host", host])
 
 
 def login_gitlab(host: str) -> None:
@@ -40,6 +58,101 @@ def login_provider(provider: str, host: str) -> None:
         login_gitlab(host)
         return
     raise HolodeckError(f"Unknown provider: {provider}")
+
+
+def _public_key_identity(path: Path) -> str:
+    """Return '<algorithm> <payload>' so comments do not affect comparisons."""
+    try:
+        parts = path.read_text().strip().split()
+    except OSError as exc:
+        raise HolodeckError(f"Could not read SSH public key {path}: {exc}") from exc
+    if len(parts) < 2:
+        raise HolodeckError(f"Invalid SSH public key: {path}")
+    return " ".join(parts[:2])
+
+
+def _github_key_exists(host: str, ssh_pub: Path) -> bool:
+    result = subprocess.run(
+        [
+            "gh",
+            "api",
+            "--hostname",
+            host,
+            "--paginate",
+            "user/keys",
+            "--jq",
+            ".[].key",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return False
+    expected = _public_key_identity(ssh_pub)
+    return any(line.strip() == expected for line in result.stdout.splitlines())
+
+
+def upload_github_ssh_key(host: str, title: str, ssh_pub: Path) -> None:
+    """Upload the exact key Holodeck configures, or fail loudly."""
+    if not ssh_pub.exists():
+        raise HolodeckError(f"SSH public key does not exist: {ssh_pub}")
+
+    if _github_key_exists(host, ssh_pub):
+        ui.ok("Holodeck SSH key is already registered in GitHub.")
+        return
+
+    def add_key() -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["gh", "ssh-key", "add", str(ssh_pub), "--title", title],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+
+    result = add_key()
+    combined = "\n".join(part for part in (result.stdout, result.stderr) if part).strip()
+    lowered = combined.lower()
+
+    # A key can already belong to the account while the token lacks read scope.
+    if result.returncode != 0 and (
+        "key is already in use" in lowered
+        or "already exists" in lowered
+        or "unprocessable entity" in lowered
+    ):
+        ui.ok("Holodeck SSH key is already registered in GitHub.")
+        return
+
+    if result.returncode != 0:
+        ui.info("Refreshing GitHub permission to register the Holodeck SSH key.")
+        refreshed = run(
+            [
+                "gh",
+                "auth",
+                "refresh",
+                "--hostname",
+                host,
+                "--scopes",
+                "write:public_key,read:public_key",
+            ],
+            check=False,
+        )
+        if refreshed.returncode == 0:
+            result = add_key()
+            combined = "\n".join(
+                part for part in (result.stdout, result.stderr) if part
+            ).strip()
+
+    if result.returncode != 0:
+        detail = combined or "gh ssh-key add failed without details"
+        raise HolodeckError(
+            "GitHub authentication succeeded, but the Holodeck SSH key could not "
+            f"be registered. Git was not reconfigured. Details: {detail}"
+        )
+
+    ui.ok("Holodeck SSH key uploaded to GitHub.")
 
 
 def upload_github_gpg_key(host: str, gpg_pub: Path) -> None:
@@ -80,14 +193,18 @@ def upload_keys(
     gpg_pub: Path | None,
 ) -> None:
     if provider == "github":
-        if ssh_pub.exists():
-            run(["gh", "ssh-key", "add", str(ssh_pub), "--title", title], check=False)
+        upload_github_ssh_key(host, title, ssh_pub)
         if gpg_pub and gpg_pub.exists():
             upload_github_gpg_key(host, gpg_pub)
         return
     if provider == "gitlab":
         if ssh_pub.exists():
-            run(["glab", "ssh-key", "add", str(ssh_pub), "--title", title], check=False)
+            result = run(
+                ["glab", "ssh-key", "add", str(ssh_pub), "--title", title],
+                check=False,
+            )
+            if result.returncode != 0:
+                raise HolodeckError("GitLab authentication succeeded, but the SSH key upload failed.")
         if gpg_pub and gpg_pub.exists():
             if command_ok(["glab", "gpg-key", "add", "--help"]):
                 run(["glab", "gpg-key", "add", str(gpg_pub)], check=False)

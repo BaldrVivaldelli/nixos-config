@@ -1,276 +1,121 @@
-# NixOS config
+# Configuración de usuario con Home Manager
 
-Configuracion personal de NixOS basada en flakes. El repo define `desktop`
-para la instalacion fisica actual, `desktop-disko` para instalaciones nuevas y
-`wsl`, todos en `x86_64-linux`. Usa `nixpkgs` desde la rama `nixos-26.05` y
-separa la configuracion en modulos reutilizables bajo `modules/`.
+Este repositorio administra aplicaciones y configuración del usuario
+`avivaldelli`. No contiene una configuración de host NixOS y no puede tocar
+particiones, UUID, LUKS, bootloader, kernel ni filesystems.
 
-## Mapa rapido
+## Aplicar la configuración
 
-```text
-flake.nix
-install-desktop.sh
-install.sh
-holodeck/
-  core/
-    holodeck/
-    tests/
-  backends/
-    nixos/
-      holodeck_system_nixos/
-      tests/
-home/
-  avivaldelli/
-    default.nix
-modules/
-  parts.nix
-  home/
-    default.nix
-    features/
-      shell/
-        default.nix
-        completions.nix
-      starship/
-      aws/
-    profiles/
-      developer/
-      minimal/
-  hosts/
-    desktop/
-      default.nix
-      disko.nix
-      hardware-configuration.nix
-    wsl/
-      default.nix
-  nixos/
-    features/
-      default.nix
-      browser/
-      desktop/
-      git/
-      python/
-      nodejs/
-      lean/
-      graphics/
-      vscodium/
-      holodeck/
-      containers/
-        windowsvm/
-docs/
-```
+`apply-home.sh` habilita `nix-command` y `flakes` únicamente durante su ejecución. No modifica `/etc/nix/nix.conf`.
 
-## Uso diario
 
-Aplicar la configuracion del desktop fisico:
+`build` solamente comprueba que todo pueda construirse:
 
 ```bash
-sudo nixos-rebuild switch --flake .#desktop
+./apply-home.sh build
 ```
 
-`desktop` conserva intencionalmente los UUID del sistema instalado antes de
-Disko. Una maquina creada por `install-desktop.sh` usa `desktop-disko`; sus
-aliases `nixswitch`, `nixbuild` y `rebuild` apuntan automaticamente a ese
-perfil.
-
-Aplicar actualizaciones normales dentro de NixOS-WSL:
+Para instalar y activar los programas del usuario hay que ejecutar:
 
 ```bash
-sudo nixos-rebuild switch --flake .#wsl
+./apply-home.sh switch
 ```
 
-La primera instalacion de WSL cambia el usuario predeterminado y usa el
-selector unificado:
+Luego de la primera activación quedan disponibles:
 
 ```bash
-./install.sh nixos wsl
+hmbuild   # construir sin activar
+hmswitch  # construir y activar
+hmverify  # comprobar que no haya configuración de sistema
 ```
 
-Construir sin activar, eligiendo el host:
+## Programas administrados
+
+La activación instala en el perfil del usuario:
+
+- Chromium y VSCodium.
+- Git, Git LFS, Delta, Lazygit, GitHub CLI y GitLab CLI.
+- Python, uv, Node.js y elan.
+- AWS CLI.
+- Holodeck.
+- wget, curl, OpenSSH, GnuPG, FreeRDP y utilidades XDG.
+- Zsh, Starship, fzf, zoxide, direnv, eza, fd, jq y ripgrep.
+
+Los programas se instalan en el perfil de Home Manager y no en el perfil global
+de NixOS.
+
+## Qué no puede administrar Home Manager
+
+Servicios y componentes como GNOME/GDM, PipeWire, controladores gráficos,
+Docker daemon, usuarios/grupos, red y bootloader son configuración de sistema.
+Esta variante no los modifica ni intenta instalarlos.
+
+## Reemplazo seguro del repositorio anterior
+
+No descomprimir encima del repositorio viejo:
 
 ```bash
-sudo nixos-rebuild build --flake .#desktop
-sudo nixos-rebuild build --flake .#wsl
+mv ~/projects/personal/nixos-config \
+  ~/projects/personal/nixos-config-system-backup
+
+mv nixos-config-user-programs-fixed \
+  ~/projects/personal/nixos-config
+
+cd ~/projects/personal/nixos-config
+./verify-user-only.sh
+./apply-home.sh build
+./apply-home.sh switch
 ```
 
-Actualizar el lockfile:
+Todos los comandos deben ejecutarse como usuario normal, sin `sudo`.
+
+## Inicio de sesión de GitHub sin logs de Chromium
+
+Holodeck establece `GH_BROWSER` únicamente dentro de su propio proceso y abre
+la URL mediante un launcher desacoplado. La ventana del navegador se sigue
+abriendo normalmente, pero su salida estándar y sus diagnósticos internos no
+se imprimen en la terminal.
+
+Para aplicar esta corrección:
 
 ```bash
-nix flake update
+./apply-home.sh build
+./apply-home.sh switch
 ```
 
-Validar la flake:
+Después se puede ejecutar nuevamente:
 
 ```bash
-nix flake check
+holodeck github
 ```
 
-La misma validacion corre en GitHub Actions para pushes a `main` y pull
-requests.
+## Holodeck: GitHub y Git verificados
 
-## Instalacion reproducible del desktop
+La versión 0.4.0 corrige el flujo en el que `gh` podía autenticar una llave y
+Holodeck configurar otra distinta.
 
-El layout del disco fisico se declara con Disko en
-`modules/hosts/desktop/disko.nix`:
+Ahora `holodeck github`:
 
-- tabla GPT
-- particion EFI de 1 GiB montada en `/boot`
-- resto del disco cifrado con LUKS
-- raiz ext4 en `/dev/mapper/cryptroot`
-- sin UUID de una instalacion anterior
+1. autentica GitHub sin permitir que `gh` seleccione o suba otra llave SSH;
+2. genera o reutiliza `~/.ssh/holodeck_<perfil>_github`;
+3. registra exactamente esa llave pública en GitHub;
+4. prueba la autenticación SSH real;
+5. si el puerto 22 está bloqueado, prueba automáticamente `ssh.github.com:443`;
+6. activa la configuración Git solamente después de verificar la conexión;
+7. comprueba que `includeIf` cargue el nombre y correo dentro de
+   `~/projects/personal`.
 
-Desde un instalador NixOS iniciado en modo UEFI, clona el repo y ejecuta:
+La firma GPG queda desactivada en el flujo automático de GitHub. Git y SSH no
+dependen de `gpg-agent` ni de `pinentry`.
+
+Para reparar una instalación creada con una versión anterior:
 
 ```bash
-./install-desktop.sh
+./apply-home.sh switch
+holodeck github
+holodeck doctor
 ```
 
-> [!CAUTION]
-> El backend detecta discos completos con identidad estable en
-> `/dev/disk/by-id`, excluye el disco que sostiene el sistema en ejecucion y
-> prefiere discos internos. Si hay mas de uno pide elegir. Despues de la
-> confirmacion, desmonta automaticamente los filesystems liberables y desactiva
-> su swap antes de ejecutar Disko.
-
-El script crea y monta el layout, instala `#desktop-disko` con `nixos-install`
-y pide las contrasenas LUKS, root y `avivaldelli`. No se debe ejecutar
-`nixos-rebuild` ni `switch-to-configuration` desde el sistema live.
-
-## Entrypoints de instalacion
-
-Desktop tiene un entrypoint directo. Sin argumentos conserva la deteccion
-automatica segura:
-
-```bash
-./install-desktop.sh
-```
-
-El selector generico queda disponible para WSL y futuros backends:
-
-```bash
-./install.sh
-./install.sh nixos wsl
-```
-
-Los entrypoints delegan en backends opcionales:
-
-```text
-install-desktop.sh
-  -> holodeck-system-nixos -> desktop
-install.sh
-  -> holodeck-system-nixos
-       -> wsl
-  -> holodeck-system-<otro-backend>
-```
-
-El backend NixOS tambien puede ejecutarse directamente:
-
-```bash
-nix run .#holodeck-system-nixos -- install --target desktop
-
-nix run .#holodeck-system-nixos -- install --target wsl
-```
-
-Para recuperacion o hardware ambiguo se puede indicar un disco manualmente con
-`--disk /dev/disk/by-id/ID`, pero no es parte del flujo normal.
-
-La reinstalacion del mismo disco que sostiene el NixOS activo requiere las dos
-opciones explicitas:
-
-```bash
-./install-desktop.sh \
-  --disk /dev/disk/by-id/ID \
-  --allow-running-system-disk
-```
-
-Ese modo muestra los montajes protegidos, construye un NixOS efimero en RAM,
-exige `REINSTALAR SISTEMA EN EJECUCION <ID>` ademas de `BORRAR <ID>` y hace la
-transicion con `kexec`. Disko nunca se ejecuta desde el sistema raiz que sera
-borrado. Tras arrancar el entorno efimero, el disco y su ID se validan otra vez
-y se vuelve a pedir `BORRAR <ID>`.
-
-Para agregar otro sistema se publica una app de flake o un ejecutable con el
-contrato `holodeck-system-<backend>`. Por ejemplo, `./install.sh ubuntu` busca
-`holodeck-system-ubuntu` en `PATH` y luego `.#holodeck-system-ubuntu`.
-
-El backend NixOS valida el repo y la flake antes de delegar en Disko,
-`nixos-install` o `nixos-rebuild`. El core portable de Holodeck no importa ese
-backend ni depende de Nix. Despues de reiniciar e iniciar sesion como
-`avivaldelli`, el onboarding se completa sin `sudo`:
-
-```bash
-holodeck setup
-```
-
-Formatear archivos Nix:
-
-```bash
-nix fmt
-```
-
-Instalar el hook local contra secretos:
-
-```bash
-git config core.hooksPath .githooks
-```
-
-## Que configura hoy
-
-- NixOS `desktop` con systemd-boot, GDM, GNOME, NetworkManager, PipeWire,
-  Chromium, `wget`, `curl`, usuario `avivaldelli` y los UUID del sistema fisico
-  existente.
-- NixOS `desktop-disko` con la misma configuracion funcional y el layout
-  GPT/EFI/LUKS/ext4 usado por instalaciones nuevas.
-- NixOS `wsl` con el mismo entorno terminal/developer y Home Manager, sin
-  hardware configuration, bootloader fisico, desktop Linux, audio, impresion,
-  drivers ni la VM Windows anidada; incluye Docker Desktop y `nix-ld` para
-  VS Code Remote WSL.
-- Locale base `en_US.UTF-8` con settings regionales `es_AR.UTF-8`.
-- Zona horaria `America/Argentina/Buenos_Aires`.
-- Feature `browser`: instala Chromium con configuracion minimalista preparada
-  para personalizaciones futuras.
-- Feature `desktop`: habilita el entorno de escritorio elegido; hoy GNOME con
-  GDM y layout de teclado.
-- Feature `git`: instala Git, Git LFS, delta y lazygit.
-- Feature `python`: instala Python y `uv`.
-- Feature `nodejs`: instala Node.js con npm y npx.
-- Feature `lean`: instala `elan` para proyectos Lean y Lake.
-- Feature `graphics`: habilita aceleracion grafica e instala `gpu-doctor` para
-  recomendar drivers segun la GPU local.
-- Feature `vscodium`: instala VSCodium y extensiones pinneadas.
-- Feature `holodeck`: instala el core portable para configurar perfiles Git,
-  SSH, GPG, GitHub y GitLab. La instalacion NixOS vive en un backend separado.
-- Feature `containers`: habilita Docker o Podman. En el host actual usa Docker.
-- Feature `windowsVm`: agrega el comando `windowsvm` para correr una VM Windows
-  via `dockurr/windows` dentro de Docker.
-- Home Manager para `avivaldelli`: configura zsh, aliases, fzf, zoxide,
-  direnv, starship y helpers AWS.
-
-## Documentacion
-
-- [Indice de docs](docs/index.md)
-- [Arquitectura del repo](docs/architecture.md)
-- [Host desktop](docs/desktop.md)
-- [Host WSL](docs/wsl.md)
-- [Home Manager](docs/home-manager.md)
-- [Features](docs/features.md)
-- [Browser](docs/browser.md)
-- [Desktop feature](docs/desktop-feature.md)
-- [Git](docs/git.md)
-- [Python](docs/python.md)
-- [Node.js](docs/nodejs.md)
-- [Lean](docs/lean.md)
-- [Graficos y GPU](docs/graphics.md)
-- [VSCodium](docs/vscodium.md)
-- [Holodeck](docs/holodeck.md)
-- [Contenedores y Windows VM](docs/containers.md)
-- [Mantenimiento](docs/maintenance.md)
-- [Seguridad y secretos](docs/security.md)
-
-## Principios del repo
-
-- La flake declara sistemas reproducibles; el estado local vive fuera del repo.
-- Los modulos de features exponen opciones bajo `features.*`.
-- El host decide que features activar.
-- Home Manager declara preferencias y dotfiles del usuario.
-- Imagenes, extensiones y entradas externas se pinnean con version, digest o hash.
-- Secretos, llaves privadas y tokens no se versionan.
+No hace falta ejecutar `holodeck purge`: el comando reutiliza la llave
+`holodeck_*` existente y reescribe únicamente los bloques administrados por
+Holodeck.
