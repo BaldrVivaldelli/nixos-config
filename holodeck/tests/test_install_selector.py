@@ -81,6 +81,11 @@ class InstallSelectorTests(unittest.TestCase):
         self.assertIn("-- build --flake", result.stdout)
         self.assertIn("-- switch -b hm-bak --flake", result.stdout)
         self.assertIn("#default", result.stdout)
+        self.assertIn(
+            "Nota: build no instala los programas.",
+            result.stderr,
+        )
+        self.assertNotIn("\x1b", result.stderr)
         self.assertLess(
             result.stdout.index("-- build --flake"),
             result.stdout.index("-- switch -b hm-bak --flake"),

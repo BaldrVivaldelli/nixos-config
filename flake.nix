@@ -30,6 +30,30 @@
       lib = nixpkgs.lib;
       deployment = import ./lib/inventory.nix { inherit lib; };
       inherit (deployment) inventory users defaultHomeUser;
+      holodeckIrPath = ./holodeck.local.json;
+      holodeckIr = import ./lib/holodeck-ir.nix {
+        inherit lib;
+        value =
+          if builtins.pathExists holodeckIrPath then
+            builtins.fromJSON (builtins.readFile holodeckIrPath)
+          else
+            null;
+      };
+      defaultHolodeckIr = import ./lib/holodeck-ir.nix { inherit lib; };
+      lightHolodeckIr = import ./lib/holodeck-ir.nix {
+        inherit lib;
+        value = lib.recursiveUpdate defaultHolodeckIr {
+          appearance.theme.mode = "light";
+        };
+      };
+      invalidHolodeckIr = builtins.tryEval (
+        import ./lib/holodeck-ir.nix {
+          inherit lib;
+          value = lib.recursiveUpdate defaultHolodeckIr {
+            desktop.shell = "bash";
+          };
+        }
+      );
       system = inventory.system or "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
       wslHost = deployment.getHost "wsl";
@@ -40,7 +64,7 @@
         home-manager.lib.homeManagerConfiguration {
           inherit pkgs;
           extraSpecialArgs = {
-            inherit inputs user;
+            inherit inputs user holodeckIr;
           };
           modules = [ ./home ];
         };
@@ -112,10 +136,18 @@
         defaultWslHostName = wslHost.hostName;
         defaultRepoPath = wslUser.repoPath;
       };
+      holodeckctl = pkgs.callPackage ./packages/holodeckctl {
+        inherit holodeck;
+        defaultRepoPath = defaultHomeUser.repoPath;
+      };
+      noctaliaPlugin = pkgs.callPackage ./packages/holodeck-noctalia-plugin {
+        noctalia = inputs.noctalia.packages.${system}.default;
+        inherit holodeckctl;
+      };
       wsl = nixpkgs.lib.nixosSystem {
         inherit system;
         specialArgs = {
-          inherit inputs users;
+          inherit inputs users holodeckIr;
           hostConfig = wslHost;
         };
         modules = [
@@ -153,8 +185,13 @@
       nixosModules.niri-desktop = import ./modules/nixos/profiles/niri-desktop;
 
       packages.${system} = {
-        inherit holodeck holodeck-system-nixos;
+        inherit
+          holodeck
+          holodeck-system-nixos
+          ;
         home-manager = homeManagerCli;
+        inherit holodeckctl;
+        holodeck-noctalia-plugin = noctaliaPlugin;
       };
 
       apps.${system} = {
@@ -174,6 +211,12 @@
           type = "app";
           program = "${holodeck-system-nixos}/bin/holodeck-system-nixos";
           meta.description = "Install the declared NixOS-WSL target.";
+        };
+
+        holodeckctl = {
+          type = "app";
+          program = "${holodeckctl}/bin/holodeckctl";
+          meta.description = "Manage the declarative Holodeck IR used by Noctalia and Nix.";
         };
       };
 
@@ -200,7 +243,17 @@
           assert homeProfile.config.homeFeatures.noctalia.enable;
           assert homeProfile.config.programs.noctalia.enable;
           assert !homeProfile.config.programs.noctalia.systemd.enable;
-          assert homeProfile.config.programs.noctalia.settings.theme.builtin == "Catppuccin";
+          assert
+            homeProfile.config.programs.noctalia.settings.theme.builtin == holodeckIr.appearance.theme.builtin;
+          assert homeProfile.config.programs.noctalia.settings.theme.mode == holodeckIr.appearance.theme.mode;
+          assert homeProfile.config.programs.noctalia.settings.plugins.enabled == [ "holodeck/control" ];
+          assert
+            builtins.elem
+              "holodeck/control:config"
+              homeProfile.config.programs.noctalia.settings.bar.main.end;
+          assert builtins.hasAttr "noctalia/plugins/holodeck-control" homeProfile.config.xdg.dataFile;
+          assert builtins.hasAttr "holodeck-control" homeProfile.config.xdg.desktopEntries;
+          assert lib.any (package: lib.getName package == "holodeckctl") homeProfile.config.home.packages;
           assert homeProfile.config.homeFeatures.niri.enable;
           assert homeProfile.config.home.sessionVariables.NIXOS_OZONE_WL == "1";
           assert homeProfile.config.programs.vscodium.enable;
@@ -243,6 +296,10 @@
           assert wsl.config.time.timeZone == wslHost.timeZone;
           assert !wsl.config.home-manager.users.${wslUser.username}.homeFeatures.noctalia.enable;
           assert !wsl.config.home-manager.users.${wslUser.username}.programs.noctalia.enable;
+          assert
+            !(builtins.hasAttr "noctalia/plugins/holodeck-control"
+              wsl.config.home-manager.users.${wslUser.username}.xdg.dataFile
+            );
           assert !wsl.config.home-manager.users.${wslUser.username}.homeFeatures.niri.enable;
           assert !wsl.config.programs.niri.enable;
           assert !wsl.config.features.containers.enable;
@@ -308,6 +365,36 @@
               python3 -m unittest discover -s tests -v
               touch "$out"
             '';
+
+        holodeckctl-tests =
+          pkgs.runCommand "holodeckctl-tests"
+            {
+              nativeBuildInputs = [ pkgs.python3 ];
+            }
+            ''
+              cd ${./packages/holodeckctl}
+              export PYTHONDONTWRITEBYTECODE=1
+              export PYTHONPATH=src
+              python3 -m unittest discover -s tests -v
+              touch "$out"
+            '';
+
+        noctalia-plugin = noctaliaPlugin;
+
+        holodeck-ir =
+          assert defaultHolodeckIr.schemaVersion == 1;
+          assert defaultHolodeckIr.deployment.target == "home-manager";
+          assert defaultHolodeckIr.desktop.compositor == "niri";
+          assert defaultHolodeckIr.desktop.shell == "noctalia";
+          assert lightHolodeckIr.appearance.theme.mode == "light";
+          assert !invalidHolodeckIr.success;
+          assert builtins.elem holodeckIr.appearance.theme.mode [
+            "dark"
+            "light"
+          ];
+          pkgs.runCommand "holodeck-ir-check" { } ''
+            touch "$out"
+          '';
 
         install-selector-tests =
           pkgs.runCommand "install-selector-tests"

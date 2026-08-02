@@ -4,6 +4,19 @@
 
 ### Added
 
+- Added an original Holodeck chamber identity to the READMEs, application
+  launcher and plugin panel, plus a reduced companion icon designed for the
+  Noctalia bar and compact navigation rail.
+- Added the `holodeck/control` Noctalia v5 plugin, installed and enabled
+  declaratively by Home Manager with a launcher entry.
+- Added unified Holodeck Control cards for GitHub, GitLab, AWS SSO and the
+  declarative Windows VM, with terminal-visible allowlisted actions and
+  non-secret profile discovery.
+- Added the versioned `holodeck.local.json` IR and `holodeckctl` backend with
+  strict validation, atomic writes, locking, plan preview and safe argv-based
+  delegation to the centralized installer.
+- Added Nix, Python, Luau and Noctalia checks for the Holodeck IR, backend and
+  packaged plugin.
 - Enabled the declarative Dockurr Windows VM on existing physical NixOS hosts,
   including Docker access for the inventory user and Zsh completions.
 - Added a safe existing-NixOS target that overlays the reusable Niri profile
@@ -26,6 +39,16 @@
 
 ### Changed
 
+- Highlighted interactive `Nota:` messages in bold yellow while respecting
+  `NO_COLOR`, dumb terminals and non-interactive logs.
+- Replaced the colored Holodeck bar image with Noctalia's `cube-spark` glyph
+  using the semantic `on_surface` color, matching adjacent controls in both
+  light and dark themes.
+- Tightened the transparent framing of both Holodeck icons so their visible
+  artwork matches the scale of neighboring launcher and bar icons.
+- Reworked Holodeck Control around Noctalia's native panel conventions: compact
+  semantic controls, a Control Center-style navigation rail, focused provider
+  details, palette-aware surfaces and explicit destructive actions.
 - Bound the Windows VM web and RDP ports to loopback by default.
 - Made the primary physical-NixOS installer build both the system and Home
   Manager before switching either, then select Niri in SDDM automatically.

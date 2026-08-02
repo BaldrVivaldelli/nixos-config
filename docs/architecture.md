@@ -1,11 +1,14 @@
 # Arquitectura
 
-La flake expone Home Manager standalone, NixOS-WSL y dos comandos Holodeck.
+La flake expone Home Manager standalone, NixOS-WSL, dos comandos Holodeck y el
+controlador declarativo del escritorio.
 
 ```text
 inventory.nix
 ├── defaults portables
 └── inventory.local.nix (detección local, ignorada por Git)
+holodeck.local.json (intención del escritorio, ignorada por Git)
+└── lib/holodeck-ir.nix (schema y validación)
 flake.nix
 ├── homeConfigurations.default
 │   └── home/default.nix
@@ -22,8 +25,12 @@ flake.nix
 ├── apps.holodeck
 │   └── packages/holodeck
 │       └── holodeck/core
-└── apps.holodeck-system-nixos
-    └── holodeck/backends/nixos
+├── apps.holodeck-system-nixos
+│   └── holodeck/backends/nixos
+├── apps.holodeckctl
+│   └── packages/holodeckctl
+└── packages.holodeck-noctalia-plugin
+    └── plugins/noctalia/holodeck-control
 ```
 
 ## Home Manager
@@ -82,6 +89,26 @@ reutilizables y no declara el layout de ningún host.
 `nixosModules.niri-desktop` expone una composición reutilizable para un NixOS
 existente. Habilita la sesión gráfica, pero deliberadamente no incorpora un
 host físico, hardware config ni almacenamiento.
+
+## Control declarativo del escritorio
+
+El plugin de Noctalia es una vista Luau del estado deseado. Sólo invoca comandos
+cerrados de `holodeckctl`; el backend normaliza el IR JSON, escribe de forma
+atómica y delega la aplicación en `install.sh`. La flake vuelve a validar el
+mismo schema antes de generar la configuración de Noctalia.
+
+```text
+Noctalia/Luau → holodeckctl → holodeck.local.json → Nix → build/switch
+                ├──────────→ holodeck → GitHub / GitLab
+                ├──────────→ aws → SSO / STS
+                └──────────→ windowsvm → Docker / RDP / web
+```
+
+El resultado queda determinado por el source del repo, `flake.lock`, el IR
+local y, para `#existing`, la configuración/hardware activos del equipo.
+Las tres ramas de integración no se convierten en Nix: conservan autenticación
+y estado runtime fuera del repo, y sólo reciben acciones allowlisted en una
+terminal visible.
 
 ## Extender
 

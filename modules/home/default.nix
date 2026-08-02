@@ -2,6 +2,7 @@
   hostConfig,
   inputs,
   users,
+  holodeckIr,
   ...
 }:
 
@@ -15,7 +16,7 @@ in
     useUserPackages = true;
     backupFileExtension = "hm-bak";
     extraSpecialArgs = {
-      inherit inputs user;
+      inherit inputs user holodeckIr;
     };
     users.${user.username} = import ../../home;
   };

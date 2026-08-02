@@ -21,6 +21,11 @@ Home Manager valida el archivo `~/.config/niri/config.kdl` durante el build.
 La selección de Niri como sesión predeterminada es una responsabilidad NixOS y
 se documenta en [niri.md](niri.md).
 
+La feature de Noctalia instala además `holodeckctl`, el plugin Luau
+`holodeck/control` y una entrada de launcher `Holodeck Control`. Todo queda
+incluido en los flujos existentes de `./install.sh`; no hay un instalador
+paralelo para el plugin.
+
 El perfil publica Zsh en `SHELL` y redirige a Zsh las terminales interactivas
 que todavía arranquen Bash. Esto permite usarlo también en instalaciones donde
 Home Manager no puede cambiar el login shell de `/etc/passwd`. Para abrir Bash

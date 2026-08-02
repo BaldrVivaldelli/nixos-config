@@ -1,0 +1,130 @@
+{
+  "common": {
+    "yes": "yes",
+    "no": "no"
+  },
+  "widget": {
+    "label": "Holodeck",
+    "tooltip": "Open Holodeck Control"
+  },
+  "panel": {
+    "title": "Holodeck Control",
+    "close": "Close",
+    "working": "Working…",
+    "refresh": "Refresh",
+    "save_ir": "Save IR",
+    "cancel": "Cancel",
+    "apply_terminal": "Apply in terminal",
+    "unsaved": "The selection has not been saved to the IR yet.",
+    "saved": "The selection matches the saved IR.",
+    "error_title": "Backend error",
+    "nav": {
+      "overview": "Overview",
+      "system": "System",
+      "integrations": "Integrations"
+    },
+    "overview": {
+      "title": "Overview",
+      "description": "At-a-glance status for the declarative system and its integrations.",
+      "system_summary": "Target {target} · mode {mode}",
+      "configured_count": "{count}/4 configured",
+      "open_system": "Configure system",
+      "open_integrations": "Manage integrations"
+    },
+    "system": {
+      "title": "System",
+      "description": "Choose the target and appearance, save the IR, and review the plan before applying it."
+    },
+    "status": {
+      "ready": "IR ready",
+      "not_created": "IR not created",
+      "current": "Saved target: {target} · mode: {mode}",
+      "defaults": "Proposed values: {target} · mode: {mode}",
+      "path": "File: {path}",
+      "source": "Source: {source}"
+    },
+    "target": {
+      "title": "Installation target",
+      "description": "Home Manager configures an existing user. Existing NixOS applies the complete system profile.",
+      "home_manager": "Home Manager",
+      "existing_nixos": "Existing NixOS"
+    },
+    "mode": {
+      "title": "Appearance",
+      "description": "Choose the desired light or dark theme mode recorded in the IR.",
+      "dark": "Dark",
+      "light": "Light"
+    },
+    "plan": {
+      "title": "Plan and apply",
+      "description": "The backend validates the saved IR and produces a plan. Applying always requires confirmation and opens a terminal for visible logs and privilege prompts.",
+      "button": "Generate plan",
+      "summary": "Target: {target}\nRequires elevation: {elevation}\nIR: {digest}"
+    },
+    "confirm": {
+      "title": "Confirm apply",
+      "warning": "This will run the allowlisted holodeckctl apply command. Review the plan before continuing."
+    },
+    "integrations": {
+      "title": "Integrations",
+      "description": "Configuration and authentication open in a visible terminal. The panel displays only non-sensitive metadata.",
+      "tools": "General tools",
+      "tools_description": "Run the complete setup assistant or check the health of every integration.",
+      "setup_all": "Configure all",
+      "doctor": "Diagnostics",
+      "configure": "Configure",
+      "login": "Login",
+      "identity": "Identity",
+      "profiles": "Profiles: {profiles}",
+      "none": "none",
+      "state": {
+        "configured": "Configured",
+        "available": "Available",
+        "unavailable": "Not installed"
+      },
+      "github": {
+        "title": "GitHub",
+        "description": "Configure authentication, an SSH key, and Git routing for personal projects."
+      },
+      "gitlab": {
+        "title": "GitLab",
+        "description": "Configure authentication and a separate Git/SSH profile for work projects."
+      },
+      "aws": {
+        "title": "AWS",
+        "description": "Create SSO profiles, log in, and inspect the active identity without displaying credentials."
+      },
+      "windows": {
+        "title": "Windows VM",
+        "short_title": "Windows",
+        "description": "Control the Dockurr VM declared by NixOS through the windowsvm command.",
+        "ready": "The helper is available on this system.",
+        "install": "Requires applying the existing physical NixOS target.",
+        "open": "Start/open",
+        "status": "Status",
+        "web": "Web",
+        "logs": "Logs",
+        "stop": "Stop"
+      }
+    }
+  },
+  "notice": {
+    "status_loaded": "Current IR loaded.",
+    "ir_missing": "No saved IR exists yet. Review the defaults and select Save IR to create it.",
+    "ir_saved": "IR saved through holodeckctl.",
+    "apply_cancelled": "Apply cancelled.",
+    "terminal_opened": "Apply opened in a terminal. Follow the build and any privilege prompt there.",
+    "integration_terminal": "The integration opened in a terminal. Select Refresh when it finishes to update its state."
+  },
+  "error": {
+    "unknown": "Unknown backend error.",
+    "timeout": "The backend command timed out.",
+    "invalid_json": "The backend returned invalid JSON: {detail}",
+    "backend_rejected": "The backend rejected the operation.",
+    "backend_missing": "holodeckctl is not available on PATH. Install the backend through the Nix profile and reopen this panel.",
+    "command_not_allowed": "The requested action is not in the frontend command allowlist.",
+    "command_not_started": "Noctalia could not start the backend command.",
+    "invalid_plan": "The backend returned a plan with an unsupported target.",
+    "terminal_not_started": "Noctalia could not open the action in a terminal."
+  }
+}

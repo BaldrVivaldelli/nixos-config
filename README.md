@@ -1,5 +1,9 @@
 # NixOS existente, Home Manager y NixOS-WSL
 
+<p align="center">
+  <img src="plugins/noctalia/holodeck-control/assets/holodeck-control.png" width="180" alt="Holodeck Control: cámara de simulación holográfica">
+</p>
+
 Este repositorio mantiene tres flujos:
 
 - un overlay seguro para configurar Niri sobre un NixOS físico existente;
@@ -90,6 +94,27 @@ El perfil instala Zsh, Starship, Git, Python, Node.js, AWS CLI, Chromium,
 VSCodium, Niri, Noctalia y Holodeck, entre otras herramientas de usuario. Niri
 inicia Noctalia automáticamente dentro de su sesión.
 
+El mismo `switch` instala y habilita el plugin **Holodeck Control** de Noctalia. Se
+puede abrir desde el launcher con `Mod+Space` buscando `Holodeck Control`; su
+icono representa una cámara de simulación holográfica. También se puede abrir con:
+
+```bash
+noctalia msg panel-toggle holodeck/control:control
+```
+
+El glifo `cube-spark` de Holodeck queda agregado automáticamente al extremo
+derecho de la barra de Noctalia. Usa el mismo color semántico que los demás
+controles y al seleccionarlo abre el mismo panel.
+
+El panel Luau guarda la intención declarativa en `holodeck.local.json`, muestra
+el plan del backend y abre la aplicación en una terminal visible. Nix valida
+ese IR antes del build y sigue siendo la única capa que construye y activa la
+configuración. La misma pantalla integra los perfiles GitHub/GitLab, AWS SSO y
+los controles de la Windows VM sin exponer credenciales. La navegación separa
+**Resumen**, **Sistema** e **Integraciones** y usa controles nativos de Noctalia,
+por lo que respeta la escala, paleta y accesibilidad de la shell. Ver
+[docs/holodeck-control.md](docs/holodeck-control.md).
+
 Al terminar, alcanza con cerrar la sesión de KDE y entrar a Niri desde SDDM; no
 es necesario reiniciar. Plasma permanece disponible como alternativa. Ver
 [docs/niri.md](docs/niri.md).
@@ -134,11 +159,13 @@ sudo nixos-rebuild switch --flake path:.#wsl
 flake.nix
 inventory.nix
 inventory.local.nix  # generado localmente e ignorado por Git
+holodeck.local.json  # IR generado por el panel, ignorado por Git
 configure-inventory.sh
 install.sh
 apply-nixos-system.sh
 home/default.nix
 lib/inventory.nix
+lib/holodeck-ir.nix
 modules/
   home/
   hosts/wsl/
@@ -146,7 +173,11 @@ modules/
 holodeck/
   core/
   backends/nixos/
-packages/holodeck/
+packages/
+  holodeck/
+  holodeckctl/
+  holodeck-noctalia-plugin/
+plugins/noctalia/holodeck-control/
 ```
 
 Los módulos NixOS bajo `modules/nixos/features` se conservan como piezas
@@ -169,6 +200,7 @@ CI ejecuta los mismos límites antes de evaluar la flake.
 - [Arquitectura](docs/architecture.md)
 - [Inventario](docs/inventory.md)
 - [Home Manager](docs/home-manager.md)
+- [Holodeck Control](docs/holodeck-control.md)
 - [NixOS-WSL](docs/wsl.md)
 - [Holodeck](docs/holodeck.md)
 - [Mantenimiento](docs/maintenance.md)

@@ -14,7 +14,8 @@ físicas desde cero.
 6. [Mantenimiento](maintenance.md): checks y actualizaciones.
 7. [Seguridad y secretos](security.md): estado que queda fuera de Git.
 8. [Noctalia](noctalia.md): shell Wayland del perfil personal.
-9. [Niri](niri.md): compositor, atajos e integración opcional de sistema.
+9. [Holodeck Control](holodeck-control.md): frontend Luau, IR y backend Nix.
+10. [Niri](niri.md): compositor, atajos e integración opcional de sistema.
 
 ## Módulos reutilizables
 

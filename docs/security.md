@@ -18,7 +18,19 @@ sensible deben vivir fuera del repo.
 - archivos `.gpg`, `.pgp`, `.asc`, `.age`, `.kdbx`
 - directorios `secrets`, `private`, `.secrets`, `.private`
 - estado generado por Holodeck bajo `.config/holodeck`
+- inventario de máquina `inventory.local.nix`
+- IR declarativo local `holodeck.local.json` y su lock
 - caches de Python y Node.js
+
+`holodeck.local.json` no contiene comandos ni secretos: sólo enums y valores de
+apariencia validados. Aun así queda fuera de Git porque expresa la intención de
+una máquina concreta.
+
+Holodeck Control sólo devuelve al frontend nombres de perfil, proveedor y host.
+No devuelve emails, rutas de claves, fingerprints, tokens, passwords ni el
+contenido de archivos AWS. Sus acciones se ejecutan en una terminal mediante
+un enum cerrado y listas de argumentos, nunca mediante comandos construidos con
+datos recibidos desde Luau.
 
 ## Hook pre-commit
 

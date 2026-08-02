@@ -5,6 +5,14 @@ repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 mode="${1:-switch}"
 readonly required_nix_features="nix-command flakes"
 
+note() {
+  if [[ -t 2 && -z "${NO_COLOR+x}" && "${TERM:-}" != "dumb" ]]; then
+    printf '\033[1;33mNota: %s\033[0m\n' "$*" >&2
+  else
+    printf 'Nota: %s\n' "$*" >&2
+  fi
+}
+
 usage() {
   cat <<'MSG'
 Uso:
@@ -51,7 +59,7 @@ fi
 
 if [[ "$mode" == "build" ]]; then
   echo "Construyendo la configuracion sin activarla..." >&2
-  echo "Nota: build no instala los programas. Luego ejecuta: ./apply-home.sh switch" >&2
+  note "build no instala los programas. Luego ejecuta: ./apply-home.sh switch"
 else
   echo "Instalando y activando los programas del usuario..." >&2
   echo "Los archivos previos en conflicto se conservaran con extension .hm-bak." >&2

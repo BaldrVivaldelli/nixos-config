@@ -48,7 +48,16 @@ nix --extra-experimental-features "nix-command flakes" \
 El primer script comprueba el límite de la configuración Home Manager. El
 segundo rechaza instaladores destructivos, Disko y patrones de almacenamiento.
 El check de la flake evalúa además `#existing`, `#wsl` y ejecuta las pruebas de
-Holodeck e instaladores.
+Holodeck, instaladores, `holodeckctl` y el plugin Luau. El artefacto del
+plugin se compila con Luau y se valida con el binario de Noctalia fijado.
+
+El backend también se puede revisar sin aplicar cambios:
+
+```bash
+holodeckctl status
+holodeckctl init  # sólo si todavía no existe holodeck.local.json
+holodeckctl plan
+```
 
 ## Formato
 

@@ -1,0 +1,23 @@
+id = "holodeck/control"
+name = "Holodeck Control"
+version = "0.4.4"
+plugin_api = 9
+author = "holodeck"
+license = "MIT"
+dependencies = ["holodeckctl"]
+tags = ["nixos", "system", "utility"]
+icon = "cube-spark"
+description = "A thin Noctalia frontend for the deterministic Holodeck IR workflow."
+
+[[widget]]
+id = "config"
+entry = "widget.luau"
+
+[[panel]]
+id = "control"
+entry = "panel.luau"
+width = 620
+height = 620
+placement = "floating"
+position = "center"
+dismiss_on_outside_click = false

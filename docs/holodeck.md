@@ -5,6 +5,11 @@ Holodeck conserva dos responsabilidades separadas:
 - el core portable configura Git, SSH, GitHub y GitLab;
 - los backends opcionales instalan sistemas declarados.
 
+El plugin **Holodeck Control** reúne esas capacidades con AWS y la Windows VM
+en una interfaz Noctalia. Conserva la lógica y las credenciales en sus comandos
+originales; el frontend sólo muestra estado no sensible y abre flujos
+allowlisted en una terminal. Ver [holodeck-control.md](holodeck-control.md).
+
 ## Core
 
 El core vive en `holodeck/core` y el wrapper Nix en
