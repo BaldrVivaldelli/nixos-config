@@ -46,6 +46,12 @@
           appearance.theme.mode = "light";
         };
       };
+      legacyHolodeckIr = import ./lib/holodeck-ir.nix {
+        inherit lib;
+        value = (builtins.removeAttrs defaultHolodeckIr [ "integrations" ]) // {
+          schemaVersion = 1;
+        };
+      };
       invalidHolodeckIr = builtins.tryEval (
         import ./lib/holodeck-ir.nix {
           inherit lib;
@@ -382,10 +388,13 @@
         noctalia-plugin = noctaliaPlugin;
 
         holodeck-ir =
-          assert defaultHolodeckIr.schemaVersion == 1;
+          assert defaultHolodeckIr.schemaVersion == 2;
           assert defaultHolodeckIr.deployment.target == "home-manager";
           assert defaultHolodeckIr.desktop.compositor == "niri";
           assert defaultHolodeckIr.desktop.shell == "noctalia";
+          assert defaultHolodeckIr.integrations.windows.rdp.displayMode == "half";
+          assert legacyHolodeckIr.schemaVersion == 2;
+          assert legacyHolodeckIr.integrations.windows.rdp.displayMode == "half";
           assert lightHolodeckIr.appearance.theme.mode == "light";
           assert !invalidHolodeckIr.success;
           assert builtins.elem holodeckIr.appearance.theme.mode [

@@ -1,5 +1,9 @@
 # Holodeck
 
+El README principal del proyecto portable está en
+[`holodeck/README.md`](../holodeck/README.md). Este documento resume cómo se
+integra con la flake, Home Manager y los backends de este repositorio.
+
 Holodeck conserva dos responsabilidades separadas:
 
 - el core portable configura Git, SSH, GitHub y GitLab;
@@ -8,7 +12,9 @@ Holodeck conserva dos responsabilidades separadas:
 El plugin **Holodeck Control** reúne esas capacidades con AWS y la Windows VM
 en una interfaz Noctalia. Conserva la lógica y las credenciales en sus comandos
 originales; el frontend sólo muestra estado no sensible y abre flujos
-allowlisted en una terminal. Ver [holodeck-control.md](holodeck-control.md).
+allowlisted. Los flujos interactivos conservan una terminal visible, mientras
+que RDP y Web se lanzan directamente. Ver
+[holodeck-control.md](holodeck-control.md).
 
 ## Core
 

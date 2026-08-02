@@ -38,6 +38,8 @@ holodeckctl --json set deployment.target home-manager
 holodeckctl --json set deployment.target existing-nixos
 holodeckctl --json set appearance.theme.mode dark
 holodeckctl --json set appearance.theme.mode light
+holodeckctl --json set integrations.windows.rdp.displayMode half
+holodeckctl --json set integrations.windows.rdp.displayMode fullscreen
 holodeckctl --json plan
 holodeckctl apply
 holodeckctl action holodeck-setup
@@ -55,9 +57,11 @@ holodeckctl action windows-logs
 holodeckctl action windows-down
 ```
 
-The non-JSON `apply` and `action` commands run in a terminal so output,
-authentication, choices and any privilege prompt remain visible. Status only
-returns provider/profile metadata; it excludes emails, key paths and secrets.
+The non-JSON `apply` and interactive `action` commands run in a terminal so
+output, authentication, choices and any privilege prompt remain visible. The
+RDP and Web actions are graphical launchers and run detached from the panel,
+without opening a disposable terminal. Status only returns provider/profile
+metadata; it excludes emails, key paths and secrets.
 
 The source tree intentionally retains the replacement token, so it can be
 linted directly but must be installed through the Nix package before it can run.

@@ -11,6 +11,8 @@ local COMMANDS = {
   targetExisting = CONFIGCTL .. " --json set deployment.target existing-nixos",
   modeDark = CONFIGCTL .. " --json set appearance.theme.mode dark",
   modeLight = CONFIGCTL .. " --json set appearance.theme.mode light",
+  rdpModeHalf = CONFIGCTL .. " --json set integrations.windows.rdp.displayMode half",
+  rdpModeFullscreen = CONFIGCTL .. " --json set integrations.windows.rdp.displayMode fullscreen",
   plan = CONFIGCTL .. " --json plan",
   apply = CONFIGCTL .. " apply",
   holodeckSetup = CONFIGCTL .. " action holodeck-setup",
@@ -36,12 +38,17 @@ local modeOptions = {
   noctalia.tr("panel.mode.dark"),
   noctalia.tr("panel.mode.light"),
 }
+local rdpDisplayModeOptions = {
+  noctalia.tr("panel.integrations.windows.display_half"),
+  noctalia.tr("panel.integrations.windows.display_fullscreen"),
+}
 
 local backendAvailable = false
 local busy = false
 local statusExists = false
 local selectedTargetIndex = 0
 local selectedModeIndex = 0
+local selectedRdpDisplayModeIndex = 0
 local persistedTarget = "home-manager"
 local persistedMode = "dark"
 local irPath = ""
@@ -115,6 +122,17 @@ local function setSelectionsFromIr(ir)
     elseif theme.mode == "dark" then
       selectedModeIndex = 0
       persistedMode = "dark"
+    end
+  end
+
+  local irIntegrations = ir.integrations
+  local windows = type(irIntegrations) == "table" and irIntegrations.windows or nil
+  local rdp = type(windows) == "table" and windows.rdp or nil
+  if type(rdp) == "table" then
+    if rdp.displayMode == "fullscreen" then
+      selectedRdpDisplayModeIndex = 1
+    elseif rdp.displayMode == "half" then
+      selectedRdpDisplayModeIndex = 0
     end
   end
 end
@@ -198,6 +216,24 @@ local function openTerminalAction(action)
   else
     notice = ""
     currentError = tr("error.terminal_not_started")
+  end
+  render()
+end
+
+local function openGraphicalAction(action)
+  local command = COMMANDS[action]
+  if command == nil then
+    fail(tr("error.command_not_allowed"))
+    return
+  end
+
+  local opened = noctalia.runAsync(command)
+  if opened then
+    notice = tr("notice.graphical_action_started")
+    currentError = ""
+  else
+    notice = ""
+    currentError = tr("error.command_not_started")
   end
   render()
 end
@@ -625,6 +661,27 @@ local function integrationDetail()
         color = "on_surface_variant",
         maxLines = 3,
       }),
+      ui.separator({ spacing = 2 }),
+      ui.label({
+        text = tr("panel.integrations.windows.display_title"),
+        fontWeight = "bold",
+        color = "on_surface",
+      }),
+      ui.label({
+        text = tr("panel.integrations.windows.display_description"),
+        fontSize = 13,
+        color = "on_surface_variant",
+        maxLines = 3,
+      }),
+      ui.select({
+        key = "windows-rdp-display-mode",
+        options = rdpDisplayModeOptions,
+        selectedIndex = selectedRdpDisplayModeIndex,
+        controlSize = "sm",
+        enabled = available,
+        onChange = "onWindowsRdpDisplayModeChanged",
+      }),
+      ui.separator({ spacing = 2 }),
       ui.row({ gap = 8 }, {
         ui.button({
           text = tr("panel.integrations.windows.open"),
@@ -800,7 +857,7 @@ render = function()
       navigationButton("system", tr("panel.nav.system"), "device-desktop-cog", "onShowSystem"),
       navigationButton("integrations", tr("panel.nav.integrations"), "plug-connected", "onShowIntegrations"),
       ui.spacer({ flexGrow = 1 }),
-      ui.label({ text = "v0.4.4", fontSize = 11, color = "on_surface_variant" }),
+      ui.label({ text = "v0.4.6", fontSize = 11, color = "on_surface_variant" }),
     }),
     ui.column({ flexGrow = 1, gap = 12, align = "stretch" }, {
       ui.row({ align = "center", gap = 8 }, {
@@ -1053,11 +1110,38 @@ function onWindowsStatusClicked()
 end
 
 function onWindowsRdpClicked()
-  openTerminalAction("windowsRdp")
+  openGraphicalAction("windowsRdp")
+end
+
+function onWindowsRdpDisplayModeChanged(index, _text)
+  if busy or not backendAvailable then
+    return
+  end
+
+  local parsed = tonumber(index)
+  if parsed ~= 0 and parsed ~= 1 then
+    return
+  end
+
+  busy = true
+  currentError = ""
+  notice = ""
+  render()
+
+  local action = parsed == 1 and "rdpModeFullscreen" or "rdpModeHalf"
+  runAllowed(action, function(payload)
+    setSelectionsFromIr(payload.ir)
+    statusExists = true
+    statusSource = "file"
+    recomputeDirty()
+    busy = false
+    notice = tr("notice.windows_rdp_display_saved")
+    render()
+  end)
 end
 
 function onWindowsWebClicked()
-  openTerminalAction("windowsWeb")
+  openGraphicalAction("windowsWeb")
 end
 
 function onWindowsLogsClicked()

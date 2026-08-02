@@ -8,7 +8,7 @@ from typing import Any
 
 from .errors import ConfigCtlError
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 DEFAULT_IR: dict[str, Any] = {
     "schemaVersion": SCHEMA_VERSION,
@@ -23,6 +23,13 @@ DEFAULT_IR: dict[str, Any] = {
             "builtin": "Catppuccin",
         }
     },
+    "integrations": {
+        "windows": {
+            "rdp": {
+                "displayMode": "half",
+            }
+        }
+    },
 }
 
 SETTERS: dict[str, tuple[str, ...]] = {
@@ -30,6 +37,7 @@ SETTERS: dict[str, tuple[str, ...]] = {
     "desktop.compositor": ("niri",),
     "desktop.shell": ("noctalia",),
     "appearance.theme.mode": ("dark", "light"),
+    "integrations.windows.rdp.displayMode": ("half", "fullscreen"),
 }
 
 ALL_SETTABLE_KEYS = (*SETTERS.keys(), "appearance.theme.builtin")
@@ -68,20 +76,22 @@ def _expect_allowed(value: Any, allowed: tuple[str, ...], path: str) -> str:
 
 def validate_ir(value: Any) -> dict[str, Any]:
     root = _expect_object(value, "IR")
-    _expect_exact_keys(
-        root,
-        {"schemaVersion", "deployment", "desktop", "appearance"},
-        "IR",
-    )
+    if "schemaVersion" not in root:
+        raise ConfigCtlError("invalid-ir", "falta la clave schemaVersion en IR")
 
     version = root["schemaVersion"]
     if isinstance(version, bool) or not isinstance(version, int):
         raise ConfigCtlError("invalid-ir", "schemaVersion debe ser un entero")
-    if version != SCHEMA_VERSION:
+    if version not in (1, SCHEMA_VERSION):
         raise ConfigCtlError(
             "unsupported-schema",
-            f"schemaVersion {version} no está soportado; se esperaba {SCHEMA_VERSION}",
+            f"schemaVersion {version} no está soportado; se esperaba 1 o {SCHEMA_VERSION}",
         )
+
+    expected_root_keys = {"schemaVersion", "deployment", "desktop", "appearance"}
+    if version == SCHEMA_VERSION:
+        expected_root_keys.add("integrations")
+    _expect_exact_keys(root, expected_root_keys, "IR")
 
     deployment = _expect_object(root["deployment"], "deployment")
     _expect_exact_keys(deployment, {"target"}, "deployment")
@@ -116,6 +126,20 @@ def validate_ir(value: Any) -> dict[str, Any]:
             "appearance.theme.builtin no puede contener NUL ni saltos de línea",
         )
 
+    display_mode = "half"
+    if version == SCHEMA_VERSION:
+        integrations = _expect_object(root["integrations"], "integrations")
+        _expect_exact_keys(integrations, {"windows"}, "integrations")
+        windows = _expect_object(integrations["windows"], "integrations.windows")
+        _expect_exact_keys(windows, {"rdp"}, "integrations.windows")
+        rdp = _expect_object(windows["rdp"], "integrations.windows.rdp")
+        _expect_exact_keys(rdp, {"displayMode"}, "integrations.windows.rdp")
+        display_mode = _expect_allowed(
+            rdp["displayMode"],
+            SETTERS["integrations.windows.rdp.displayMode"],
+            "integrations.windows.rdp.displayMode",
+        )
+
     # Rebuild the object so callers never preserve custom Mapping subclasses or
     # unknown aliases after validation.
     return {
@@ -123,6 +147,13 @@ def validate_ir(value: Any) -> dict[str, Any]:
         "deployment": {"target": target},
         "desktop": {"compositor": compositor, "shell": shell},
         "appearance": {"theme": {"mode": mode, "builtin": builtin.strip()}},
+        "integrations": {
+            "windows": {
+                "rdp": {
+                    "displayMode": display_mode,
+                }
+            }
+        },
     }
 
 
@@ -147,11 +178,11 @@ def set_value(ir: Mapping[str, Any], key: str, value: str) -> dict[str, Any]:
             f"clave no configurable: {key}; opciones: {', '.join(ALL_SETTABLE_KEYS)}",
         )
 
-    first, second, *third = key.split(".")
-    if third:
-        normalized[first][second][third[0]] = value
-    else:
-        normalized[first][second] = value
+    path = key.split(".")
+    destination = normalized
+    for component in path[:-1]:
+        destination = destination[component]
+    destination[path[-1]] = value
     return validate_ir(normalized)
 
 

@@ -76,7 +76,7 @@ def make_parser() -> Parser:
     subparsers.add_parser("apply", help="aplica el IR mediante install.sh")
 
     action_parser = subparsers.add_parser(
-        "action", help="abre una integración permitida en la terminal actual"
+        "action", help="ejecuta una integración permitida por argv"
     )
     action_parser.add_argument("name", choices=ALL_ACTIONS)
     return parser
@@ -253,7 +253,7 @@ HELP_SUMMARIES = {
     "set": "Actualiza una clave allowlisted; inicializa el IR si todavía no existe.",
     "plan": "Valida el IR y devuelve el argv literal, sin ejecutar nada.",
     "apply": "Bloquea el IR y ejecuta install.sh por argv, sin shell ni sudo propio.",
-    "action": "Ejecuta una acción integrada allowlisted por argv y en una terminal visible.",
+    "action": "Ejecuta una acción integrada allowlisted por argv; la UI decide si requiere terminal.",
 }
 
 
@@ -360,11 +360,15 @@ def run(
             if json_output:
                 raise ConfigCtlError(
                     "usage",
-                    "action no acepta --json porque ejecuta un flujo interactivo en terminal",
+                    "action no acepta --json porque delega el proceso integrado sin capturar su salida",
                 )
+            ir = load_ir(ir_path) if ir_path.exists() else default_ir()
             result = execute_action(
                 args.name,
                 environment,
+                rdp_display_mode=ir["integrations"]["windows"]["rdp"][
+                    "displayMode"
+                ],
                 runner=runner,
                 input_fn=input_fn,
                 stdout=out,

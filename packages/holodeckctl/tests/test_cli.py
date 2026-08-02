@@ -90,6 +90,20 @@ class CliTests(unittest.TestCase):
         self.assertFalse(invalid["ok"])
         self.assertEqual("invalid-value", invalid["error"]["code"])
 
+    def test_set_persists_windows_rdp_display_mode(self) -> None:
+        code, payload, _ = self.invoke(
+            "--json",
+            "set",
+            "integrations.windows.rdp.displayMode",
+            "fullscreen",
+        )
+
+        self.assertEqual(0, code)
+        self.assertEqual(
+            "fullscreen",
+            payload["ir"]["integrations"]["windows"]["rdp"]["displayMode"],
+        )
+
     def test_plan_discloses_literal_argv_and_elevation(self) -> None:
         self.invoke("--json", "set", "deployment.target", "existing-nixos")
         code, payload, _ = self.invoke("--json", "plan")
@@ -142,6 +156,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(0, code)
         self.assertEqual("help", payload["command"])
         self.assertIn("deployment.target", payload["settable"])
+        self.assertIn("integrations.windows.rdp.displayMode", payload["settable"])
         self.assertIn("github-setup", payload["actions"])
         self.assertIn("windows-up", payload["actions"])
 

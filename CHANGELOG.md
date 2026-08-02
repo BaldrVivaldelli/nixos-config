@@ -4,6 +4,11 @@
 
 ### Added
 
+- Added a standalone project README for Holodeck covering its portable core,
+  command reference, managed state, security boundaries, system-backend
+  contract, tests and optional Noctalia ecosystem integrations.
+- Added a persistent half-screen/full-screen RDP selector to the Windows card,
+  backed by the versioned Holodeck IR and a safe automatic v1-to-v2 migration.
 - Added an original Holodeck chamber identity to the READMEs, application
   launcher and plugin panel, plus a reduced companion icon designed for the
   Noctalia bar and compact navigation rail.
@@ -39,6 +44,9 @@
 
 ### Changed
 
+- Made the Windows RDP launcher select the native SDL client on Wayland and
+  the X11 client on X11, while RDP and Web now open directly from Holodeck
+  Control without a short-lived terminal.
 - Highlighted interactive `Nota:` messages in bold yellow while respecting
   `NO_COLOR`, dumb terminals and non-interactive logs.
 - Replaced the colored Holodeck bar image with Noctalia's `cube-spark` glyph

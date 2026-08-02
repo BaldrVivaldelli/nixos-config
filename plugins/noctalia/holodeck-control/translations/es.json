@@ -103,6 +103,10 @@
         "open": "Iniciar/abrir",
         "status": "Estado",
         "web": "Web",
+        "display_title": "Tamaño de la sesión RDP",
+        "display_description": "Media pantalla abre una ventana al 50% del ancho. Pantalla completa ocupa el monitor; ambos modos conservan resolución dinámica.",
+        "display_half": "Media pantalla",
+        "display_fullscreen": "Pantalla completa",
         "logs": "Logs",
         "stop": "Detener"
       }
@@ -114,7 +118,9 @@
     "ir_saved": "El IR fue guardado mediante holodeckctl.",
     "apply_cancelled": "Aplicación cancelada.",
     "terminal_opened": "La aplicación se abrió en una terminal. Seguí allí el build y cualquier pedido de privilegios.",
-    "integration_terminal": "La integración se abrió en una terminal. Al terminar, usá Actualizar para refrescar su estado."
+    "integration_terminal": "La integración se abrió en una terminal. Al terminar, usá Actualizar para refrescar su estado.",
+    "graphical_action_started": "Se está abriendo el cliente gráfico. No hace falta mantener una terminal abierta.",
+    "windows_rdp_display_saved": "Se guardó el tamaño de RDP. Se usará al abrir o iniciar Windows."
   },
   "error": {
     "unknown": "Error desconocido del backend.",

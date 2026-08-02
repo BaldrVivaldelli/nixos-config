@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "holodeckctl"
-version = "0.2.0"
+version = "0.3.0"
 description = "Safe bridge between Noctalia preferences and Holodeck"
 requires-python = ">=3.11"
 dependencies = []

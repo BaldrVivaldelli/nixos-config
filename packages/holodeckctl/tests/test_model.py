@@ -31,15 +31,35 @@ class ModelTests(unittest.TestCase):
 
     def test_rejects_unsupported_schema(self) -> None:
         ir = default_ir()
-        ir["schemaVersion"] = 2
+        ir["schemaVersion"] = 3
 
         with self.assertRaises(ConfigCtlError) as raised:
             validate_ir(ir)
         self.assertEqual("unsupported-schema", raised.exception.code)
 
+    def test_schema_v1_is_migrated_with_safe_rdp_default(self) -> None:
+        legacy = default_ir()
+        legacy["schemaVersion"] = 1
+        del legacy["integrations"]
+
+        migrated = validate_ir(legacy)
+
+        self.assertEqual(2, migrated["schemaVersion"])
+        self.assertEqual(
+            "half", migrated["integrations"]["windows"]["rdp"]["displayMode"]
+        )
+
     def test_set_only_accepts_allowlisted_keys_and_values(self) -> None:
         updated = set_value(default_ir(), "appearance.theme.mode", "light")
         self.assertEqual("light", updated["appearance"]["theme"]["mode"])
+
+        updated = set_value(
+            updated, "integrations.windows.rdp.displayMode", "fullscreen"
+        )
+        self.assertEqual(
+            "fullscreen",
+            updated["integrations"]["windows"]["rdp"]["displayMode"],
+        )
 
         with self.assertRaises(ConfigCtlError) as raised:
             set_value(updated, "appearance.theme.mode", "automatic")

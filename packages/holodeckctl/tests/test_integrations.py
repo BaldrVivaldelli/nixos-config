@@ -105,6 +105,34 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual([[str(executable), "github"]], [call[0] for call in calls])
         self.assertIs(calls[0][1]["shell"], False)
 
+    def test_windows_rdp_receives_only_validated_display_mode(self) -> None:
+        executable = self.add_command("windowsvm")
+        calls: list[list[str]] = []
+
+        def runner(argv: list[str], **_kwargs: Any) -> subprocess.CompletedProcess[str]:
+            calls.append(argv)
+            return subprocess.CompletedProcess(argv, 0)
+
+        execute_action(
+            "windows-rdp",
+            self.environment,
+            rdp_display_mode="fullscreen",
+            runner=runner,
+            stdout=io.StringIO(),
+        )
+
+        self.assertEqual([[str(executable), "rdp", "fullscreen"]], calls)
+
+        with self.assertRaises(ConfigCtlError) as raised:
+            execute_action(
+                "windows-rdp",
+                self.environment,
+                rdp_display_mode="1920x1080",
+                runner=runner,
+                stdout=io.StringIO(),
+            )
+        self.assertEqual("invalid-rdp-display-mode", raised.exception.code)
+
     def test_aws_action_selects_only_a_discovered_profile(self) -> None:
         executable = self.add_command("aws")
         aws_dir = self.home / ".aws"

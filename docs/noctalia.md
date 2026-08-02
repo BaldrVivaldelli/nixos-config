@@ -49,8 +49,9 @@ como la del Control Center y divide el uso en **Resumen**, **Sistema** e
 **Integraciones**. Esta última vista muestra un proveedor por vez para evitar
 una pantalla larga y saturada. Para los providers sólo lee nombres, host y
 disponibilidad; la autenticación, las claves y las credenciales siguen en
-`holodeck`, AWS CLI y `windowsvm`. Cada acción se abre en una terminal y al
-volver se actualiza con el botón de recarga del encabezado.
+`holodeck`, AWS CLI y `windowsvm`. Las acciones interactivas se abren en una
+terminal y al volver se actualizan con el botón de recarga del encabezado. Los
+lanzadores gráficos RDP y Web se abren directamente desde el panel.
 
 La UI de Noctalia puede guardar un override que deshabilite un plugin. Home
 Manager garantiza que esté instalado y habilitado en la configuración base,

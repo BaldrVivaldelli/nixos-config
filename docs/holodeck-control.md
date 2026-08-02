@@ -38,7 +38,7 @@ Home Manager agrega automáticamente `holodeck/control:config` al extremo
 derecho de la barra principal, antes de Control Center y sesión. El widget sólo
 muestra el glifo temático; su tooltip explica la acción y un click abre el panel.
 
-## IR v1
+## IR v2
 
 El backend crea `holodeck.local.json` sólo cuando el usuario guarda por primera
 vez. Si no existe, `status` muestra defaults seguros sin escribir nada.
@@ -58,18 +58,27 @@ vez. Si no existe, `status` muestra defaults seguros sin escribir nada.
     "compositor": "niri",
     "shell": "noctalia"
   },
-  "schemaVersion": 1
+  "integrations": {
+    "windows": {
+      "rdp": {
+        "displayMode": "half"
+      }
+    }
+  },
+  "schemaVersion": 2
 }
 ```
 
 El frontend actual permite elegir:
 
 - `deployment.target`: `home-manager` o `existing-nixos`;
-- `appearance.theme.mode`: `dark` o `light`.
+- `appearance.theme.mode`: `dark` o `light`;
+- `integrations.windows.rdp.displayMode`: `half` o `fullscreen`.
 
-Niri y Noctalia son los únicos valores aceptados por el schema v1 para
-compositor y shell. Extenderlos requiere cambiar en conjunto el modelo Python,
-la validación Nix, los tests y la UI.
+Niri y Noctalia son los únicos valores aceptados por el schema v2 para
+compositor y shell. Los archivos v1 se migran automáticamente con media pantalla
+como valor seguro. Extender el contrato requiere cambiar en conjunto el modelo
+Python, la validación Nix, los tests y la UI.
 
 ## Navegación e integraciones
 
@@ -91,11 +100,12 @@ La vista de integraciones reúne:
   logs y detención.
 
 `Configurar todo` reutiliza el wizard existente de `holodeck`; `Diagnóstico`
-ejecuta `holodeck doctor`. Todas las operaciones interactivas se abren en una
+ejecuta `holodeck doctor`. Las operaciones interactivas se abren en una
 terminal y al finalizar se puede usar la recarga del encabezado para releer el
-estado. Los botones usan tamaños semánticos de Noctalia, la acción principal de
-cada vista queda destacada y **Detener** usa explícitamente el estilo
-destructivo.
+estado. **RDP** y **Web** son lanzadores gráficos: se ejecutan directamente sin
+crear una terminal efímera; RDP usa el cliente SDL nativo en Wayland. Los
+botones usan tamaños semánticos de Noctalia, la acción principal de cada vista
+queda destacada y **Detener** usa explícitamente el estilo destructivo.
 
 Windows aparece disponible después de aplicar `./install.sh` con la opción 1,
 porque `windowsvm` pertenece al perfil del sistema NixOS. GitHub, GitLab y AWS
@@ -111,6 +121,7 @@ holodeckctl status --json
 holodeckctl init
 holodeckctl set deployment.target existing-nixos
 holodeckctl set appearance.theme.mode light
+holodeckctl set integrations.windows.rdp.displayMode fullscreen
 holodeckctl plan --json
 holodeckctl apply
 holodeckctl action holodeck-setup

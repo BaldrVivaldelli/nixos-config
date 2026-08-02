@@ -181,6 +181,7 @@ def execute_action(
     action: str,
     environ: Mapping[str, str],
     *,
+    rdp_display_mode: str = "half",
     runner: Runner = subprocess.run,
     input_fn: Input = input,
     stdout: TextIO,
@@ -188,6 +189,13 @@ def execute_action(
 ) -> dict[str, Any]:
     if action in ACTION_COMMANDS:
         argv = list(ACTION_COMMANDS[action])
+        if action in {"windows-up", "windows-rdp"}:
+            if rdp_display_mode not in {"half", "fullscreen"}:
+                raise ConfigCtlError(
+                    "invalid-rdp-display-mode",
+                    "el modo RDP debe ser half o fullscreen",
+                )
+            argv.append(rdp_display_mode)
     elif action in AWS_PROFILE_ACTIONS:
         profile = _select_aws_profile(environ, input_fn=input_fn, stdout=stdout)
         argv = ["aws", *AWS_PROFILE_ACTIONS[action], "--profile", profile]

@@ -52,6 +52,7 @@ let
       keyboard=''${WINDOWSVM_KEYBOARD:-$keyboard}
       rdp_timeout=''${WINDOWSVM_RDP_TIMEOUT:-90}
       rdp_attempts=''${WINDOWSVM_RDP_ATTEMPTS:-10}
+      rdp_display_mode=''${WINDOWSVM_RDP_DISPLAY_MODE:-half}
       container_created=0
 
       has_active_docker_group() {
@@ -93,12 +94,12 @@ let
 
       usage() {
         cat <<'USAGE'
-      Usage: windowsvm <command>
+      Usage: windowsvm <command> [rdp-display-mode]
 
       Commands:
-        up       Start the Dockurr Windows container
+        up       Start the Dockurr Windows container and open half or fullscreen RDP
         start    Start the container without opening a client
-        rdp      Open FreeRDP against the running container
+        rdp      Open FreeRDP in half or fullscreen mode
         web      Open the Dockurr web viewer
         status   Show the Docker container status
         logs     Follow container logs
@@ -117,6 +118,8 @@ let
         WINDOWSVM_LANGUAGE     Windows installation language
         WINDOWSVM_REGION       Windows installation region
         WINDOWSVM_KEYBOARD     Windows keyboard layout
+        WINDOWSVM_RDP_CLIENT   FreeRDP client override (sdl-freerdp or xfreerdp)
+        WINDOWSVM_RDP_DISPLAY_MODE  RDP size: half or fullscreen, default half
         WINDOWSVM_RDP_TIMEOUT  Seconds to wait for RDP from "up", default 90
         WINDOWSVM_RDP_ATTEMPTS RDP connection attempts from "up", default 10
       USAGE
@@ -236,19 +239,90 @@ let
         return 1
       }
 
-      run_xfreerdp() {
+      select_rdp_client() {
+        local requested
+        requested=''${WINDOWSVM_RDP_CLIENT:-}
+
+        if [ -n "$requested" ]; then
+          case "$requested" in
+            sdl-freerdp|xfreerdp)
+              if command -v "$requested" >/dev/null 2>&1; then
+                printf '%s\n' "$requested"
+                return 0
+              fi
+              echo "Requested RDP client is not available: $requested" >&2
+              return 1
+              ;;
+            *)
+              echo "Unsupported WINDOWSVM_RDP_CLIENT: $requested" >&2
+              echo "Use sdl-freerdp or xfreerdp." >&2
+              return 1
+              ;;
+          esac
+        fi
+
+        if [ -n "''${WAYLAND_DISPLAY:-}" ]; then
+          printf '%s\n' sdl-freerdp
+          return 0
+        fi
+
+        if [ -n "''${DISPLAY:-}" ]; then
+          printf '%s\n' xfreerdp
+          return 0
+        fi
+
+        echo "No graphical Wayland or X11 session was detected." >&2
+        echo "Open RDP from the desktop session, or use: windowsvm web" >&2
+        return 1
+      }
+
+      normalize_rdp_display_mode() {
+        case "$1" in
+          half|fullscreen)
+            printf '%s\n' "$1"
+            ;;
+          *)
+            echo "Unsupported RDP display mode: $1" >&2
+            echo "Use half or fullscreen." >&2
+            return 1
+            ;;
+        esac
+      }
+
+      run_freerdp() {
+        local rdp_client=$1
+        local display_mode=$2
+        local display_argument
+
+        case "$display_mode" in
+          half)
+            display_argument="/size:50%w"
+            ;;
+          fullscreen)
+            display_argument="+f"
+            ;;
+          *)
+            echo "Unsupported RDP display mode: $display_mode" >&2
+            return 1
+            ;;
+        esac
+
         printf '%s\n' \
           "/v:127.0.0.1:$rdp_port" \
           "/u:$username" \
           "/p:$password" \
           "/cert:ignore" \
-          "/dynamic-resolution" \
+          "$display_argument" \
+          "+dynamic-resolution" \
           "/log-level:ERROR" \
           "/timeout:15000" \
-          | xfreerdp /args-from:stdin
+          | "$rdp_client" /args-from:stdin
       }
 
       open_rdp() {
+        local rdp_client
+        local display_mode=$1
+
         ensure_docker
 
         if ! container_running; then
@@ -256,16 +330,21 @@ let
           exit 1
         fi
 
-        run_xfreerdp
+        rdp_client=$(select_rdp_client)
+        run_freerdp "$rdp_client" "$display_mode"
       }
 
       open_rdp_with_retries() {
         local attempt
+        local rdp_client
+        local display_mode=$1
+
+        rdp_client=$(select_rdp_client) || return 1
         attempt=1
 
         while [ "$attempt" -le "$rdp_attempts" ]; do
           echo "Opening RDP session ($attempt/$rdp_attempts)..."
-          if run_xfreerdp; then
+          if run_freerdp "$rdp_client" "$display_mode"; then
             return 0
           fi
 
@@ -280,11 +359,18 @@ let
       }
 
       open_web() {
-        xdg-open "http://127.0.0.1:$web_port" >/dev/null 2>&1 &
+        local url="http://127.0.0.1:$web_port"
+
+        if ! xdg-open "$url" >/dev/null 2>&1; then
+          echo "Could not open the Windows web viewer." >&2
+          echo "Open this URL manually: $url" >&2
+          return 1
+        fi
       }
 
       case "''${1:-help}" in
         up)
+          rdp_display_mode=$(normalize_rdp_display_mode "''${2:-$rdp_display_mode}")
           start_container
 
           if [ "$container_created" = "1" ]; then
@@ -296,7 +382,7 @@ let
 
           echo "Waiting for RDP on 127.0.0.1:$rdp_port..."
           if wait_for_rdp; then
-            if ! open_rdp_with_retries; then
+            if ! open_rdp_with_retries "$rdp_display_mode"; then
               echo "RDP is not accepting sessions yet. Opening the web viewer instead."
               open_web
             fi
@@ -309,7 +395,8 @@ let
           start_container
           ;;
         rdp)
-          open_rdp
+          rdp_display_mode=$(normalize_rdp_display_mode "''${2:-$rdp_display_mode}")
+          open_rdp "$rdp_display_mode"
           ;;
         web)
           open_web

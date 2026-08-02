@@ -83,6 +83,10 @@ Los puertos web y RDP usan `features.containers.windowsVm.bindAddress =
 "127.0.0.1"` por default. No cambiarlo a `0.0.0.0` sin definir antes controles
 de red y credenciales adecuadas.
 
+El modo de pantalla RDP guardado en el IR es un enum cerrado (`half` o
+`fullscreen`). `holodeckctl` lo valida antes de pasarlo como argumento a
+`windowsvm`; el frontend no construye comandos ni acepta resoluciones libres.
+
 ## Reglas practicas
 
 - No commitear tokens, passwords ni llaves privadas.

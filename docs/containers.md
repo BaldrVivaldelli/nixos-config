@@ -88,7 +88,7 @@ features.containers.windowsVm.enable = true;
 Cuando esta activa:
 
 - carga el modulo kernel `tun`
-- instala FreeRDP
+- instala FreeRDP y elige `sdl-freerdp` en Wayland o `xfreerdp` en X11
 - agrega el comando `windowsvm`
 - conecta con la imagen declarativa si `features.containers.images` contiene
   la misma referencia que `features.containers.windowsVm.image`
@@ -115,9 +115,9 @@ Cuando esta activa:
 ## Comando windowsvm
 
 ```text
-windowsvm up       Start the container and open RDP or web viewer
+windowsvm up [half|fullscreen]  Start the container and open RDP or web viewer
 windowsvm start    Start without opening a client
-windowsvm rdp      Open FreeRDP
+windowsvm rdp [half|fullscreen] Open FreeRDP at the selected size
 windowsvm web      Open the Dockurr web viewer
 windowsvm status   Show Docker container status
 windowsvm logs     Follow logs
@@ -176,9 +176,20 @@ WINDOWSVM_PASSWORD
 WINDOWSVM_LANGUAGE
 WINDOWSVM_REGION
 WINDOWSVM_KEYBOARD
+WINDOWSVM_RDP_CLIENT
+WINDOWSVM_RDP_DISPLAY_MODE
 WINDOWSVM_RDP_TIMEOUT
 WINDOWSVM_RDP_ATTEMPTS
 ```
+
+`WINDOWSVM_RDP_CLIENT` sólo hace falta para diagnóstico o una selección manual;
+acepta `sdl-freerdp` y `xfreerdp`. En el uso normal el helper detecta el tipo de
+sesión gráfica automáticamente.
+
+`WINDOWSVM_RDP_DISPLAY_MODE` acepta `half` o `fullscreen`. El primero abre la
+ventana al 50% del ancho disponible; el segundo usa el monitor completo. Ambos
+conservan `dynamic-resolution`, por lo que Windows se adapta si luego cambia el
+tamaño de la ventana.
 
 Para cambios permanentes, preferir las opciones Nix en el host.
 

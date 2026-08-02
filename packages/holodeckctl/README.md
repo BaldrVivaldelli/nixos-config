@@ -13,6 +13,7 @@ holodeckctl status --json
 holodeckctl init
 holodeckctl set deployment.target existing-nixos
 holodeckctl set appearance.theme.mode light
+holodeckctl set integrations.windows.rdp.displayMode fullscreen
 holodeckctl plan --json
 holodeckctl apply
 holodeckctl action holodeck-setup
@@ -44,7 +45,7 @@ porque el instalador existente solicita elevación durante `nixos-rebuild`.
 comandos. `action` acepta exclusivamente el enum documentado, resuelve el
 ejecutable y usa `shell=False`; los flujos interactivos no aceptan `--json`.
 
-## IR v1
+## IR v2
 
 ```json
 {
@@ -53,9 +54,15 @@ ejecutable y usa `shell=False`; los flujos interactivos no aceptan `--json`.
   },
   "deployment": { "target": "home-manager" },
   "desktop": { "compositor": "niri", "shell": "noctalia" },
-  "schemaVersion": 1
+  "integrations": {
+    "windows": { "rdp": { "displayMode": "half" } }
+  },
+  "schemaVersion": 2
 }
 ```
+
+Los IR v1 se migran en memoria con `displayMode=half` y se escriben como v2 en
+el siguiente `set`. El modo RDP sólo acepta `half` o `fullscreen`.
 
 Las escrituras son atómicas y `init`, `set` y `apply` comparten un lock
 exclusivo. El lock evita que cambie el IR durante una aplicación.

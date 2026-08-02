@@ -1,9 +1,5 @@
 # NixOS existente, Home Manager y NixOS-WSL
 
-<p align="center">
-  <img src="plugins/noctalia/holodeck-control/assets/holodeck-control.png" width="180" alt="Holodeck Control: cámara de simulación holográfica">
-</p>
-
 Este repositorio mantiene tres flujos:
 
 - un overlay seguro para configurar Niri sobre un NixOS físico existente;
@@ -121,7 +117,9 @@ es necesario reiniciar. Plasma permanece disponible como alternativa. Ver
 
 El mismo target habilita Docker y agrega `windowsvm` con autocompletado de Zsh.
 La primera creación se inicia con `windowsvm up`; el visor web y RDP sólo se
-publican en `127.0.0.1`. Ver [docs/containers.md](docs/containers.md).
+publican en `127.0.0.1`. La tarjeta Windows de Holodeck permite guardar si RDP
+debe abrirse a media pantalla o en pantalla completa. Ver
+[docs/containers.md](docs/containers.md).
 
 `inventory.nix` contiene defaults portables y `inventory.local.nix` los datos
 detectados de cada máquina. Los scripts usan `homeConfigurations.default`, por
@@ -171,6 +169,7 @@ modules/
   hosts/wsl/
   nixos/features/
 holodeck/
+  README.md              # documentación del proyecto portable
   core/
   backends/nixos/
 packages/
@@ -200,8 +199,9 @@ CI ejecuta los mismos límites antes de evaluar la flake.
 - [Arquitectura](docs/architecture.md)
 - [Inventario](docs/inventory.md)
 - [Home Manager](docs/home-manager.md)
+- [Holodeck (proyecto portable)](holodeck/README.md)
 - [Holodeck Control](docs/holodeck-control.md)
 - [NixOS-WSL](docs/wsl.md)
-- [Holodeck](docs/holodeck.md)
+- [Integración de Holodeck](docs/holodeck.md)
 - [Mantenimiento](docs/maintenance.md)
 - [Seguridad y secretos](docs/security.md)

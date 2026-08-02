@@ -103,6 +103,10 @@
         "open": "Start/open",
         "status": "Status",
         "web": "Web",
+        "display_title": "RDP session size",
+        "display_description": "Half screen opens at 50% of the display width. Full screen occupies the monitor; both modes retain dynamic resolution.",
+        "display_half": "Half screen",
+        "display_fullscreen": "Full screen",
         "logs": "Logs",
         "stop": "Stop"
       }
@@ -114,7 +118,9 @@
     "ir_saved": "IR saved through holodeckctl.",
     "apply_cancelled": "Apply cancelled.",
     "terminal_opened": "Apply opened in a terminal. Follow the build and any privilege prompt there.",
-    "integration_terminal": "The integration opened in a terminal. Select Refresh when it finishes to update its state."
+    "integration_terminal": "The integration opened in a terminal. Select Refresh when it finishes to update its state.",
+    "graphical_action_started": "The graphical client is opening. No terminal needs to remain open.",
+    "windows_rdp_display_saved": "The RDP size was saved. It will be used when opening or starting Windows."
   },
   "error": {
     "unknown": "Unknown backend error.",

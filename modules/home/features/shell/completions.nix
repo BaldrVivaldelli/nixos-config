@@ -56,7 +56,20 @@ in
 {
   config = lib.mkIf cfg.enable {
     programs.zsh.siteFunctions = {
-      _windowsvm = mkSubcommandCompletion "windowsvm" windowsvmCommands [ ];
+      _windowsvm = ''
+        #compdef windowsvm
+
+        if (( CURRENT == 2 )); then
+          _values "windowsvm command" ${zshWords windowsvmCommands}
+          return
+        fi
+
+        case "$words[2]" in
+          up|rdp)
+            _values "RDP display mode" half fullscreen
+            ;;
+        esac
+      '';
       _holodeck = ''
         #compdef holodeck
 
