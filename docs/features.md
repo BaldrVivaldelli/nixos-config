@@ -51,6 +51,12 @@ features.containers.enable = true;
 - Detalles de Holodeck: [holodeck.md](holodeck.md).
 - Detalles de Docker, Podman o Windows VM: [containers.md](containers.md).
 
+En `#existing` están activas `desktop = niri`, `containers = docker` y
+`containers.windowsVm`. Browser, Git, Holodeck, Lean, Node.js, Python y
+VSCodium permanecen apagadas en la capa NixOS porque el perfil `developer` de
+Home Manager ya instala sus equivalentes. `graphics` también queda apagada
+hasta elegir explícitamente el driver de la máquina.
+
 ## Patron recomendado para nuevas features
 
 ```nix

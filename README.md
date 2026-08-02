@@ -67,7 +67,7 @@ Ese target reutiliza `/etc/nixos/configuration.nix` y su
 copiar esas configuraciones al repo. Ejecuta, en orden:
 
 1. verificaciones de seguridad;
-2. build del sistema NixOS con Niri;
+2. build del sistema NixOS con Niri, Docker y la Windows VM;
 3. build de Home Manager;
 4. switch del sistema, que registra Niri y lo deja predeterminado en SDDM;
 5. switch de Home Manager.
@@ -93,6 +93,10 @@ inicia Noctalia automáticamente dentro de su sesión.
 Al terminar, alcanza con cerrar la sesión de KDE y entrar a Niri desde SDDM; no
 es necesario reiniciar. Plasma permanece disponible como alternativa. Ver
 [docs/niri.md](docs/niri.md).
+
+El mismo target habilita Docker y agrega `windowsvm` con autocompletado de Zsh.
+La primera creación se inicia con `windowsvm up`; el visor web y RDP sólo se
+publican en `127.0.0.1`. Ver [docs/containers.md](docs/containers.md).
 
 `inventory.nix` contiene defaults portables y `inventory.local.nix` los datos
 detectados de cada máquina. Los scripts usan `homeConfigurations.default`, por

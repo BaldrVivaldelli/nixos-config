@@ -9,6 +9,8 @@ let
   cfg = config.homeFeatures.shell;
 in
 {
+  imports = [ ./completions.nix ];
+
   options.homeFeatures.shell = {
     enable = lib.mkEnableOption "zsh shell experience";
 

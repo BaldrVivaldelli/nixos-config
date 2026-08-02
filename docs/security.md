@@ -67,6 +67,10 @@ Es comoda para una VM local, pero no debe tratarse como secreto real. Para usos
 mas sensibles, cambiarla en la configuracion o por entorno local y evitar
 commitear credenciales personales.
 
+Los puertos web y RDP usan `features.containers.windowsVm.bindAddress =
+"127.0.0.1"` por default. No cambiarlo a `0.0.0.0` sin definir antes controles
+de red y credenciales adecuadas.
+
 ## Reglas practicas
 
 - No commitear tokens, passwords ni llaves privadas.

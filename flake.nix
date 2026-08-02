@@ -92,7 +92,16 @@
         inherit system;
         modules = [
           existingConfigurationModule
+          ./modules/nixos/features
           ./modules/nixos/profiles/niri-desktop
+          {
+            features.containers = {
+              enable = true;
+              engine = "docker";
+              users = [ defaultHomeUser.username ];
+              windowsVm.enable = true;
+            };
+          }
         ];
       };
       holodeck = pkgs.callPackage ./packages/holodeck {
@@ -186,6 +195,8 @@
             == [ "chromium-browser.desktop" ];
           assert homeProfile.config.programs.bash.enable;
           assert homeProfile.config.programs.zsh.enable;
+          assert builtins.hasAttr "_windowsvm" homeProfile.config.programs.zsh.siteFunctions;
+          assert builtins.hasAttr "_holodeck" homeProfile.config.programs.zsh.siteFunctions;
           assert homeProfile.config.homeFeatures.noctalia.enable;
           assert homeProfile.config.programs.noctalia.enable;
           assert !homeProfile.config.programs.noctalia.systemd.enable;
@@ -234,6 +245,7 @@
           assert !wsl.config.home-manager.users.${wslUser.username}.programs.noctalia.enable;
           assert !wsl.config.home-manager.users.${wslUser.username}.homeFeatures.niri.enable;
           assert !wsl.config.programs.niri.enable;
+          assert !wsl.config.features.containers.enable;
           pkgs.runCommand "wsl-profile-check" { } ''
             touch "$out"
           '';
@@ -256,6 +268,17 @@
           assert existing.config.programs.niri.enable;
           assert existing.config.services.displayManager.defaultSession == "niri";
           assert !existing.config.services.displayManager.autoLogin.enable;
+          assert existing.config.features.containers.enable;
+          assert existing.config.features.containers.engine == "docker";
+          assert existing.config.features.containers.users == [ defaultHomeUser.username ];
+          assert existing.config.features.containers.windowsVm.enable;
+          assert existing.config.features.containers.windowsVm.bindAddress == "127.0.0.1";
+          assert existing.config.virtualisation.docker.enable;
+          assert builtins.elem defaultHomeUser.username existing.config.users.groups.docker.members;
+          assert builtins.elem "tun" existing.config.boot.kernelModules;
+          assert lib.any (
+            package: lib.getName package == "windowsvm"
+          ) existing.config.environment.systemPackages;
           pkgs.runCommand "existing-profile-check" { } ''
             touch "$out"
           '';

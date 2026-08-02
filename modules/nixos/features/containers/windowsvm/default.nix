@@ -83,6 +83,12 @@
       description = "Windows keyboard layout.";
     };
 
+    bindAddress = lib.mkOption {
+      type = lib.types.str;
+      default = "127.0.0.1";
+      description = "Host address used to expose the web viewer and RDP ports.";
+    };
+
     webPort = lib.mkOption {
       type = lib.types.port;
       default = 8006;

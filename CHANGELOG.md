@@ -4,6 +4,8 @@
 
 ### Added
 
+- Enabled the declarative Dockurr Windows VM on existing physical NixOS hosts,
+  including Docker access for the inventory user and Zsh completions.
 - Added a safe existing-NixOS target that overlays the reusable Niri profile
   on the active `/etc/nixos/configuration.nix` without copying hardware or
   storage declarations into the repository.
@@ -24,6 +26,7 @@
 
 ### Changed
 
+- Bound the Windows VM web and RDP ports to loopback by default.
 - Made the primary physical-NixOS installer build both the system and Home
   Manager before switching either, then select Niri in SDDM automatically.
 - Made local installation commands evaluate `path:.` so the Git-ignored

@@ -7,7 +7,8 @@
 ```
 
 Este comando verifica y construye primero NixOS y Home Manager, y luego activa
-ambos. Para validar sólo el sistema sin activarlo:
+ambos. También instala Docker, `windowsvm` y sus completions. Para validar sólo
+el sistema sin activarlo:
 
 ```bash
 ./apply-nixos-system.sh build

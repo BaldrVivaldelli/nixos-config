@@ -34,6 +34,7 @@ let
       language=$(printf '%s' ${lib.escapeShellArg vm.language})
       region=$(printf '%s' ${lib.escapeShellArg vm.region})
       keyboard=$(printf '%s' ${lib.escapeShellArg vm.keyboard})
+      bind_address=$(printf '%s' ${lib.escapeShellArg vm.bindAddress})
       web_port=${toString vm.webPort}
       rdp_port=${toString vm.rdpPort}
       declared_image_file=${lib.escapeShellArg vm.imageFile}
@@ -204,9 +205,9 @@ let
           -e "LANGUAGE=$language" \
           -e "REGION=$region" \
           -e "KEYBOARD=$keyboard" \
-          -p "$web_port:8006" \
-          -p "$rdp_port:3389/tcp" \
-          -p "$rdp_port:3389/udp" \
+          -p "$bind_address:$web_port:8006" \
+          -p "$bind_address:$rdp_port:3389/tcp" \
+          -p "$bind_address:$rdp_port:3389/udp" \
           --device=/dev/kvm \
           --device=/dev/net/tun \
           --cap-add NET_ADMIN \

@@ -1,7 +1,8 @@
 # Contenedores y Windows VM
 
-La feature vive en `modules/nixos/features/containers` y puede habilitar Docker o
-Podman. Se conserva como módulo reutilizable y ningún host actual la activa.
+La feature vive en `modules/nixos/features/containers` y puede habilitar Docker
+o Podman. El target `#existing` activa Docker y la subfeature Windows VM; WSL la
+mantiene deshabilitada porque usa la integración de Docker Desktop.
 
 ## Opciones principales
 
@@ -107,6 +108,7 @@ Cuando esta activa:
 | `language` | `English` |
 | `region` | `en-US` |
 | `keyboard` | `en-US` |
+| `bindAddress` | `127.0.0.1` |
 | `webPort` | `8006` |
 | `rdpPort` | `3389` |
 
@@ -128,6 +130,10 @@ Primer arranque:
 ```bash
 windowsvm up
 ```
+
+Zsh completa tanto el comando como sus subcomandos. Si se acaba de aplicar el
+perfil, abrir una terminal nueva o ejecutar `exec zsh` antes de probar
+`windowsvm <Tab>`.
 
 Si el contenedor es nuevo, abre el visor web para la instalacion inicial. Cuando
 Windows llegue al escritorio:
@@ -191,6 +197,10 @@ La VM requiere:
 - `/dev/net/tun`
 - imagen Docker cargada
 - puertos `8006` y `3389` libres, salvo que se cambien las opciones
+
+Por defecto ambos puertos se publican únicamente en loopback. Cambiar
+`bindAddress` sólo cuando se quiera exponer deliberadamente el visor o RDP a
+otra interfaz.
 
 Si la sesion todavia no tomo el grupo `docker`, `windowsvm` intenta reejecutarse
 con `sg docker`. Si sigue fallando, cerrar sesion y volver a entrar.
