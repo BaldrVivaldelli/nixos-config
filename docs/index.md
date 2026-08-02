@@ -1,7 +1,8 @@
 # Documentación
 
-El repositorio combina Home Manager standalone con un único host de sistema:
-NixOS-WSL. No administra un desktop físico ni discos.
+El repositorio combina Home Manager standalone, un overlay Niri para NixOS
+físicos existentes y el host NixOS-WSL. No administra discos ni reinstalaciones
+físicas desde cero.
 
 ## Lectura recomendada
 
@@ -28,5 +29,6 @@ NixOS-WSL. No administra un desktop físico ni discos.
 - [VSCodium](vscodium.md)
 - [Contenedores y Windows VM](containers.md)
 
-Estos módulos se conservan como biblioteca, aunque el repo ya no publique un
-host de desktop físico que los active.
+Estos módulos se conservan como biblioteca. El target `existing` activa la
+composición Niri sobre la configuración real del equipo, sin publicar un host
+físico con hardware o almacenamiento propio.

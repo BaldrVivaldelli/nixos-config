@@ -33,6 +33,7 @@ patterns=(
 search_roots=(
   flake.nix
   install.sh
+  apply-nixos-system.sh
   holodeck/backends/nixos
   modules/hosts
   modules/nixos
@@ -49,4 +50,4 @@ for pattern in "${patterns[@]}"; do
   fi
 done
 
-echo "OK: WSL y los backends no contienen lógica del desktop físico ni de discos."
+echo "OK: los instaladores no contienen lógica de discos ni reinstalación destructiva."

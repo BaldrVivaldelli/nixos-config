@@ -16,6 +16,9 @@ flake.nix
 │   │   ├── modules/home
 │   │   └── modules/nixos/features
 │   └── modules/hosts/wsl
+├── nixosConfigurations.existing
+│   ├── /etc/nixos/configuration.nix (sólo durante evaluación impura)
+│   └── modules/nixos/profiles/niri-desktop
 ├── apps.holodeck
 │   └── packages/holodeck
 │       └── holodeck/core
@@ -42,6 +45,18 @@ features reutilizables y `modules/hosts/wsl`. Este host administra su usuario,
 locales, shell e integración con Windows y Docker Desktop. Tanto el usuario
 como el hostname y la zona horaria se resuelven desde el inventario efectivo.
 
+## NixOS físico existente
+
+`nixosConfigurations.existing` es un overlay de instalación, no un host con
+hardware propio. Durante `apply-nixos-system.sh`, toma la ruta de la
+configuración NixOS activa mediante `NIXOS_EXISTING_CONFIGURATION` y agrega el
+perfil Niri. En evaluaciones puras usa un contenedor sintético para que la flake
+siga siendo comprobable y portable.
+
+El target completo de `install.sh` construye este sistema y Home Manager antes
+de activar cualquiera de los dos. El repo no copia ni genera el hardware config
+del equipo.
+
 ## Backends
 
 `install.sh` centraliza Home Manager para NixOS existentes, conserva el
@@ -50,7 +65,7 @@ incluido `holodeck-system-nixos` sólo implementa `--target wsl`; otros
 sistemas pueden aportar un ejecutable o una app con el nombre
 `holodeck-system-<backend>`.
 
-## Límite del desktop físico
+## Límite de la instalación física
 
 Se eliminaron:
 
@@ -60,9 +75,9 @@ Se eliminaron:
 - el reinstalador kexec;
 - toda selección, montaje, particionado y formateo de discos.
 
-`verify-no-desktop.sh` impide que esas rutas y patrones vuelvan a entrar. Los
-módulos de features permanecen porque son reutilizables y no declaran el layout
-de ningún host.
+`verify-no-desktop.sh` impide que esas rutas y patrones destructivos vuelvan a
+entrar. El overlay `#existing` sólo compone la configuración activa con módulos
+reutilizables y no declara el layout de ningún host.
 
 `nixosModules.niri-desktop` expone una composición reutilizable para un NixOS
 existente. Habilita la sesión gráfica, pero deliberadamente no incorpora un

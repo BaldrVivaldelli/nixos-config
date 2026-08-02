@@ -16,9 +16,34 @@ por los atajos multimedia incluidos en la configuración base.
 
 ## Sesión predeterminada de NixOS
 
-Home Manager instala la configuración personal, pero no puede registrar ni
-elegir la sesión del display manager. En un NixOS físico existente, importar el
-perfil de sistema sin reemplazar su `hardware-configuration.nix`:
+Home Manager instala la configuración personal, pero registrar y elegir la
+sesión del display manager requiere un rebuild de NixOS. El instalador lo
+centraliza:
+
+```bash
+./install.sh
+# elegir 1) NixOS físico existente: Niri + Home Manager
+```
+
+Su equivalente directo es:
+
+```bash
+./install.sh existing-nixos
+```
+
+El target toma como base `/etc/nixos/configuration.nix`, conserva su import de
+`hardware-configuration.nix` y superpone el perfil del repositorio durante el
+build. Primero construye el sistema y Home Manager; sólo si ambos pasan ejecuta
+los switches. No modifica los archivos de `/etc/nixos` ni guarda su hardware o
+almacenamiento en el repo.
+
+Después se cierra la sesión de KDE. SDDM deja Niri preseleccionado y Plasma
+permanece disponible como respaldo; no hace falta reiniciar la computadora.
+
+### Integración manual
+
+Si se prefiere administrar el rebuild fuera del instalador, se puede importar
+el mismo perfil desde la configuración NixOS existente:
 
 ```nix
 {

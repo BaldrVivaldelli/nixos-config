@@ -8,8 +8,10 @@ usage() {
 Uso:
   ./install.sh
   ./install.sh configure [--print|--yes|--force]
+  ./install.sh existing-nixos
   ./install.sh home-manager
   ./install.sh nixos
+  ./install.sh nixos existing
   ./install.sh nixos home-manager
   ./install.sh nixos wsl
   ./install.sh BACKEND [argumentos del backend]
@@ -17,10 +19,11 @@ Uso:
 Sin argumentos abre un selector interactivo.
 
 Targets incluidos:
-  configure     Detecta esta máquina y crea inventory.local.nix.
-  home-manager  Configura el usuario default de inventory.nix sobre NixOS.
-  nixos wsl     Prepara el host NixOS-WSL declarado por la flake.
-  otro          Una app de flake o ejecutable holodeck-system-BACKEND.
+  configure      Detecta esta máquina y crea inventory.local.nix.
+  existing-nixos Configura Niri en el sistema y aplica Home Manager.
+  home-manager   Aplica solamente la configuración del usuario.
+  nixos wsl      Prepara el host NixOS-WSL declarado por la flake.
+  otro           Una app de flake o ejecutable holodeck-system-BACKEND.
 MSG
 }
 
@@ -32,7 +35,7 @@ fail() {
 choose_backend() {
   cat >&2 <<'MSG'
 Seleccioná qué querés instalar:
-  1) Home Manager sobre un NixOS existente
+  1) NixOS físico existente: Niri + Home Manager
   2) NixOS-WSL
   3) Otro backend instalado
   4) Sólo detectar y configurar esta máquina
@@ -40,7 +43,7 @@ MSG
   printf "Opción [1-4]: " >&2
   IFS= read -r selection
   case "$selection" in
-    1) printf "home-manager" ;;
+    1) printf "existing-nixos" ;;
     2) printf "nixos" ;;
     3)
       printf "ID del backend (por ejemplo ubuntu o macos): " >&2
@@ -79,6 +82,32 @@ install_home_manager() {
   bash "$repo_dir/apply-home.sh" switch
 }
 
+install_existing_nixos() {
+  if [[ "${EUID:-$(id -u)}" -eq 0 ]]; then
+    fail "la instalación completa debe ejecutarse como usuario normal, sin sudo"
+  fi
+
+  configure_inventory_if_needed
+
+  echo "==> Verificando los límites de sistema y Home Manager..." >&2
+  bash "$repo_dir/verify-no-desktop.sh"
+  bash "$repo_dir/verify-user-only.sh"
+
+  echo "==> Construyendo el perfil NixOS con Niri, sin activarlo..." >&2
+  bash "$repo_dir/apply-nixos-system.sh" build
+
+  echo "==> Construyendo Home Manager, sin activarlo..." >&2
+  bash "$repo_dir/apply-home.sh" build
+
+  echo "==> Activando Niri como sesión predeterminada de NixOS..." >&2
+  bash "$repo_dir/apply-nixos-system.sh" switch
+
+  echo "==> Instalando y activando Home Manager..." >&2
+  bash "$repo_dir/apply-home.sh" switch
+
+  echo "Instalación completa. Cerrá la sesión de KDE para entrar a Niri." >&2
+}
+
 case "${1:-}" in
   -h|--help|help)
     usage
@@ -97,7 +126,13 @@ case "$backend" in
   configure|config|detect)
     exec bash "$repo_dir/configure-inventory.sh" "$@"
     ;;
-  home|home-manager|existing-nixos)
+  existing|existing-nixos)
+    if [[ $# -ne 0 ]]; then
+      fail "existing-nixos no acepta argumentos adicionales"
+    fi
+    install_existing_nixos
+    ;;
+  home|home-manager)
     if [[ $# -ne 0 ]]; then
       fail "home-manager no acepta argumentos adicionales"
     fi
@@ -111,7 +146,14 @@ case "$backend" in
     fi
 
     case "$target" in
-      home|home-manager|existing-nixos)
+      existing|existing-nixos)
+        if [[ $# -ne 0 ]]; then
+          fail "existing-nixos no acepta argumentos adicionales"
+        fi
+        install_existing_nixos
+        exit 0
+        ;;
+      home|home-manager)
         if [[ $# -ne 0 ]]; then
           fail "home-manager no acepta argumentos adicionales"
         fi
@@ -119,7 +161,7 @@ case "$backend" in
         exit 0
         ;;
       wsl) ;;
-      *) fail "target NixOS desconocido: $target (usá home-manager o wsl)" ;;
+      *) fail "target NixOS desconocido: $target (usá existing, home-manager o wsl)" ;;
     esac
 
     if ! command -v nix >/dev/null 2>&1; then

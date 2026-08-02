@@ -1,12 +1,28 @@
 # Mantenimiento
 
+## NixOS físico existente
+
+```bash
+./install.sh existing-nixos
+```
+
+Este comando verifica y construye primero NixOS y Home Manager, y luego activa
+ambos. Para validar sólo el sistema sin activarlo:
+
+```bash
+./apply-nixos-system.sh build
+```
+
+El build reutiliza `/etc/nixos/configuration.nix` y no escribe dentro de
+`/etc/nixos`.
+
 ## Home Manager standalone
 
 ```bash
 ./install.sh home-manager
 ```
 
-Este comando verifica, construye y activa el perfil. Se ejecuta como usuario
+Este comando aplica solamente el perfil de usuario. Se ejecuta como usuario
 normal. Para validar sin activar todavía se puede usar
 `./apply-home.sh build`.
 
@@ -29,8 +45,9 @@ nix --extra-experimental-features "nix-command flakes" \
 ```
 
 El primer script comprueba el límite de la configuración Home Manager. El
-segundo rechaza hosts físicos, Disko y patrones de almacenamiento. El check de
-la flake evalúa además `#wsl` y ejecuta las pruebas de Holodeck e instaladores.
+segundo rechaza instaladores destructivos, Disko y patrones de almacenamiento.
+El check de la flake evalúa además `#existing`, `#wsl` y ejecuta las pruebas de
+Holodeck e instaladores.
 
 ## Formato
 

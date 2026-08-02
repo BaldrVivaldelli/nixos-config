@@ -4,6 +4,9 @@
 
 ### Added
 
+- Added a safe existing-NixOS target that overlays the reusable Niri profile
+  on the active `/etc/nixos/configuration.nix` without copying hardware or
+  storage declarations into the repository.
 - Added a confirmable machine preflight that detects user, home, repository,
   hostname, architecture, time zone and WSL before installation, while keeping
   the generated `inventory.local.nix` outside Git.
@@ -21,6 +24,8 @@
 
 ### Changed
 
+- Made the primary physical-NixOS installer build both the system and Home
+  Manager before switching either, then select Niri in SDDM automatically.
 - Made local installation commands evaluate `path:.` so the Git-ignored
   machine inventory participates without affecting CI or the repository.
 - Replaced the user-specific Home Manager directory and installer target with

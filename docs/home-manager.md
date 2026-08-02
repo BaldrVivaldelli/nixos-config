@@ -34,6 +34,9 @@ El perfil `minimal` conserva únicamente shell y Starship.
 
 ## Instalación centralizada
 
+Para instalar Niri a nivel de sistema junto con este perfil, el flujo completo
+es `./install.sh existing-nixos`. Para aplicar únicamente Home Manager:
+
 ```bash
 ./install.sh configure  # opcional; se ofrece automáticamente
 ./install.sh home-manager

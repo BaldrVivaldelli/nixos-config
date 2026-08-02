@@ -79,6 +79,22 @@
           }
         ];
       };
+      existingConfigurationPath = builtins.getEnv "NIXOS_EXISTING_CONFIGURATION";
+      existingConfigurationModule =
+        if existingConfigurationPath == "" then
+          {
+            boot.isContainer = true;
+            system.stateVersion = "26.05";
+          }
+        else
+          builtins.toPath existingConfigurationPath;
+      existing = nixpkgs.lib.nixosSystem {
+        inherit system;
+        modules = [
+          existingConfigurationModule
+          ./modules/nixos/profiles/niri-desktop
+        ];
+      };
       holodeck = pkgs.callPackage ./packages/holodeck {
         coreSource = ./holodeck/core;
       };
@@ -156,6 +172,7 @@
         default = homeProfile;
       };
       nixosConfigurations.wsl = wsl;
+      nixosConfigurations.existing = existing;
 
       checks.${system} = {
         home-profile =
@@ -232,6 +249,14 @@
           assert niriProfile.config.services.upower.enable;
           assert niriProfile.config.services.power-profiles-daemon.enable;
           pkgs.runCommand "niri-profile-check" { } ''
+            touch "$out"
+          '';
+
+        existing-profile =
+          assert existing.config.programs.niri.enable;
+          assert existing.config.services.displayManager.defaultSession == "niri";
+          assert !existing.config.services.displayManager.autoLogin.enable;
+          pkgs.runCommand "existing-profile-check" { } ''
             touch "$out"
           '';
 

@@ -44,8 +44,13 @@ class InstallSelectorTests(unittest.TestCase):
             write_echo_command(command_dir, "nix")
             for command in extra_commands:
                 write_echo_command(command_dir, command)
+            system_root = command_dir / "system-root"
+            (system_root / "etc" / "nixos").mkdir(parents=True)
+            (system_root / "etc" / "NIXOS").touch()
+            (system_root / "etc" / "nixos" / "configuration.nix").touch()
             environment = os.environ.copy()
             environment["PATH"] = f"{command_dir}{os.pathsep}{environment['PATH']}"
+            environment["NIXOS_CONFIG_SYSTEM_ROOT"] = str(system_root)
             environment.update(extra_environment or {})
             return subprocess.run(
                 [BASH, str(INSTALLER), *args],
@@ -95,11 +100,25 @@ class InstallSelectorTests(unittest.TestCase):
         self.assertIn("--target wsl", result.stdout)
 
     def test_interactive_selector_can_choose_home_manager(self) -> None:
-        result = self.run_installer([], input_text="1\n")
+        result = self.run_installer(
+            [],
+            input_text="1\n",
+            extra_commands=("sudo", "nixos-rebuild"),
+        )
 
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("nixos-rebuild build", result.stdout)
+        self.assertIn("nixos-rebuild switch", result.stdout)
         self.assertIn("-- build --flake", result.stdout)
         self.assertIn("-- switch -b hm-bak --flake", result.stdout)
+        self.assertLess(
+            result.stdout.index("nixos-rebuild build"),
+            result.stdout.index("-- build --flake"),
+        )
+        self.assertLess(
+            result.stdout.index("-- build --flake"),
+            result.stdout.index("nixos-rebuild switch"),
+        )
 
     def test_interactive_selector_can_choose_wsl(self) -> None:
         result = self.run_installer([], input_text="2\n")
@@ -111,7 +130,7 @@ class InstallSelectorTests(unittest.TestCase):
         result = self.run_installer(["nixos", "desktop"])
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("usá home-manager o wsl", result.stderr)
+        self.assertIn("usá existing, home-manager o wsl", result.stderr)
 
     def test_routes_external_backend_by_executable_contract(self) -> None:
         result = self.run_installer(

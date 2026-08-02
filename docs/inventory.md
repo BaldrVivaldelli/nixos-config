@@ -28,9 +28,10 @@ discos, particiones, UUID, filesystems ni montajes. `--print` permite revisar el
 resultado sin escribir, `--yes` sirve para automatización y un archivo existente
 sólo se reemplaza explícitamente con `--force`.
 
-`install.sh home-manager` y `install.sh nixos wsl` ofrecen este preflight
-automáticamente cuando falta el archivo y hay una terminal. Sin TTY mantienen
-los defaults, de modo que CI no queda esperando input.
+`install.sh existing-nixos`, `install.sh home-manager` y `install.sh nixos wsl`
+ofrecen este preflight automáticamente cuando falta el archivo y hay una
+terminal. Sin TTY mantienen los defaults, de modo que CI no queda esperando
+input.
 
 Como el archivo local está ignorado por Git, las evaluaciones manuales que deban
 verlo deben usar una flake de tipo path:
