@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import configparser
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -9,11 +10,18 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any, TextIO
 
+from .aws_sso import (
+    SsoClientFactory,
+    aws_alias_profiles,
+    default_sso_client_factory,
+    sync_aws_sso,
+)
 from .errors import ConfigCtlError
 
 Runner = Callable[..., subprocess.CompletedProcess[str]]
 Input = Callable[[str], str]
 Which = Callable[..., str | None]
+GITLAB_HOST_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$")
 
 
 ACTION_COMMANDS: dict[str, tuple[str, ...]] = {
@@ -30,12 +38,16 @@ ACTION_COMMANDS: dict[str, tuple[str, ...]] = {
     "windows-down": ("windowsvm", "down"),
 }
 
+AWS_SYNC_ACTIONS = ("aws-sync",)
+
 AWS_PROFILE_ACTIONS = {
     "aws-login": ("sso", "login"),
     "aws-identity": ("sts", "get-caller-identity"),
 }
 
-ALL_ACTIONS = tuple((*ACTION_COMMANDS.keys(), *AWS_PROFILE_ACTIONS.keys()))
+ALL_ACTIONS = tuple(
+    (*ACTION_COMMANDS.keys(), *AWS_PROFILE_ACTIONS.keys(), *AWS_SYNC_ACTIONS)
+)
 
 
 def _home(environ: Mapping[str, str]) -> Path:
@@ -118,19 +130,70 @@ def aws_profiles(environ: Mapping[str, str]) -> list[str]:
     return sorted(names)
 
 
+def gitlab_auth_state(
+    environ: Mapping[str, str], executable: str | None
+) -> tuple[bool, list[str]]:
+    """Ask glab whether it has a valid session without exposing credentials."""
+    if executable is None:
+        return False, []
+
+    host = ""
+    try:
+        configured_host = subprocess.run(
+            [executable, "config", "get", "host"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            check=False,
+            shell=False,
+            text=True,
+            env=dict(environ),
+        )
+        candidate = configured_host.stdout.strip().lower()
+        if configured_host.returncode == 0 and GITLAB_HOST_RE.fullmatch(candidate):
+            host = candidate
+    except OSError:
+        pass
+
+    status_args = [executable, "auth", "status"]
+    status_args.extend(["--hostname", host] if host else ["--all"])
+    try:
+        status = subprocess.run(
+            status_args,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+            shell=False,
+            text=True,
+            env=dict(environ),
+        )
+    except OSError:
+        return False, []
+    if status.returncode != 0:
+        return False, []
+    return True, [host] if host else []
+
+
 def integration_status(
     environ: Mapping[str, str], *, which: Which = shutil.which
 ) -> dict[str, Any]:
     profiles = provider_profiles(environ)
     github = [profile for profile in profiles if profile["provider"] == "github"]
-    gitlab = [profile for profile in profiles if profile["provider"] == "gitlab"]
     aws = aws_profiles(environ)
+    managed_assignments = aws_alias_profiles(environ)
     holodeck_available = _command_path("holodeck", environ, which) is not None
+    glab = _command_path("glab", environ, which)
+    gitlab_authenticated, gitlab_hosts = gitlab_auth_state(environ, glab)
 
     return {
         "aws": {
+            "aliases": managed_assignments,
             "available": _command_path("aws", environ, which) is not None,
-            "configured": bool(aws),
+            "configured": bool(managed_assignments or aws),
+            "pendingRegionCount": sum(
+                1
+                for assignment in managed_assignments
+                if assignment.get("pending") is True
+            ),
             "profiles": aws,
         },
         "github": {
@@ -141,9 +204,10 @@ def integration_status(
         },
         "gitlab": {
             "available": holodeck_available
-            and _command_path("glab", environ, which) is not None,
-            "configured": bool(gitlab),
-            "profiles": gitlab,
+            and glab is not None,
+            "configured": gitlab_authenticated,
+            "hosts": gitlab_hosts,
+            "profiles": [],
         },
         "windowsVm": {
             "available": _command_path("windowsvm", environ, which) is not None,
@@ -159,7 +223,7 @@ def _select_aws_profile(
     if not profiles:
         raise ConfigCtlError(
             "missing-aws-profile",
-            "no hay perfiles AWS; ejecutá primero `holodeckctl action aws-configure`",
+            "no hay perfiles AWS; ejecutá primero `holodeckctl action aws-sync`",
         )
     if len(profiles) == 1:
         stdout.write(f"Perfil AWS: {profiles[0]}\n")
@@ -186,7 +250,18 @@ def execute_action(
     input_fn: Input = input,
     stdout: TextIO,
     which: Which = shutil.which,
+    aws_client_factory: SsoClientFactory = default_sso_client_factory,
 ) -> dict[str, Any]:
+    if action in AWS_SYNC_ACTIONS:
+        return sync_aws_sso(
+            environ,
+            runner=runner,
+            input_fn=input_fn,
+            stdout=stdout,
+            which=which,
+            client_factory=aws_client_factory,
+        )
+
     if action in ACTION_COMMANDS:
         argv = list(ACTION_COMMANDS[action])
         if action in {"windows-up", "windows-rdp"}:
@@ -217,10 +292,27 @@ def execute_action(
             "exec-failed", f"no se pudo iniciar {argv[0]}: {exc}", exit_code=1
         ) from exc
 
-    return {
+    result = {
         "action": action,
         "argv": argv,
         "command": "action",
         "exitCode": completed.returncode,
         "ok": completed.returncode == 0,
     }
+
+    if action == "holodeck-setup" and result["ok"]:
+        answer = input_fn("¿Configurar o sincronizar AWS SSO ahora? [S/n]: ").strip().lower()
+        if answer not in {"n", "no"}:
+            aws_result = sync_aws_sso(
+                environ,
+                runner=runner,
+                input_fn=input_fn,
+                stdout=stdout,
+                which=which,
+                client_factory=aws_client_factory,
+            )
+            aws_result["action"] = action
+            aws_result["components"] = ["git", "aws"]
+            return aws_result
+
+    return result

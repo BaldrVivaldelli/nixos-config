@@ -20,7 +20,6 @@ SSH_BEGIN = "# >>> holodeck ssh"
 SSH_END = "# <<< holodeck ssh"
 
 DEFAULT_GITHUB_HOST = os.environ.get("HOLODECK_DEFAULT_GITHUB_HOST", "github.com")
-DEFAULT_GITLAB_HOST = os.environ.get("HOLODECK_DEFAULT_GITLAB_HOST", "gitlab.com")
 DEFAULT_PERSONAL_DIR = os.environ.get(
     "HOLODECK_DEFAULT_PERSONAL_DIR",
     "$HOME/projects/personal",

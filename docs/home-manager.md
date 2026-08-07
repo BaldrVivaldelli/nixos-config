@@ -35,6 +35,10 @@ de forma explícita se puede ejecutar `HM_KEEP_BASH=1 bash`; scripts y
 Chromium se instala en el perfil y queda como navegador predeterminado para
 links web, documentos HTML/XML y PDF mediante asociaciones XDG.
 
+Kiro se instala junto con las aplicaciones de desarrollo en Linux x86-64. La
+instancia de `nixpkgs` usada por Home Manager autoriza únicamente a Kiro como
+paquete no libre; no habilita `allowUnfree` de forma global.
+
 El perfil `minimal` conserva únicamente shell y Starship.
 
 ## Instalación centralizada
@@ -50,6 +54,16 @@ es `./install.sh existing-nixos`. Para aplicar únicamente Home Manager:
 `install.sh` ejecuta primero `verify-user-only.sh`, después
 `apply-home.sh build` y finalmente `apply-home.sh switch`. Si un paso falla,
 los siguientes no se ejecutan.
+
+Para aplicar ese mismo flujo y recargar Holodeck Control al final:
+
+```bash
+holodeck-regenerate
+```
+
+Su equivalente desde el checkout es `./install.sh regenerate`. No ejecuta un
+segundo `apply-home.sh switch`: `install.sh home-manager` ya incluye la
+activación. Sólo reinicia el plugin cuando Home Manager terminó correctamente.
 
 `apply-home.sh` siempre usa `homeConfigurations.default`; el nombre real, el
 home y la ruta del repositorio se derivan del inventario. La flake conserva
@@ -71,6 +85,7 @@ hmbuild
 hmswitch
 hmverify
 rebuild
+holodeck-regenerate
 ```
 
 `rebuild` es alias de `hmswitch`.
@@ -90,7 +105,11 @@ sudo nixos-rebuild switch --flake path:.#wsl
 
 ## AWS
 
-`awslogin` inicia AWS SSO, `awscxt` selecciona y exporta un perfil,
-`awsprofiles` lista perfiles y `awswho` muestra la identidad activa. Los
-nombres no secretos para completion se declaran con
+Holodeck Control inicia AWS SSO y descubre cada cuenta y rol asignados.
+`awslogin` renueva una sesión, `awscxt` selecciona y exporta un perfil,
+`awsprofiles` lista perfiles y `awswho` muestra la identidad activa. Después
+del login, cada cuenta/rol genera automáticamente perfiles `use1` y `use2`. El
+editor permite asignar un alias personalizado o recomendado, conservar ambas
+regiones, dejar sólo una o agregar otra como `sae1`; las elecciones se conservan
+al resincronizar. Los nombres no secretos para completion se declaran con
 `homeFeatures.aws.profiles`; las credenciales siguen fuera del repo.

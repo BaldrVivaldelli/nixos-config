@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, TextIO
 
 from .errors import ConfigCtlError
+from .aws_sso import apply_aws_aliases
 from .integrations import ALL_ACTIONS, execute_action, integration_status
 from .model import ALL_SETTABLE_KEYS, SETTERS, default_ir, digest_ir, set_value
 from .storage import atomic_write_ir, exclusive_lock, load_ir
@@ -74,6 +75,10 @@ def make_parser() -> Parser:
 
     subparsers.add_parser("plan", help="muestra exactamente qué argv ejecutaría apply")
     subparsers.add_parser("apply", help="aplica el IR mediante install.sh")
+    subparsers.add_parser(
+        "aws-aliases-apply",
+        help="valida y aplica el borrador local de alias AWS creado por Noctalia",
+    )
 
     action_parser = subparsers.add_parser(
         "action", help="ejecuta una integración permitida por argv"
@@ -253,6 +258,7 @@ HELP_SUMMARIES = {
     "set": "Actualiza una clave allowlisted; inicializa el IR si todavía no existe.",
     "plan": "Valida el IR y devuelve el argv literal, sin ejecutar nada.",
     "apply": "Bloquea el IR y ejecuta install.sh por argv, sin shell ni sudo propio.",
+    "aws-aliases-apply": "Aplica alias AWS locales validados sin iniciar otra sesión SSO.",
     "action": "Ejecuta una acción integrada allowlisted por argv; la UI decide si requiere terminal.",
 }
 
@@ -356,6 +362,13 @@ def run(
                 if result["ok"]
                 else f"La instalación terminó con código {result['exitCode']}."
             )
+        elif command == "aws-aliases-apply":
+            if not json_output:
+                raise ConfigCtlError(
+                    "usage", "aws-aliases-apply requiere --json"
+                )
+            result = apply_aws_aliases(environment)
+            text = "Alias AWS aplicados."
         elif command == "action":
             if json_output:
                 raise ConfigCtlError(

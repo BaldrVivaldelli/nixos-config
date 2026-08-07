@@ -11,12 +11,13 @@
 
 python3Packages.buildPythonApplication {
   pname = "holodeckctl";
-  version = "0.3.0";
+  version = "0.7.0";
   pyproject = true;
 
   src = ./.;
 
   build-system = [ python3Packages.setuptools ];
+  dependencies = [ python3Packages.boto3 ];
   nativeBuildInputs = [ makeWrapper ];
 
   doCheck = true;

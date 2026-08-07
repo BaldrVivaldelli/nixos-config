@@ -22,12 +22,6 @@ in
       description = "Default GitHub host used by holodeck.";
     };
 
-    gitlabHost = lib.mkOption {
-      type = lib.types.str;
-      default = "gitlab.com";
-      description = "Default GitLab host used by holodeck.";
-    };
-
     personalProjectsDir = lib.mkOption {
       type = lib.types.str;
       default = "$HOME/projects/personal";

@@ -27,6 +27,14 @@ Este comando aplica solamente el perfil de usuario. Se ejecuta como usuario
 normal. Para validar sin activar todavía se puede usar
 `./apply-home.sh build`.
 
+Para regenerar Home Manager y recargar el plugin de Holodeck Control en una
+sola operación:
+
+```bash
+holodeck-regenerate
+# Equivalente desde el repositorio: ./install.sh regenerate
+```
+
 ## NixOS-WSL
 
 ```bash

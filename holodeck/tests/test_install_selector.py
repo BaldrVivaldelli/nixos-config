@@ -91,6 +91,26 @@ class InstallSelectorTests(unittest.TestCase):
             result.stdout.index("-- switch -b hm-bak --flake"),
         )
 
+    def test_regenerate_applies_home_manager_once_and_reloads_plugin(self) -> None:
+        result = self.run_installer(
+            ["regenerate"],
+            extra_commands=("noctalia",),
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.count("-- build --flake"), 1)
+        self.assertEqual(result.stdout.count("-- switch -b hm-bak --flake"), 1)
+        self.assertIn("msg plugins disable holodeck/control", result.stdout)
+        self.assertIn("msg plugins enable holodeck/control", result.stdout)
+        self.assertLess(
+            result.stdout.index("-- switch -b hm-bak --flake"),
+            result.stdout.index("msg plugins disable holodeck/control"),
+        )
+        self.assertLess(
+            result.stdout.index("msg plugins disable holodeck/control"),
+            result.stdout.index("msg plugins enable holodeck/control"),
+        )
+
     def test_nixos_home_manager_alias_uses_same_flow(self) -> None:
         result = self.run_installer(["nixos", "home-manager"])
 
@@ -160,6 +180,7 @@ class InstallSelectorTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("./install.sh configure", result.stdout)
+        self.assertIn("./install.sh regenerate", result.stdout)
         self.assertIn("inventory.local.nix", result.stdout)
 
     def test_configure_print_uses_detected_overrides(self) -> None:

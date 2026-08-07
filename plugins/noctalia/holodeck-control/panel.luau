@@ -19,9 +19,8 @@ local COMMANDS = {
   holodeckDoctor = CONFIGCTL .. " action holodeck-doctor",
   githubSetup = CONFIGCTL .. " action github-setup",
   gitlabSetup = CONFIGCTL .. " action gitlab-setup",
-  awsConfigure = CONFIGCTL .. " action aws-configure",
-  awsLogin = CONFIGCTL .. " action aws-login",
-  awsIdentity = CONFIGCTL .. " action aws-identity",
+  awsSync = CONFIGCTL .. " action aws-sync",
+  awsAliasesApply = CONFIGCTL .. " --json aws-aliases-apply",
   windowsUp = CONFIGCTL .. " action windows-up",
   windowsStatus = CONFIGCTL .. " action windows-status",
   windowsRdp = CONFIGCTL .. " action windows-rdp",
@@ -61,14 +60,47 @@ local pendingPlan = nil
 local confirmingApply = false
 local activeView = "overview"
 local activeIntegration = "github"
+local awsAliasEditorOpen = false
+local awsAliasDraft = {}
+local awsRegionDraft = {}
+local awsAliasRevision = {}
+local awsAliasRequestPath = ""
+local awsSyncPolling = false
+local awsSyncPollInFlight = false
+local awsSyncPollCount = 0
+local AWS_SYNC_POLL_LIMIT = 150
 local integrations = {
-  aws = { available = false, configured = false, profiles = {} },
+  aws = { aliases = {}, available = false, configured = false, profiles = {} },
   github = { available = false, configured = false, profiles = {} },
   gitlab = { available = false, configured = false, profiles = {} },
   windowsVm = { available = false, configured = false },
 }
 
 local render
+
+local function awsRegionDraftValue(assignment)
+  local regions = type(assignment.regions) == "table" and assignment.regions or {}
+  return table.concat(regions, ", ")
+end
+
+local function resetAwsAliasDraft()
+  awsAliasDraft = {}
+  awsRegionDraft = {}
+  awsAliasRevision = {}
+  local aws = integrations.aws or {}
+  local aliases = type(aws.aliases) == "table" and aws.aliases or {}
+  for _, assignment in ipairs(aliases) do
+    if type(assignment) == "table"
+      and type(assignment.key) == "string"
+      and type(assignment.alias) == "string"
+      and type(assignment.regions) == "table"
+      and type(assignment.suggestedRegions) == "table" then
+      awsAliasDraft[assignment.key] = assignment.alias
+      awsRegionDraft[assignment.key] = awsRegionDraftValue(assignment)
+      awsAliasRevision[assignment.key] = 0
+    end
+  end
+end
 
 local function tr(key, substitutions)
   if substitutions == nil then
@@ -211,9 +243,19 @@ local function openTerminalAction(action)
 
   local opened = noctalia.runInTerminal(command)
   if opened then
-    notice = tr("notice.integration_terminal")
+    if action == "awsSync" then
+      awsSyncPolling = true
+      awsSyncPollInFlight = false
+      awsSyncPollCount = 0
+      notice = tr("notice.aws_sync_waiting")
+    else
+      notice = tr("notice.integration_terminal")
+    end
     currentError = ""
   else
+    if action == "awsSync" then
+      awsSyncPolling = false
+    end
     notice = ""
     currentError = tr("error.terminal_not_started")
   end
@@ -238,6 +280,18 @@ local function openGraphicalAction(action)
   render()
 end
 
+local function applyStatusPayload(payload)
+  statusExists = payload.exists == true
+  irPath = type(payload.irPath) == "string" and payload.irPath or ""
+  statusSource = type(payload.source) == "string" and payload.source or ""
+  if type(payload.integrations) == "table" then
+    integrations = payload.integrations
+    resetAwsAliasDraft()
+  end
+  setSelectionsFromIr(payload.ir or payload.effective)
+  recomputeDirty()
+end
+
 local function loadStatus(reportSuccess)
   if busy then
     return
@@ -259,20 +313,58 @@ local function loadStatus(reportSuccess)
   busy = true
   render()
   runAllowed("status", function(payload)
-    statusExists = payload.exists == true
-    irPath = type(payload.irPath) == "string" and payload.irPath or ""
-    statusSource = type(payload.source) == "string" and payload.source or ""
-    if type(payload.integrations) == "table" then
-      integrations = payload.integrations
-    end
-    setSelectionsFromIr(payload.ir or payload.effective)
-    recomputeDirty()
+    applyStatusPayload(payload)
     busy = false
     notice = statusExists
       and (reportSuccess == true and tr("notice.status_loaded") or "")
       or tr("notice.ir_missing")
     render()
   end)
+end
+
+local function pollAwsSyncStatus()
+  if not awsSyncPolling or awsSyncPollInFlight or busy then
+    return
+  end
+
+  awsSyncPollInFlight = true
+  local accepted = noctalia.runAsync(COMMANDS.status, function(result)
+    awsSyncPollInFlight = false
+    if not awsSyncPolling then
+      return
+    end
+
+    local payload = decodeCommandResult(result)
+    if payload ~= nil then
+      applyStatusPayload(payload)
+      local aws = integrations.aws or {}
+      local aliases = type(aws.aliases) == "table" and aws.aliases or {}
+      if #aliases > 0 then
+        awsSyncPolling = false
+        awsAliasEditorOpen = true
+        notice = tr("notice.aws_sync_ready")
+        currentError = ""
+        render()
+        return
+      end
+    end
+
+    awsSyncPollCount += 1
+    if awsSyncPollCount >= AWS_SYNC_POLL_LIMIT then
+      awsSyncPolling = false
+      notice = ""
+      currentError = tr("error.aws_sync_not_detected")
+      render()
+    end
+  end)
+
+  if not accepted then
+    awsSyncPollInFlight = false
+    awsSyncPolling = false
+    notice = ""
+    currentError = tr("error.command_not_started")
+    render()
+  end
 end
 
 local function integrationProfileNames(integration)
@@ -292,6 +384,23 @@ local function integrationProfileNames(integration)
     return tr("panel.integrations.none")
   end
   return table.concat(names, ", ")
+end
+
+local function integrationHostNames(integration)
+  if type(integration) ~= "table" or type(integration.hosts) ~= "table" then
+    return tr("panel.integrations.none")
+  end
+
+  local hosts = {}
+  for _, host in ipairs(integration.hosts) do
+    if type(host) == "string" and host ~= "" then
+      table.insert(hosts, host)
+    end
+  end
+  if #hosts == 0 then
+    return tr("panel.integrations.none")
+  end
+  return table.concat(hosts, ", ")
 end
 
 local function card(children, fill)
@@ -583,6 +692,282 @@ local function integrationDetailHeader(title, glyph, integration)
   })
 end
 
+local function awsAliasRecords(integration)
+  if type(integration) ~= "table" or type(integration.aliases) ~= "table" then
+    return {}
+  end
+  local records = {}
+  for _, assignment in ipairs(integration.aliases) do
+    if type(assignment) == "table"
+      and type(assignment.key) == "string"
+      and type(assignment.accountName) == "string"
+      and type(assignment.roleName) == "string"
+      and type(assignment.regions) == "table"
+      and type(assignment.suggestedRegions) == "table"
+      and type(assignment.profiles) == "table"
+      and type(assignment.alias) == "string"
+      and type(assignment.defaultAlias) == "string"
+      and type(assignment.suggestedAlias) == "string" then
+      table.insert(records, assignment)
+    end
+  end
+  return records
+end
+
+local function parseAwsRegionDraft(value)
+  local regions = {}
+  local seen = {}
+  for region in string.gmatch(string.lower(tostring(value or "")), "[a-z0-9-]+") do
+    if seen[region] ~= true then
+      seen[region] = true
+      table.insert(regions, region)
+    end
+  end
+  return regions
+end
+
+local function awsRegionSelected(assignment, region)
+  for _, selected in ipairs(parseAwsRegionDraft(awsRegionDraft[assignment.key])) do
+    if selected == region then
+      return true
+    end
+  end
+  return false
+end
+
+local function toggleAwsRegionDraft(assignment, region)
+  local regions = parseAwsRegionDraft(awsRegionDraft[assignment.key])
+  local updated = {}
+  local removed = false
+  for _, selected in ipairs(regions) do
+    if selected == region then
+      removed = true
+    else
+      table.insert(updated, selected)
+    end
+  end
+  if not removed then
+    table.insert(updated, region)
+  end
+  awsRegionDraft[assignment.key] = table.concat(updated, ", ")
+  awsAliasRevision[assignment.key] = (awsAliasRevision[assignment.key] or 0) + 1
+  render()
+end
+
+local function setAwsAliasDraft(assignment, value)
+  awsAliasDraft[assignment.key] = value
+  awsAliasRevision[assignment.key] = (awsAliasRevision[assignment.key] or 0) + 1
+  render()
+end
+
+local function awsAliasProfileEditor(assignment, enabled)
+  local alias = awsAliasDraft[assignment.key] or assignment.alias
+  local regions = awsRegionDraft[assignment.key] or awsRegionDraftValue(assignment)
+  local revision = awsAliasRevision[assignment.key] or 0
+  local suggestedRegions = type(assignment.suggestedRegions) == "table"
+    and table.concat(assignment.suggestedRegions, ", ")
+    or ""
+  local profileNames = {}
+  for _, profile in ipairs(assignment.profiles) do
+    if type(profile) == "table" and type(profile.name) == "string" then
+      table.insert(profileNames, profile.name)
+    end
+  end
+  return ui.column({
+    key = "aws-alias-card-" .. assignment.key,
+    fill = "surface/0.66",
+    radius = 8,
+    padding = 10,
+    gap = 7,
+  }, {
+    ui.label({
+      text = assignment.accountName .. " · " .. assignment.roleName,
+      color = "on_surface",
+      fontWeight = "bold",
+      maxLines = 2,
+    }),
+    ui.label({ text = tr("panel.integrations.aws.alias_field"), color = "on_surface_variant", fontSize = 11 }),
+    ui.input({
+      key = "aws-alias-input-" .. assignment.key .. "-" .. tostring(revision),
+      value = alias,
+      placeholder = assignment.suggestedAlias,
+      controlSize = "sm",
+      enabled = enabled,
+      onChange = function(value)
+        awsAliasDraft[assignment.key] = value
+      end,
+    }),
+    ui.label({ text = tr("panel.integrations.aws.region_field"), color = "on_surface_variant", fontSize = 11 }),
+    ui.input({
+      key = "aws-region-input-" .. assignment.key .. "-" .. tostring(revision),
+      value = regions,
+      placeholder = "us-east-1, us-east-2",
+      controlSize = "sm",
+      enabled = enabled,
+      onChange = function(value)
+        awsRegionDraft[assignment.key] = value
+      end,
+    }),
+    ui.row({ gap = 6 }, {
+      ui.button({
+        text = "us-east-1",
+        variant = awsRegionSelected(assignment, "us-east-1") and "primary" or "secondary",
+        controlSize = "sm",
+        enabled = enabled,
+        flexGrow = 1,
+        onClick = function()
+          toggleAwsRegionDraft(assignment, "us-east-1")
+        end,
+      }),
+      ui.button({
+        text = "us-east-2",
+        variant = awsRegionSelected(assignment, "us-east-2") and "primary" or "secondary",
+        controlSize = "sm",
+        enabled = enabled,
+        flexGrow = 1,
+        onClick = function()
+          toggleAwsRegionDraft(assignment, "us-east-2")
+        end,
+      }),
+    }),
+    ui.label({
+      text = assignment.pending == true
+        and tr("panel.integrations.aws.region_pending", {
+          regions = suggestedRegions ~= "" and suggestedRegions or "—",
+        })
+        or tr("panel.integrations.aws.region_help"),
+      color = "on_surface_variant",
+      fontSize = 11,
+      maxLines = 3,
+    }),
+    ui.label({
+      text = #profileNames > 0
+        and tr("panel.integrations.aws.alias_current", { profile = table.concat(profileNames, ", ") })
+        or tr("panel.integrations.aws.alias_pending"),
+      color = "on_surface_variant",
+      fontSize = 11,
+      maxLines = 2,
+    }),
+    ui.row({ gap = 6 }, {
+      ui.button({
+        text = tr("panel.integrations.aws.recommend"),
+        glyph = "sparkles",
+        variant = "secondary",
+        controlSize = "sm",
+        enabled = enabled,
+        flexGrow = 1,
+        onClick = function()
+          setAwsAliasDraft(assignment, assignment.suggestedAlias)
+        end,
+      }),
+      ui.button({
+        text = tr("panel.integrations.aws.original"),
+        variant = "ghost",
+        controlSize = "sm",
+        enabled = enabled,
+        flexGrow = 1,
+        onClick = function()
+          setAwsAliasDraft(assignment, assignment.defaultAlias)
+        end,
+      }),
+    }),
+  })
+end
+
+local function appendAwsAliasEditor(children, integration, enabled)
+  local records = awsAliasRecords(integration)
+  if #records == 0 then
+    table.insert(children, ui.button({
+      text = tr("panel.integrations.aws.manage_aliases"),
+      glyph = "tags",
+      variant = "ghost",
+      controlSize = "sm",
+      enabled = false,
+    }))
+    table.insert(children, ui.label({
+      text = awsSyncPolling
+        and tr("panel.integrations.aws.alias_waiting")
+        or tr("panel.integrations.aws.alias_requires_sync"),
+      color = "on_surface_variant",
+      fontSize = 12,
+      maxLines = 3,
+    }))
+    return
+  end
+
+  table.insert(children, ui.button({
+    text = awsAliasEditorOpen
+      and tr("panel.integrations.aws.hide_aliases")
+      or tr("panel.integrations.aws.manage_aliases"),
+    glyph = "tags",
+    variant = "ghost",
+    controlSize = "sm",
+    enabled = enabled,
+    onClick = "onAwsAliasEditorClicked",
+  }))
+  if not awsAliasEditorOpen then
+    return
+  end
+
+  table.insert(children, ui.separator({ spacing = 2 }))
+  table.insert(children, ui.label({
+    text = tr("panel.integrations.aws.alias_title"),
+    color = "on_surface",
+    fontWeight = "bold",
+  }))
+  table.insert(children, ui.label({
+    text = tr("panel.integrations.aws.alias_description"),
+    color = "on_surface_variant",
+    fontSize = 13,
+    maxLines = 4,
+  }))
+  local pendingCount = 0
+  for _, assignment in ipairs(records) do
+    if assignment.pending == true then
+      pendingCount += 1
+    end
+  end
+  if pendingCount > 0 then
+    table.insert(children, ui.label({
+      text = tr("panel.integrations.aws.pending_count", { count = pendingCount }),
+      color = "error",
+      fontSize = 12,
+      fontWeight = "bold",
+      maxLines = 2,
+    }))
+  end
+  table.insert(children, ui.row({ gap = 8 }, {
+    ui.button({
+      text = tr("panel.integrations.aws.recommend_all"),
+      glyph = "sparkles",
+      variant = "secondary",
+      controlSize = "sm",
+      enabled = enabled,
+      flexGrow = 1,
+      onClick = "onAwsRecommendAllClicked",
+    }),
+    ui.button({
+      text = tr("panel.integrations.aws.original_all"),
+      variant = "ghost",
+      controlSize = "sm",
+      enabled = enabled,
+      flexGrow = 1,
+      onClick = "onAwsOriginalAllClicked",
+    }),
+  }))
+  for _, assignment in ipairs(records) do
+    table.insert(children, awsAliasProfileEditor(assignment, enabled))
+  end
+  table.insert(children, ui.button({
+    text = tr("panel.integrations.aws.save_aliases"),
+    glyph = "device-floppy",
+    variant = "primary",
+    controlSize = "sm",
+    enabled = enabled,
+    onClick = "onAwsAliasesSaveClicked",
+  }))
+end
+
 local function integrationDetail()
   local enabled = backendAvailable and not busy
 
@@ -590,15 +975,17 @@ local function integrationDetail()
     local integration = integrations.gitlab or {}
     return card({
       integrationDetailHeader(tr("panel.integrations.gitlab.title"), "brand-gitlab", integration),
-      ui.label({ text = tr("panel.integrations.gitlab.description"), color = "on_surface_variant", maxLines = 3 }),
+      ui.label({ text = tr("panel.integrations.gitlab.description"), color = "on_surface_variant", maxLines = 4 }),
       ui.label({
-        text = tr("panel.integrations.profiles", { profiles = integrationProfileNames(integration) }),
+        text = tr("panel.integrations.gitlab.session", { hosts = integrationHostNames(integration) }),
         fontSize = 13,
         color = "on_surface_variant",
       }),
       ui.button({
-        text = tr("panel.integrations.configure"),
-        glyph = "settings",
+        text = integration.configured == true
+          and tr("panel.integrations.gitlab.resync")
+          or tr("panel.integrations.gitlab.setup"),
+        glyph = "login",
         variant = "primary",
         controlSize = "sm",
         enabled = enabled and integration.available == true,
@@ -609,7 +996,7 @@ local function integrationDetail()
 
   if activeIntegration == "aws" then
     local integration = integrations.aws or {}
-    return card({
+    local children = {
       integrationDetailHeader(tr("panel.integrations.aws.title"), "cloud", integration),
       ui.label({ text = tr("panel.integrations.aws.description"), color = "on_surface_variant", maxLines = 3 }),
       ui.label({
@@ -617,34 +1004,19 @@ local function integrationDetail()
         fontSize = 13,
         color = "on_surface_variant",
       }),
-      ui.row({ gap = 8 }, {
-        ui.button({
-          text = tr("panel.integrations.configure"),
-          glyph = "settings",
-          variant = integration.configured == true and "default" or "primary",
-          controlSize = "sm",
-          enabled = enabled and integration.available == true,
-          flexGrow = 1,
-          onClick = "onAwsConfigureClicked",
-        }),
-        ui.button({
-          text = tr("panel.integrations.login"),
-          variant = integration.configured == true and "primary" or "default",
-          controlSize = "sm",
-          enabled = enabled and integration.configured == true,
-          flexGrow = 1,
-          onClick = "onAwsLoginClicked",
-        }),
-        ui.button({
-          text = tr("panel.integrations.identity"),
-          variant = "ghost",
-          controlSize = "sm",
-          enabled = enabled and integration.configured == true,
-          flexGrow = 1,
-          onClick = "onAwsIdentityClicked",
-        }),
+      ui.button({
+        text = integration.configured == true
+          and tr("panel.integrations.aws.resync")
+          or tr("panel.integrations.aws.setup"),
+        glyph = "cloud-upload",
+        variant = "primary",
+        controlSize = "sm",
+        enabled = enabled and integration.available == true,
+        onClick = "onAwsSyncClicked",
       }),
-    })
+    }
+    appendAwsAliasEditor(children, integration, enabled)
+    return card(children)
   end
 
   if activeIntegration == "windows" then
@@ -857,7 +1229,7 @@ render = function()
       navigationButton("system", tr("panel.nav.system"), "device-desktop-cog", "onShowSystem"),
       navigationButton("integrations", tr("panel.nav.integrations"), "plug-connected", "onShowIntegrations"),
       ui.spacer({ flexGrow = 1 }),
-      ui.label({ text = "v0.4.6", fontSize = 11, color = "on_surface_variant" }),
+      ui.label({ text = "v0.8.0", fontSize = 11, color = "on_surface_variant" }),
     }),
     ui.column({ flexGrow = 1, gap = 12, align = "stretch" }, {
       ui.row({ align = "center", gap = 8 }, {
@@ -915,10 +1287,19 @@ local function selectIntegration(id)
 end
 
 function onOpen(_context)
+  noctalia.setUpdateInterval(2000)
   backendAvailable = noctalia.fileExists(CONFIGCTL)
+  local pluginData = noctalia.pluginDataDir()
+  if type(pluginData) == "string" and pluginData ~= "" then
+    awsAliasRequestPath = pluginData .. "/aws-alias-request.json"
+  end
   activeView = "overview"
   render()
   loadStatus(false)
+end
+
+function update()
+  pollAwsSyncStatus()
 end
 
 function onShowOverview()
@@ -1089,16 +1470,95 @@ function onGitlabSetupClicked()
   openTerminalAction("gitlabSetup")
 end
 
-function onAwsConfigureClicked()
-  openTerminalAction("awsConfigure")
+function onAwsSyncClicked()
+  awsAliasEditorOpen = false
+  openTerminalAction("awsSync")
 end
 
-function onAwsLoginClicked()
-  openTerminalAction("awsLogin")
+function onAwsAliasEditorClicked()
+  awsAliasEditorOpen = not awsAliasEditorOpen
+  render()
 end
 
-function onAwsIdentityClicked()
-  openTerminalAction("awsIdentity")
+function onAwsRecommendAllClicked()
+  for _, profile in ipairs(awsAliasRecords(integrations.aws or {})) do
+    awsAliasDraft[profile.key] = profile.suggestedAlias
+    awsAliasRevision[profile.key] = (awsAliasRevision[profile.key] or 0) + 1
+  end
+  render()
+end
+
+function onAwsOriginalAllClicked()
+  for _, profile in ipairs(awsAliasRecords(integrations.aws or {})) do
+    awsAliasDraft[profile.key] = profile.defaultAlias
+    awsAliasRevision[profile.key] = (awsAliasRevision[profile.key] or 0) + 1
+  end
+  render()
+end
+
+function onAwsAliasesSaveClicked()
+  if busy or not backendAvailable then
+    return
+  end
+  if awsAliasRequestPath == "" then
+    fail(tr("error.alias_request_unavailable"))
+    return
+  end
+
+  local profiles = {}
+  for _, assignment in ipairs(awsAliasRecords(integrations.aws or {})) do
+    local regions = parseAwsRegionDraft(awsRegionDraft[assignment.key])
+    if #regions == 0 then
+      fail(tr("error.aws_region_required", {
+        account = assignment.accountName,
+        role = assignment.roleName,
+      }))
+      return
+    end
+    profiles[assignment.key] = {
+      alias = awsAliasDraft[assignment.key] or assignment.alias,
+      regions = regions,
+    }
+  end
+  local encoded, encodeError = noctalia.json.encode({
+    schemaVersion = 3,
+    profiles = profiles,
+  })
+  if type(encoded) ~= "string" then
+    fail(tr("error.alias_request_failed", { detail = tostring(encodeError or "") }))
+    return
+  end
+  local written, writeError = noctalia.writeFile(awsAliasRequestPath, encoded)
+  if written ~= true then
+    fail(tr("error.alias_request_failed", { detail = tostring(writeError or "") }))
+    return
+  end
+
+  busy = true
+  currentError = ""
+  notice = ""
+  render()
+  runAllowed("awsAliasesApply", function(payload)
+    if type(payload.profiles) ~= "table" or type(payload.assignments) ~= "table" then
+      fail(tr("error.backend_rejected"))
+      return
+    end
+    local integration = integrations.aws or {}
+    integration.aliases = payload.assignments
+    integration.profiles = {}
+    for _, profile in ipairs(payload.profiles) do
+      if type(profile) == "table" and type(profile.name) == "string" then
+        table.insert(integration.profiles, profile.name)
+      end
+    end
+    integration.configured = #integration.aliases > 0
+    integration.pendingRegionCount = payload.pendingRegionCount or 0
+    integrations.aws = integration
+    resetAwsAliasDraft()
+    busy = false
+    notice = tr("notice.aws_aliases_saved")
+    render()
+  end)
 end
 
 function onWindowsUpClicked()

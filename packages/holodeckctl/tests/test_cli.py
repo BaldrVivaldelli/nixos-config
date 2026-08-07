@@ -158,13 +158,32 @@ class CliTests(unittest.TestCase):
         self.assertIn("deployment.target", payload["settable"])
         self.assertIn("integrations.windows.rdp.displayMode", payload["settable"])
         self.assertIn("github-setup", payload["actions"])
+        self.assertIn("aws-sync", payload["actions"])
         self.assertIn("windows-up", payload["actions"])
+        self.assertIn("aws-aliases-apply", payload["commands"])
 
     def test_interactive_actions_reject_json_output(self) -> None:
         code, payload, _ = self.invoke("--json", "action", "github-setup")
 
         self.assertEqual(2, code)
         self.assertEqual("usage", payload["error"]["code"])
+
+    def test_aws_alias_apply_requires_json_and_a_discovered_catalog(self) -> None:
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        code = run(
+            ["aws-aliases-apply"],
+            environ=self.environment,
+            stdout=stdout,
+            stderr=stderr,
+        )
+        self.assertEqual(2, code)
+        self.assertIn("requiere --json", stderr.getvalue())
+
+        code, payload, stderr_text = self.invoke("--json", "aws-aliases-apply")
+        self.assertEqual(2, code)
+        self.assertEqual("", stderr_text)
+        self.assertEqual("missing-aws-alias-catalog", payload["error"]["code"])
 
 
 if __name__ == "__main__":

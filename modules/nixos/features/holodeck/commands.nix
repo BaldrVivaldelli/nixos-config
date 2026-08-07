@@ -11,7 +11,6 @@ let
   holodeckCommand = pkgs.callPackage ./package.nix {
     inherit (cfg)
       githubHost
-      gitlabHost
       personalProjectsDir
       workProjectsDir
       ;

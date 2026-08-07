@@ -6,13 +6,24 @@
 
 Thin Luau frontend for the repository's deterministic `holodeckctl`
 workflow. The plugin targets Noctalia `v5.0.0-beta.7` and declares plugin API
-9, the first API that supports closure callbacks in declarative UI trees.
+10, which provides the keyboard focus required by the per-profile AWS alias
+and region editor as well as closure callbacks in declarative UI trees.
 
 The panel reads backend status, selects one of the two supported deployment
 targets (`home-manager` or `existing-nixos`) and the dark/light appearance mode,
 saves those choices to the IR, previews the backend plan, and asks for explicit
 confirmation before opening `apply` in a terminal. It also presents GitHub,
 GitLab, AWS and Windows VM cards backed by their existing commands.
+The GitLab action accepts an instance or group URL, extracts the authentication
+host, then delegates only web OAuth/SSO to Holodeck. It does not create a
+profile, register an SSH key, or change Git routing.
+After AWS discovery, the AWS card offers a local editor for every account/role
+assignment. The backend automatically creates `us-east-1` and `us-east-2`
+profiles for each one. Users can request the deterministic short
+recommendation, customize the semantic alias, keep both defaults, retain only
+one region, add others, or recommend all aliases at once. The backend generates
+a separate profile and suffix for every selected region and preserves those
+choices across resynchronization.
 
 The UI follows Noctalia's native panel hierarchy: a compact Control Center-style
 navigation rail, an overview, a focused system workflow, and an integration
@@ -41,14 +52,13 @@ holodeckctl --json set appearance.theme.mode light
 holodeckctl --json set integrations.windows.rdp.displayMode half
 holodeckctl --json set integrations.windows.rdp.displayMode fullscreen
 holodeckctl --json plan
+holodeckctl --json aws-aliases-apply
 holodeckctl apply
 holodeckctl action holodeck-setup
 holodeckctl action holodeck-doctor
 holodeckctl action github-setup
 holodeckctl action gitlab-setup
-holodeckctl action aws-configure
-holodeckctl action aws-login
-holodeckctl action aws-identity
+holodeckctl action aws-sync
 holodeckctl action windows-up
 holodeckctl action windows-status
 holodeckctl action windows-rdp
@@ -62,6 +72,9 @@ output, authentication, choices and any privilege prompt remain visible. The
 RDP and Web actions are graphical launchers and run detached from the panel,
 without opening a disposable terminal. Status only returns provider/profile
 metadata; it excludes emails, key paths and secrets.
+Alias text never enters a command string. The panel writes a transient JSON
+request in its Noctalia state directory, then invokes the fixed
+`aws-aliases-apply` command; the backend validates and removes that request.
 
 The source tree intentionally retains the replacement token, so it can be
 linted directly but must be installed through the Nix package before it can run.

@@ -20,6 +20,13 @@ let
     noctalia = config.programs.noctalia.package;
     inherit holodeckctl;
   };
+  holodeckRegenerate = pkgs.writeShellApplication {
+    name = "holodeck-regenerate";
+    runtimeInputs = [ config.programs.noctalia.package ];
+    text = ''
+      exec ${pkgs.bash}/bin/bash ${lib.escapeShellArg "${user.repoPath}/install.sh"} regenerate "$@"
+    '';
+  };
 in
 {
   options.homeFeatures.noctalia.enable = lib.mkEnableOption "Noctalia v5 Wayland desktop shell";
@@ -60,7 +67,10 @@ in
       };
     };
 
-    home.packages = [ holodeckctl ];
+    home.packages = [
+      holodeckctl
+      holodeckRegenerate
+    ];
 
     # Noctalia always discovers this local XDG data source after its official
     # and community sources. The Nix-store symlink keeps the plugin immutable

@@ -6,7 +6,7 @@ integra con la flake, Home Manager y los backends de este repositorio.
 
 Holodeck conserva dos responsabilidades separadas:
 
-- el core portable configura Git, SSH, GitHub y GitLab;
+- el core portable configura Git/GitHub y autentica GitLab;
 - los backends opcionales instalan sistemas declarados.
 
 El plugin **Holodeck Control** reúne esas capacidades con AWS y la Windows VM
@@ -35,6 +35,11 @@ holodeck purge
 
 El estado local vive en `~/.config/holodeck`, `~/.ssh`, `~/.gitconfig` y
 `~/.ssh/config`, nunca dentro del repositorio.
+
+El flujo `holodeck gitlab` acepta la URL de la instancia o de un grupo, como
+`https://gitlab.com/nave-negocios`. Extrae el host para reutilizar o abrir el
+login web OAuth/SSO de `glab` y termina allí: no crea perfiles, claves SSH ni
+routing Git. Ningún host GitLab queda fijado en Nix ni en el código.
 
 ## Backend NixOS
 

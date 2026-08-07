@@ -1,4 +1,4 @@
-"""GitHub and GitLab provider integration."""
+"""GitHub configuration and provider authentication."""
 
 from __future__ import annotations
 
@@ -7,7 +7,6 @@ import sys
 from pathlib import Path
 
 from .errors import HolodeckError
-from .platform import open_url
 from .process import command_ok, command_output, run
 from .ui import ui
 
@@ -37,17 +36,31 @@ def login_github(host: str) -> None:
     run(["gh", "config", "set", "git_protocol", "ssh", "--host", host])
 
 
-def login_gitlab(host: str) -> None:
+def login_gitlab(host: str, protocol: str = "https") -> None:
     if command_ok(["glab", "auth", "status", "--hostname", host]):
         ui.ok(f"GitLab is already authenticated on {host}.")
         return
 
-    web_login = run(["glab", "auth", "login", "--hostname", host, "--web"], check=False)
+    login_args = [
+        "glab",
+        "auth",
+        "login",
+        "--hostname",
+        host,
+        "--web",
+        "--git-protocol",
+        "https",
+    ]
+    if protocol == "http":
+        login_args.extend(["--api-protocol", "http"])
+    web_login = run(login_args, check=False)
     if web_login.returncode == 0:
         return
-
-    ui.warn("GitLab web login was not available; falling back to glab interactive login.")
-    run(["glab", "auth", "login", "--hostname", host])
+    raise HolodeckError(
+        "GitLab web OAuth/SSO did not complete. Holodeck will not request or "
+        "store a token manually; verify that web OAuth is enabled for this "
+        "GitLab instance and retry."
+    )
 
 
 def login_provider(provider: str, host: str) -> None:
@@ -192,28 +205,11 @@ def upload_keys(
     ssh_pub: Path,
     gpg_pub: Path | None,
 ) -> None:
-    if provider == "github":
-        upload_github_ssh_key(host, title, ssh_pub)
-        if gpg_pub and gpg_pub.exists():
-            upload_github_gpg_key(host, gpg_pub)
-        return
-    if provider == "gitlab":
-        if ssh_pub.exists():
-            result = run(
-                ["glab", "ssh-key", "add", str(ssh_pub), "--title", title],
-                check=False,
-            )
-            if result.returncode != 0:
-                raise HolodeckError("GitLab authentication succeeded, but the SSH key upload failed.")
-        if gpg_pub and gpg_pub.exists():
-            if command_ok(["glab", "gpg-key", "add", "--help"]):
-                run(["glab", "gpg-key", "add", str(gpg_pub)], check=False)
-            else:
-                settings_url = f"https://{host}/-/user_settings/gpg_keys"
-                ui.warn("glab does not expose gpg-key add here. Opening GitLab GPG settings.")
-                if not open_url(settings_url):
-                    print(f"GitLab GPG settings: {settings_url}")
-                print(f"Public GPG key: {gpg_pub}")
+    if provider != "github":
+        raise HolodeckError("Holodeck only manages SSH and GPG keys for GitHub.")
+    upload_github_ssh_key(host, title, ssh_pub)
+    if gpg_pub and gpg_pub.exists():
+        upload_github_gpg_key(host, gpg_pub)
 
 
 def github_api_field(host: str, field: str) -> str:

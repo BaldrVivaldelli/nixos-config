@@ -1,28 +1,47 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-blocked_path_regex='(^|/)(\.env(\..*)?|\.ssh|\.gnupg|secrets|private|\.secrets|\.private)(/|$)|(^|/)(id_rsa|id_ed25519)(\.|$)|\.(key|pem|p12|pfx|gpg|pgp|asc|age|kdbx)$'
-secret_content_regex='-----BEGIN (RSA |DSA |EC |OPENSSH |PGP )?PRIVATE KEY-----|ghp_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|aws[_-]?secret[_-]?access[_-]?key|xox[baprs]-[A-Za-z0-9-]{20,}'
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
 
+blocked_path_regex='(^|/)(\.env(\..*)?|\.ssh|\.gnupg|\.aws|\.azure|\.kube|secrets|private|\.secrets|\.private)(/|$)|(^|/)(id_rsa|id_ed25519|credentials)(\.|$)|\.(key|pem|p12|pfx|jks|keystore|gpg|pgp|asc|age|kdbx|ovpn|secret|secrets|token|password|tfstate|tfvars|bak|backup)$'
+
+scan_files=()
 failed=0
-while IFS= read -r file; do
-  [ -n "$file" ] || continue
-  [ -f "$file" ] || continue
+while IFS= read -r -d "" file; do
+  [[ -n "$file" ]] || continue
+  [[ -f "$file" ]] || continue
 
-  if printf '%s\n' "$file" | grep -Eiq "$blocked_path_regex"; then
+  if [[ "$file" =~ $blocked_path_regex ]]; then
     echo "Blocked possible secret path: $file" >&2
     failed=1
-    continue
   fi
 
-  if grep -Iq . "$file" && grep -Eiq -- "$secret_content_regex" "$file"; then
-    echo "Blocked possible secret content in: $file" >&2
-    failed=1
+  # The baseline stores only reviewed hashes, which look like high-entropy
+  # secrets to the scanner itself. It is still subject to the path checks.
+  if [[ "$file" != ".secrets.baseline" ]]; then
+    scan_files+=("$file")
   fi
-done < <(git diff --cached --name-only --diff-filter=ACMR)
-if [ "$failed" -ne 0 ]; then
+done < <(git diff --cached --name-only --diff-filter=ACMR -z)
+
+if [[ "$failed" -ne 0 ]]; then
   echo >&2
   echo "Commit blocked: this repo should never handle secrets." >&2
   echo "Move secrets to local state outside the repo, for example ~/.config/holodeck, ~/.ssh, or a real secret manager." >&2
   exit 1
 fi
+
+if [[ "${#scan_files[@]}" -eq 0 ]]; then
+  exit 0
+fi
+
+if ! command -v detect-secrets-hook >/dev/null 2>&1; then
+  echo "Commit blocked: falta detect-secrets-hook; aplicá primero el perfil de Home Manager." >&2
+  exit 1
+fi
+
+detect-secrets-hook \
+  --baseline "$repo_root/.secrets.baseline" \
+  --no-verify \
+  -- \
+  "${scan_files[@]}"

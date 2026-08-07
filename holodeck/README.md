@@ -4,9 +4,8 @@
   <img src="../plugins/noctalia/holodeck-control/assets/holodeck-control.png" width="160" alt="Holodeck: cámara de simulación holográfica">
 </p>
 
-Holodeck es un asistente portable para preparar identidades de desarrollo y
-mantener separados los perfiles personales y laborales de Git, SSH, GitHub y
-GitLab.
+Holodeck es un asistente portable para preparar identidades de desarrollo,
+configurar GitHub y resolver la autenticación OAuth/SSO de GitLab.
 
 El proyecto puede usarse desde la terminal sin NixOS, Home Manager, Noctalia ni
 la Windows VM. Esas piezas son integraciones opcionales mantenidas por el
@@ -16,15 +15,15 @@ repositorio que actualmente hospeda el proyecto.
 
 - configura identidades Git distintas según el árbol de proyectos;
 - autentica GitHub y GitLab mediante sus clientes oficiales;
-- crea una clave SSH Ed25519 independiente para cada perfil;
+- crea una clave SSH Ed25519 independiente para el perfil GitHub;
 - valida la conexión SSH antes de activar una configuración;
 - permite habilitar firma GPG por perfil;
 - comprueba autenticación, claves y enrutamiento con `holodeck doctor`;
 - puede retirar únicamente el estado que administra con `holodeck purge`.
 
-Holodeck usa reglas `includeIf` de Git. Por ejemplo, un repositorio dentro de
-`~/projects/personal` puede usar la identidad de GitHub y otro dentro de
-`~/projects/work` la identidad de GitLab, sin cambiar la configuración a mano.
+Holodeck usa reglas `includeIf` de Git para el perfil administrado de GitHub.
+La integración GitLab queda deliberadamente limitada a la sesión de `glab` y
+no escribe configuración Git o SSH.
 
 ## Arquitectura
 
@@ -105,8 +104,9 @@ Ejecutar como usuario normal, nunca con `sudo`:
 holodeck setup
 ```
 
-El asistente permite configurar el perfil personal de GitHub, el perfil
-laboral de GitLab o ambos. Al terminar conviene verificar el resultado:
+El asistente permite configurar el perfil personal de GitHub, autenticar
+GitLab por OAuth/SSO o hacer ambas cosas. Al terminar conviene verificar el
+resultado:
 
 ```bash
 holodeck doctor
@@ -125,7 +125,7 @@ holodeck gitlab
 | --- | --- |
 | `holodeck setup` | Ejecuta el asistente completo. |
 | `holodeck github` | Configura el perfil personal de GitHub. |
-| `holodeck gitlab` | Configura el perfil laboral de GitLab. |
+| `holodeck gitlab` | Pide una URL y resuelve únicamente OAuth/SSO de GitLab. |
 | `holodeck login github` | Autentica solamente el cliente de GitHub. |
 | `holodeck login gitlab` | Autentica solamente el cliente de GitLab. |
 | `holodeck doctor` | Diagnostica perfiles, Git, SSH y autenticación. |
@@ -176,6 +176,21 @@ modificar el archivo correspondiente.
 borra de GitHub o GitLab las claves públicas que ya se hayan publicado. Esas
 claves se revocan desde cada proveedor.
 
+## Flujo automático de GitLab
+
+`holodeck gitlab` solicita la URL de la instancia o de un grupo, por ejemplo
+`https://gitlab.com/nave-negocios`. Holodeck extrae `gitlab.com` exclusivamente
+para autenticar `glab`; no conserva la ruta, no acepta credenciales, query
+strings ni fragmentos y no contiene un host GitLab hardcodeado. Si el host ya
+tiene una sesión válida de `glab`, la reutiliza; de lo contrario abre el login
+web, donde también se resuelve el SSO exigido por la organización.
+Si la instancia no habilita OAuth web para `glab`, el flujo se detiene con un
+diagnóstico y nunca cae en un pedido manual de token.
+
+El flujo termina al confirmar la autenticación: no consulta la identidad de
+commit, no crea ni publica claves SSH, no crea perfiles Holodeck y no modifica
+el routing Git.
+
 ## Defaults configurables
 
 El wrapper Nix admite estos valores iniciales mediante variables de entorno:
@@ -183,7 +198,6 @@ El wrapper Nix admite estos valores iniciales mediante variables de entorno:
 | Variable | Default |
 | --- | --- |
 | `HOLODECK_DEFAULT_GITHUB_HOST` | `github.com` |
-| `HOLODECK_DEFAULT_GITLAB_HOST` | `gitlab.com` |
 | `HOLODECK_DEFAULT_PERSONAL_DIR` | `$HOME/projects/personal` |
 | `HOLODECK_DEFAULT_WORK_DIR` | `$HOME/projects/work` |
 

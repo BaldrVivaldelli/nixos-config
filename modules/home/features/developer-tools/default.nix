@@ -30,6 +30,7 @@ in
       git-lfs
       delta
       lazygit
+      python3Packages.detect-secrets
       gh
       glab
 
@@ -41,6 +42,7 @@ in
 
       # Aplicaciones gráficas instalables en el perfil del usuario.
       chromium
+      kiro
 
       # Identidad, SSH y utilidades de escritorio.
       gnupg
@@ -57,6 +59,13 @@ in
       EDITOR = "codium";
       VISUAL = "codium";
     };
+
+    home.activation.holodeckSecretScannerHook = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      repo_path=${lib.escapeShellArg config.homeFeatures.shell.repoPath}
+      if [ -d "$repo_path/.git" ] && [ -x "$repo_path/.githooks/pre-commit" ]; then
+        $DRY_RUN_CMD ${pkgs.git}/bin/git -C "$repo_path" config --local core.hooksPath .githooks
+      fi
+    '';
 
     xdg.mimeApps = {
       enable = true;

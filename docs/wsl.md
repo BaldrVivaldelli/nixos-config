@@ -38,6 +38,7 @@ nixosConfigurations.wsl
 - GNOME y GDM
 - Chromium
 - drivers graficos del host fisico
+- Kiro para Linux
 - VSCodium para Linux
 - Docker nativo del modulo `features.containers`
 - `dockurr/windows` y `features.containers.windowsVm`

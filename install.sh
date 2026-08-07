@@ -10,6 +10,7 @@ Uso:
   ./install.sh configure [--print|--yes|--force]
   ./install.sh existing-nixos
   ./install.sh home-manager
+  ./install.sh regenerate
   ./install.sh nixos
   ./install.sh nixos existing
   ./install.sh nixos home-manager
@@ -22,6 +23,7 @@ Targets incluidos:
   configure      Detecta esta máquina y crea inventory.local.nix.
   existing-nixos Configura Niri en el sistema y aplica Home Manager.
   home-manager   Aplica solamente la configuración del usuario.
+  regenerate     Regenera Home Manager y recarga Holodeck Control.
   nixos wsl      Prepara el host NixOS-WSL declarado por la flake.
   otro           Una app de flake o ejecutable holodeck-system-BACKEND.
 MSG
@@ -82,6 +84,22 @@ install_home_manager() {
   bash "$repo_dir/apply-home.sh" switch
 }
 
+reload_holodeck_control() {
+  if ! command -v noctalia >/dev/null 2>&1; then
+    fail "Home Manager quedó aplicado, pero no se encontró el comando noctalia para recargar Holodeck Control"
+  fi
+
+  echo "==> Recargando Holodeck Control en Noctalia..." >&2
+  noctalia msg plugins disable holodeck/control
+  noctalia msg plugins enable holodeck/control
+  echo "Holodeck quedó regenerado y el plugin fue recargado." >&2
+}
+
+regenerate_holodeck() {
+  install_home_manager
+  reload_holodeck_control
+}
+
 install_existing_nixos() {
   if [[ "${EUID:-$(id -u)}" -eq 0 ]]; then
     fail "la instalación completa debe ejecutarse como usuario normal, sin sudo"
@@ -137,6 +155,12 @@ case "$backend" in
       fail "home-manager no acepta argumentos adicionales"
     fi
     install_home_manager
+    ;;
+  regenerate|holodeck-regenerate)
+    if [[ $# -ne 0 ]]; then
+      fail "regenerate no acepta argumentos adicionales"
+    fi
+    regenerate_holodeck
     ;;
   nix-os|nixos)
     target="wsl"

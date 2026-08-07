@@ -8,7 +8,7 @@ panel Luau
   └── holodeckctl
       ├── holodeck.local.json → Nix → Home Manager / NixOS
       ├── holodeck → GitHub / GitLab
-      ├── aws → perfiles SSO e identidad
+      ├── aws → login SSO y sincronización de cuentas/roles
       └── windowsvm → Dockurr / RDP / visor web
 ```
 
@@ -93,14 +93,23 @@ organizar el flujo en tres vistas:
 La vista de integraciones reúne:
 
 - **GitHub**: perfiles detectados y configuración completa de auth, SSH y Git;
-- **GitLab**: perfiles detectados y configuración independiente de auth/SSH/Git;
-- **AWS**: nombres de perfiles de `~/.aws/config`, configuración SSO, login e
-  identidad activa;
+- **GitLab**: un único botón acepta la URL de la instancia o de un grupo;
+  después extrae el host y se limita a reutilizar o abrir OAuth web/SSO, sin
+  crear perfiles, claves SSH, routing Git ni un host hardcodeado;
+- **AWS**: un único botón abre el login SSO y descubre cada combinación de
+  cuenta y rol asignada; la URL se lee de una sesión local existente o se
+  solicita en la primera ejecución, nunca desde el inventario. Cada asignación
+  genera automáticamente un perfil en `us-east-1` y otro en `us-east-2`, con
+  sufijos `use1` y `use2`. El editor permite escribir un alias, aceptar una
+  recomendación, conservar ambas regiones, dejar sólo una o agregar otras
+  separadas por coma; las elecciones sobreviven a las resincronizaciones;
 - **Windows VM**: disponibilidad de `windowsvm`, inicio, estado, RDP, visor web,
   logs y detención.
 
-`Configurar todo` reutiliza el wizard existente de `holodeck`; `Diagnóstico`
-ejecuta `holodeck doctor`. Las operaciones interactivas se abren en una
+`Configurar todo` reutiliza el wizard existente de `holodeck` para configurar
+GitHub y autenticar GitLab y, al terminar, siempre ofrece configurar o
+resincronizar AWS SSO;
+`Diagnóstico` ejecuta `holodeck doctor`. Las operaciones interactivas se abren en una
 terminal y al finalizar se puede usar la recarga del encabezado para releer el
 estado. **RDP** y **Web** son lanzadores gráficos: se ejecutan directamente sin
 crear una terminal efímera; RDP usa el cliente SDL nativo en Wayland. Los
@@ -124,11 +133,11 @@ holodeckctl set appearance.theme.mode light
 holodeckctl set integrations.windows.rdp.displayMode fullscreen
 holodeckctl plan --json
 holodeckctl apply
+holodeckctl aws-aliases-apply --json
 holodeckctl action holodeck-setup
 holodeckctl action github-setup
 holodeckctl action gitlab-setup
-holodeckctl action aws-configure
-holodeckctl action aws-login
+holodeckctl action aws-sync
 holodeckctl action windows-up
 ```
 
@@ -149,14 +158,23 @@ la autenticación permanecen visibles.
 - Luau sólo puede elegir comandos y valores de allowlists estáticas.
 - Los nombres de perfiles se muestran como metadata, pero emails, claves,
   fingerprints, tokens y credenciales nunca forman parte del JSON de estado.
-- El plugin no escribe JSON ni genera expresiones Nix.
+- El plugin no escribe el IR ni genera expresiones Nix. Para guardar alias y
+  regiones AWS escribe únicamente una solicitud transitoria en su directorio
+  de estado; `holodeckctl` la valida, aplica y elimina.
 - El backend rechaza schemas futuros, claves desconocidas y enums inválidos.
 - Las escrituras usan archivo temporal, `fsync`, reemplazo atómico y lock.
 - Nix vuelve a validar el IR antes de construir.
 - El plugin ignora el `argv` informado por `plan`; `apply` usa un comando fijo
   empaquetado con una ruta inmutable del Nix store.
 - Las integraciones resuelven el ejecutable y usan listas `argv` con
-  `shell=False`; los perfiles AWS sólo pueden elegirse de la lista detectada.
+  `shell=False`.
+- AWS CLI conserva el token bajo `~/.aws/sso/cache`; Holodeck sólo lo mantiene
+  en memoria mientras pagina las APIs SSO y nunca lo devuelve al frontend.
+- La sincronización AWS reemplaza únicamente un bloque delimitado y generado
+  por Holodeck en `~/.aws/config`; los perfiles externos quedan intactos.
+- Los alias y regiones persistentes viven en
+  `~/.config/holodeck/aws-aliases.json`, fuera del repositorio, y usan claves
+  opacas estables en lugar de nombres o IDs de cuenta.
 
 `holodeck.local.json` y `holodeck.local.json.lock` están ignorados por Git. Los
 scripts evalúan explícitamente `path:$repo` para que ese estado local participe

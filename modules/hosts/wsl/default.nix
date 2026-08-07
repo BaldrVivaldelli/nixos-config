@@ -69,7 +69,7 @@ in
   # Intentionally omitted in WSL:
   # - hardware-configuration.nix and physical bootloader settings
   # - NetworkManager, CUPS and PipeWire
-  # - GNOME/GDM, Niri, Chromium, graphics drivers, Noctalia and VSCodium for Linux
+  # - GNOME/GDM, Niri, Chromium, graphics drivers, Noctalia, Kiro and VSCodium for Linux
   # - the native containers module and its dockurr/windows VM
 
   nixpkgs.config.allowUnfree = true;

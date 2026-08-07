@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import io
+import json
 import subprocess
 import tempfile
 import unittest
@@ -52,8 +54,17 @@ class IntegrationTests(unittest.TestCase):
             ),
             encoding="utf-8",
         )
-        for command in ("holodeck", "gh", "glab", "aws", "windowsvm"):
+        for command in ("holodeck", "gh", "aws", "windowsvm"):
             self.add_command(command)
+        glab = self.add_command("glab")
+        glab.write_text(
+            "#!/bin/sh\n"
+            "if [ \"$1 $2 $3\" = \"config get host\" ]; then\n"
+            "  printf '%s\\n' gitlab.com\n"
+            "fi\n"
+            "exit 0\n",
+            encoding="utf-8",
+        )
 
         status = integration_status(self.environment)
 
@@ -64,6 +75,9 @@ class IntegrationTests(unittest.TestCase):
         )
         self.assertNotIn("secret@example.com", repr(status))
         self.assertNotIn("/secret/key", repr(status))
+        self.assertTrue(status["gitlab"]["configured"])
+        self.assertEqual(["gitlab.com"], status["gitlab"]["hosts"])
+        self.assertEqual([], status["gitlab"]["profiles"])
         self.assertTrue(status["windowsVm"]["available"])
 
     def test_aws_profiles_reads_names_without_credentials(self) -> None:
@@ -85,6 +99,25 @@ class IntegrationTests(unittest.TestCase):
         )
 
         self.assertEqual([], provider_profiles(self.environment))
+
+    def test_gitlab_status_uses_glab_auth_not_a_legacy_profile(self) -> None:
+        profiles = self.home / ".config" / "holodeck" / "profiles"
+        profiles.mkdir(parents=True)
+        (profiles / "legacy-gitlab.env").write_text(
+            "HOLODECK_PROFILE=legacy-gitlab\n"
+            "HOLODECK_PROVIDER=gitlab\n"
+            "HOLODECK_HOST=gitlab.com\n",
+            encoding="utf-8",
+        )
+        self.add_command("holodeck")
+        glab = self.add_command("glab")
+        glab.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+
+        status = integration_status(self.environment)
+
+        self.assertFalse(status["gitlab"]["configured"])
+        self.assertEqual([], status["gitlab"]["hosts"])
+        self.assertEqual([], status["gitlab"]["profiles"])
 
     def test_static_action_uses_resolved_argv_without_shell(self) -> None:
         executable = self.add_command("holodeck")
@@ -158,6 +191,125 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(
             [[str(executable), "sso", "login", "--profile", "work"]], calls
         )
+
+    def test_aws_sync_is_an_allowlisted_composite_action(self) -> None:
+        executable = self.add_command("aws")
+        self.environment.update(
+            {
+                "AWS_DEFAULT_REGION": "us-east-1",
+            }
+        )
+        cache = self.home / ".aws" / "sso" / "cache"
+        cache.mkdir(parents=True)
+        key = hashlib.sha1(b"holodeck").hexdigest()
+        (cache / f"{key}.json").write_text(
+            json.dumps({"accessToken": "not-reported"}), encoding="utf-8"
+        )
+
+        class Paginator:
+            def __init__(self, operation: str) -> None:
+                self.operation = operation
+
+            def paginate(self, **_kwargs: Any) -> list[dict[str, Any]]:
+                if self.operation == "list_accounts":
+                    return [
+                        {
+                            "accountList": [
+                                {"accountId": "111111111111", "accountName": "Dev"}
+                            ]
+                        }
+                    ]
+                return [{"roleList": [{"roleName": "DeveloperAccess"}]}]
+
+        class Client:
+            def get_paginator(self, operation: str) -> Paginator:
+                return Paginator(operation)
+
+        calls: list[list[str]] = []
+
+        def runner(argv: list[str], **_kwargs: Any) -> subprocess.CompletedProcess[str]:
+            calls.append(argv)
+            return subprocess.CompletedProcess(argv, 0)
+
+        result = execute_action(
+            "aws-sync",
+            self.environment,
+            runner=runner,
+            input_fn=lambda prompt: (
+                "https://example.awsapps.com/start" if "URL" in prompt else ""
+            ),
+            stdout=io.StringIO(),
+            aws_client_factory=lambda _region: Client(),
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(1, result["assignmentCount"])
+        self.assertEqual(0, result["pendingRegionCount"])
+        self.assertEqual(2, result["profileCount"])
+        self.assertEqual(str(executable), calls[0][0])
+        status = integration_status(self.environment)
+        self.assertEqual(1, len(status["aws"]["aliases"]))
+        self.assertFalse(status["aws"]["aliases"][0]["pending"])
+        self.assertEqual(0, status["aws"]["pendingRegionCount"])
+        self.assertEqual("Dev", status["aws"]["aliases"][0]["accountName"])
+        self.assertNotIn("111111111111", repr(status))
+        self.assertNotIn("not-reported", repr(status))
+
+    def test_holodeck_setup_offers_aws_and_runs_the_same_sync_flow(self) -> None:
+        holodeck = self.add_command("holodeck")
+        aws = self.add_command("aws")
+        self.environment.update(
+            {
+                "AWS_DEFAULT_REGION": "us-east-1",
+            }
+        )
+        cache = self.home / ".aws" / "sso" / "cache"
+        cache.mkdir(parents=True)
+        key = hashlib.sha1(b"holodeck").hexdigest()
+        (cache / f"{key}.json").write_text(
+            json.dumps({"accessToken": "not-reported"}), encoding="utf-8"
+        )
+
+        class Paginator:
+            def __init__(self, operation: str) -> None:
+                self.operation = operation
+
+            def paginate(self, **_kwargs: Any) -> list[dict[str, Any]]:
+                if self.operation == "list_accounts":
+                    return [
+                        {
+                            "accountList": [
+                                {"accountId": "111111111111", "accountName": "Dev"}
+                            ]
+                        }
+                    ]
+                return [{"roleList": [{"roleName": "DeveloperAccess"}]}]
+
+        class Client:
+            def get_paginator(self, operation: str) -> Paginator:
+                return Paginator(operation)
+
+        calls: list[list[str]] = []
+
+        def runner(argv: list[str], **_kwargs: Any) -> subprocess.CompletedProcess[str]:
+            calls.append(argv)
+            return subprocess.CompletedProcess(argv, 0)
+
+        result = execute_action(
+            "holodeck-setup",
+            self.environment,
+            runner=runner,
+            input_fn=lambda prompt: (
+                "https://example.awsapps.com/start" if "URL" in prompt else ""
+            ),
+            stdout=io.StringIO(),
+            aws_client_factory=lambda _region: Client(),
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(["git", "aws"], result["components"])
+        self.assertEqual([str(holodeck), "setup"], calls[0])
+        self.assertEqual(str(aws), calls[1][0])
 
     def test_missing_action_dependency_is_rejected(self) -> None:
         with self.assertRaises(ConfigCtlError) as raised:

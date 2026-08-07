@@ -88,11 +88,34 @@
       },
       "gitlab": {
         "title": "GitLab",
-        "description": "Configure authentication and a separate Git/SSH profile for work projects."
+        "description": "Enter the instance or group URL. Holodeck only starts or reuses glab web OAuth/SSO; it does not create profiles, SSH keys, or Git routing.",
+        "session": "OAuth/SSO session: {hosts}",
+        "setup": "Sign in with OAuth/SSO",
+        "resync": "Verify or renew session"
       },
       "aws": {
         "title": "AWS",
-        "description": "Create SSO profiles, log in, and inspect the active identity without displaying credentials."
+        "description": "One SSO flow automatically generates two profiles per account/role: one for us-east-1 and one for us-east-2.",
+        "setup": "Sign in and generate use1/use2",
+        "resync": "Sign in and resync",
+        "manage_aliases": "Manage aliases and regions",
+        "hide_aliases": "Hide aliases and regions",
+        "alias_title": "Aliases and regions per account/role",
+        "alias_description": "Holodeck creates use1 and use2 automatically for each account/role. Here you can keep both, retain only one, or add other regions.",
+        "pending_count": "{count} assignments still require region confirmation.",
+        "alias_requires_sync": "Complete Sign in and resync once to discover the accounts and roles required by the editor.",
+        "alias_waiting": "Complete the SSO flow in the terminal. This panel will open the aliases and regions editor automatically.",
+        "alias_field": "Alias",
+        "region_field": "AWS client regions",
+        "region_help": "You can select one or more. Separate them with commas; for example: us-east-1, us-east-2.",
+        "region_pending": "Pending confirmation. Previous unconfirmed value: {regions}. Choose at least one region to generate profiles.",
+        "alias_current": "Current profile: {profile}",
+        "alias_pending": "Profiles remain pending until at least one region is confirmed.",
+        "recommend": "Recommend",
+        "original": "Original",
+        "recommend_all": "Recommend all",
+        "original_all": "Restore originals",
+        "save_aliases": "Save aliases, regions, and regenerate"
       },
       "windows": {
         "title": "Windows VM",
@@ -120,7 +143,10 @@
     "terminal_opened": "Apply opened in a terminal. Follow the build and any privilege prompt there.",
     "integration_terminal": "The integration opened in a terminal. Select Refresh when it finishes to update its state.",
     "graphical_action_started": "The graphical client is opening. No terminal needs to remain open.",
-    "windows_rdp_display_saved": "The RDP size was saved. It will be used when opening or starting Windows."
+    "windows_rdp_display_saved": "The RDP size was saved. It will be used when opening or starting Windows.",
+    "aws_aliases_saved": "Local aliases and regions were confirmed and AWS profiles were regenerated, one for each selected region.",
+    "aws_sync_waiting": "Complete AWS SSO in the terminal. Holodeck Control is waiting and will refresh automatically.",
+    "aws_sync_ready": "AWS synchronization completed. The aliases and regions editor is ready."
   },
   "error": {
     "unknown": "Unknown backend error.",
@@ -131,6 +157,10 @@
     "command_not_allowed": "The requested action is not in the frontend command allowlist.",
     "command_not_started": "Noctalia could not start the backend command.",
     "invalid_plan": "The backend returned a plan with an unsupported target.",
-    "terminal_not_started": "Noctalia could not open the action in a terminal."
+    "terminal_not_started": "Noctalia could not open the action in a terminal.",
+    "alias_request_unavailable": "Noctalia could not resolve its local directory for preparing aliases.",
+    "alias_request_failed": "Noctalia could not prepare the local alias request: {detail}",
+    "aws_region_required": "Choose at least one region for {account} · {role}.",
+    "aws_sync_not_detected": "AWS synchronization was not detected after five minutes. Review the terminal output and retry."
   }
 }

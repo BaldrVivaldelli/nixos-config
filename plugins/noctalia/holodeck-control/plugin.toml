@@ -1,7 +1,7 @@
 id = "holodeck/control"
 name = "Holodeck Control"
-version = "0.4.6"
-plugin_api = 9
+version = "0.8.0"
+plugin_api = 10
 author = "holodeck"
 license = "MIT"
 dependencies = ["holodeckctl"]

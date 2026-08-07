@@ -61,7 +61,10 @@
         }
       );
       system = inventory.system or "x86_64-linux";
-      pkgs = nixpkgs.legacyPackages.${system};
+      pkgs = import nixpkgs {
+        inherit system;
+        config.allowUnfreePredicate = package: lib.getName package == "kiro";
+      };
       wslHost = deployment.getHost "wsl";
       wslUser = deployment.getHostUser "wsl";
       homeManagerCli = home-manager.packages.${system}.home-manager;
@@ -69,9 +72,7 @@
         user:
         home-manager.lib.homeManagerConfiguration {
           inherit pkgs;
-          extraSpecialArgs = {
-            inherit inputs user holodeckIr;
-          };
+          extraSpecialArgs = { inherit inputs user holodeckIr; };
           modules = [ ./home ];
         };
       homeProfiles = lib.mapAttrs (_userKey: mkHomeProfile) users;
@@ -253,16 +254,18 @@
             homeProfile.config.programs.noctalia.settings.theme.builtin == holodeckIr.appearance.theme.builtin;
           assert homeProfile.config.programs.noctalia.settings.theme.mode == holodeckIr.appearance.theme.mode;
           assert homeProfile.config.programs.noctalia.settings.plugins.enabled == [ "holodeck/control" ];
-          assert
-            builtins.elem
-              "holodeck/control:config"
-              homeProfile.config.programs.noctalia.settings.bar.main.end;
+          assert builtins.elem "holodeck/control:config"
+            homeProfile.config.programs.noctalia.settings.bar.main.end;
           assert builtins.hasAttr "noctalia/plugins/holodeck-control" homeProfile.config.xdg.dataFile;
           assert builtins.hasAttr "holodeck-control" homeProfile.config.xdg.desktopEntries;
           assert lib.any (package: lib.getName package == "holodeckctl") homeProfile.config.home.packages;
+          assert lib.any (package: lib.getName package == "holodeck-regenerate")
+            homeProfile.config.home.packages;
           assert homeProfile.config.homeFeatures.niri.enable;
           assert homeProfile.config.home.sessionVariables.NIXOS_OZONE_WL == "1";
           assert homeProfile.config.programs.vscodium.enable;
+          assert lib.any (package: lib.getName package == "kiro") homeProfile.config.home.packages;
+          assert lib.any (package: lib.getName package == "detect-secrets") homeProfile.config.home.packages;
           assert
             homeProfile.config.programs.vscodium.profiles.default.userSettings == {
               "git.autofetch" = true;
@@ -432,6 +435,53 @@
             ''
               cd ${./.}
               bash ./verify-no-desktop.sh
+              touch "$out"
+            '';
+
+        secret-scan =
+          pkgs.runCommand "secret-scan"
+            {
+              nativeBuildInputs = [
+                pkgs.bash
+                pkgs.findutils
+                pkgs.git
+                pkgs.python3Packages.detect-secrets
+              ];
+            }
+            ''
+              cp -R ${./.} "$TMPDIR/source"
+              chmod -R u+w "$TMPDIR/source"
+              cd "$TMPDIR/source"
+              git init --quiet
+              git add --all
+
+              if [ ! -x .githooks/pre-commit ]; then
+                echo "Error: el hook pre-commit debe ser ejecutable." >&2
+                exit 1
+              fi
+              bash -n .githooks/pre-commit
+
+              find . -path ./.git -prune -o \
+                -path ./.secrets.baseline -prune -o \
+                -type f -printf '%P\0' \
+                | xargs -0 detect-secrets-hook \
+                    --baseline .secrets.baseline \
+                    --no-verify
+
+              self_test="$TMPDIR/detect-secrets-self-test"
+              printf 'aws_access_key_id = %s%s\n' 'AKIA' 'Q7W4E9R2T6Y8U3I5' > "$self_test"
+              if detect-secrets-hook --no-verify "$self_test" >/dev/null 2>&1; then
+                echo "Error: el detector no reconoció la credencial sintética de control." >&2
+                exit 1
+              fi
+
+              printf 'PASSWORD=%s\n' 'synthetic-local-value' > .env.local
+              git add --force .env.local
+              if .githooks/pre-commit >/dev/null 2>&1; then
+                echo "Error: el hook no bloqueó un path sensible sintético." >&2
+                exit 1
+              fi
+
               touch "$out"
             '';
       };

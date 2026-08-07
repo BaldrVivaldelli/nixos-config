@@ -4,17 +4,17 @@ from __future__ import annotations
 
 import glob
 import os
+import re
 import shutil
 import socket
 import subprocess
 import tempfile
 from pathlib import Path
+from urllib.parse import unquote, urlsplit
 
 from .config import (
     DEFAULT_GITHUB_HOST,
-    DEFAULT_GITLAB_HOST,
     DEFAULT_PERSONAL_DIR,
-    DEFAULT_WORK_DIR,
     GIT_BEGIN,
     GIT_END,
     GITCONFIG_FILE,
@@ -39,6 +39,7 @@ from .providers import (
     github_noreply_email,
     github_primary_email,
     login_github,
+    login_gitlab,
     login_provider,
     upload_keys,
 )
@@ -79,6 +80,7 @@ def write_profile_env(
     fingerprint: str,
     ssh_hostname: str = "",
     ssh_port: str = "",
+    provider_url: str = "",
 ) -> None:
     profile_file_for(profile).write_text(
         "".join(
@@ -92,6 +94,7 @@ def write_profile_env(
                 env_line("HOLODECK_SSH_KEY", str(ssh_key)),
                 env_line("HOLODECK_SSH_HOSTNAME", ssh_hostname),
                 env_line("HOLODECK_SSH_PORT", ssh_port),
+                env_line("HOLODECK_PROVIDER_URL", provider_url),
                 env_line("HOLODECK_GPG_FINGERPRINT", fingerprint),
             ]
         )
@@ -169,8 +172,12 @@ def _resolve_ssh_endpoint(provider: str, host: str, ssh_key: Path) -> tuple[str,
         detail = "\n".join(part for part in (detail, detail_443) if part)
 
     message = detail or "SSH returned no diagnostic output."
+    provider_label = {"github": "GitHub", "gitlab": "GitLab"}.get(
+        provider, provider
+    )
     raise HolodeckError(
-        "GitHub CLI is authenticated, but Git over SSH is not working with "
+        f"{provider_label} authentication succeeded, but Git over SSH is not "
+        "working with "
         f"the Holodeck key {ssh_key}. No broken Git configuration was activated. "
         f"Details: {message}"
     )
@@ -210,6 +217,7 @@ def write_local_profile(
     ssh_mode: str = "prompt",
     gpg_mode: str = "prompt",
     upload_mode: str = "prompt",
+    provider_url: str = "",
 ) -> None:
     ensure_dirs()
     Path(projects_dir_abs).mkdir(parents=True, exist_ok=True)
@@ -258,6 +266,7 @@ def write_local_profile(
         fingerprint,
         ssh_hostname,
         ssh_port,
+        provider_url,
     )
     rebuild_gitconfig_block()
     rebuild_ssh_config_block()
@@ -325,6 +334,85 @@ def configure_github_profile() -> None:
     )
 
 
+def normalize_gitlab_url(value: str) -> tuple[str, str, str]:
+    """Return canonical reference URL, hostname and protocol for GitLab."""
+    candidate = value.strip()
+    if not candidate:
+        raise HolodeckError("GitLab URL is required.")
+    if "://" not in candidate:
+        candidate = f"https://{candidate}"
+
+    parsed = urlsplit(candidate)
+    if parsed.scheme not in {"https", "http"}:
+        raise HolodeckError("GitLab URL must use https:// or http://.")
+    if parsed.username or parsed.password:
+        raise HolodeckError("GitLab URL must not contain credentials.")
+    if not parsed.hostname:
+        raise HolodeckError("GitLab URL must contain a valid hostname.")
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise HolodeckError("GitLab URL contains an invalid port.") from exc
+    if port is not None:
+        raise HolodeckError(
+            "GitLab instances on custom web ports are not supported by the automatic OAuth flow yet."
+        )
+    if parsed.query or parsed.fragment:
+        raise HolodeckError(
+            "GitLab URL must not contain a query string or fragment."
+        )
+
+    host = parsed.hostname.lower().rstrip(".")
+    if not host:
+        raise HolodeckError("GitLab URL must contain a valid hostname.")
+
+    path_segments: list[str] = []
+    for encoded_segment in parsed.path.split("/"):
+        if not encoded_segment:
+            continue
+        segment = unquote(encoded_segment)
+        if (
+            segment in {".", ".."}
+            or "/" in segment
+            or "\\" in segment
+            or not re.fullmatch(r"[A-Za-z0-9_.-]+", segment)
+        ):
+            raise HolodeckError(
+                "GitLab group path contains unsupported characters."
+            )
+        path_segments.append(segment)
+
+    provider_url = f"{parsed.scheme}://{host}"
+    if path_segments:
+        provider_url = f"{provider_url}/{'/'.join(path_segments)}"
+    return provider_url, host, parsed.scheme
+
+
+def _gitlab_url_default() -> str:
+    configured = [
+        profile
+        for profile in profiles()
+        if profile.get("HOLODECK_PROVIDER") == "gitlab"
+    ]
+    urls = {
+        profile.get("HOLODECK_PROVIDER_URL")
+        or f"https://{profile.get('HOLODECK_HOST', '')}"
+        for profile in configured
+        if profile.get("HOLODECK_HOST")
+    }
+    if len(urls) == 1:
+        return urls.pop()
+    return ""
+
+
+def authenticate_gitlab() -> None:
+    """Resolve GitLab web OAuth/SSO without managing Git or SSH state."""
+    entered_url = prompt("GitLab URL", _gitlab_url_default())
+    _provider_url, host, protocol = normalize_gitlab_url(entered_url)
+    login_gitlab(host, protocol)
+    ui.ok(f"GitLab OAuth/SSO authentication is ready on {host}.")
+
+
 def setup() -> None:
     require_user_context()
     ui.heading("Holodeck setup")
@@ -333,8 +421,8 @@ def setup() -> None:
         configure_github_profile()
 
     print()
-    if confirm("Configure GitLab work profile?"):
-        configure_profile("gitlab", "work", DEFAULT_GITLAB_HOST, DEFAULT_WORK_DIR)
+    if confirm("Authenticate GitLab with web OAuth/SSO?"):
+        authenticate_gitlab()
 
 
 def auth_command(provider: str) -> None:
@@ -342,7 +430,8 @@ def auth_command(provider: str) -> None:
     if provider == "github":
         host = prompt("GitHub host", DEFAULT_GITHUB_HOST)
     elif provider == "gitlab":
-        host = prompt("GitLab host", DEFAULT_GITLAB_HOST)
+        authenticate_gitlab()
+        return
     else:
         raise HolodeckError("Usage: holodeck login <github|gitlab>")
     login_provider(provider, host)
@@ -353,7 +442,7 @@ def profile_command(provider: str) -> None:
     if provider == "github":
         configure_github_profile()
     elif provider == "gitlab":
-        configure_profile("gitlab", "work", DEFAULT_GITLAB_HOST, DEFAULT_WORK_DIR)
+        authenticate_gitlab()
     else:
         raise HolodeckError("Usage: holodeck profile <github|gitlab>")
 
@@ -413,7 +502,7 @@ def doctor() -> None:
     run(["gh", "auth", "status", "--hostname", DEFAULT_GITHUB_HOST], check=False)
     print()
     ui.heading("GitLab auth:")
-    run(["glab", "auth", "status", "--hostname", DEFAULT_GITLAB_HOST], check=False)
+    run(["glab", "auth", "status", "--all"], check=False)
 
 
 def logout_known_hosts() -> None:

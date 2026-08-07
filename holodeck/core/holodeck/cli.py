@@ -25,13 +25,13 @@ Recommended first run:
 Commands:
   setup                 Full wizard for GitHub personal and/or GitLab work
   github                Configure and verify GitHub SSH/Git end to end
-  gitlab                Configure one GitLab profile
+  gitlab                Ask for a GitLab URL, then resolve web OAuth/SSO only
   login github          Only authenticate GitHub; does not configure Git
   login gitlab          Only authenticate GitLab; does not configure Git
   auth github           Alias for login github
   auth gitlab           Alias for login gitlab
   profile github        Alias for github
-  profile gitlab        Alias for gitlab
+  profile gitlab        Compatibility alias for GitLab authentication
   doctor                Show profiles, auth state, and key files
   purge                 Remove Holodeck-managed local profiles, keys, and auth
   clean                 Alias for purge

@@ -4,6 +4,23 @@
 
 ### Added
 
+- Added `holodeck-regenerate` and the matching `install.sh regenerate` target
+  to rebuild and activate Home Manager once, then reload Holodeck Control in
+  Noctalia only after a successful activation.
+- Added Kiro to the developer Home Manager profile while restricting the
+  unfree-package allowance to Kiro itself.
+- Added a one-click AWS IAM Identity Center synchronization flow that reuses
+  or creates a local SSO session, discovers every assigned account and role,
+  and writes managed `us-east-1` and `us-east-2` profiles for each account-role
+  combination without exposing cached tokens.
+- Added layered secret prevention with expanded ignored credential paths, an
+  executable `detect-secrets` pre-commit hook, an audited hash-only baseline,
+  automatic Home Manager hook activation and a flake-wide scanner with
+  synthetic leak tests.
+- Added an optional per-assignment AWS editor to Holodeck Control with custom
+  aliases, deterministic recommendations, editable client regions, bulk
+  recommendation and original-name restoration, all persisted only in local
+  user state.
 - Added a standalone project README for Holodeck covering its portable core,
   command reference, managed state, security boundaries, system-backend
   contract, tests and optional Noctalia ecosystem integrations.
@@ -44,6 +61,30 @@
 
 ### Changed
 
+- Stopped inferring AWS client regions from the IAM Identity Center region.
+  Every account-role assignment now generates both `us-east-1` and `us-east-2`
+  profiles by default, while the editor can keep both, retain one or add more.
+  Schema v1/v2 aliases migrate automatically to the same dual-region policy.
+- Made the post-SSO AWS editor persist client-region selections independently
+  for every account-role assignment, producing distinct suffixes such as
+  `use1` and `use2`; existing aliases and catalogs migrate automatically to
+  stable keys that survive region changes and future resynchronization.
+- Made Holodeck Control expose the AWS alias editor as a visible pending
+  capability before the first new-style sync, poll the backend while the SSO
+  terminal is open, and automatically refresh and open the editor when profile
+  discovery completes.
+- Replaced the multi-step GitLab wizard with a one-click web OAuth/SSO flow:
+  Holodeck accepts an instance or group URL, extracts the authentication host,
+  and stops after `glab` authentication without creating profiles, SSH keys or
+  Git routing, without a hardcoded GitLab host or manual-token fallback.
+- Removed AWS SSO URLs from inventory and Nix derivations; Holodeck now reuses
+  `~/.aws/config` or prompts for the URL locally only when no SSO session
+  exists.
+- Consolidated AWS configuration, login and profile discovery into the single
+  `aws-sync` action and Noctalia button, also offered by the full Holodeck
+  setup.
+- Included the selected client region in every generated profile name using
+  short suffixes such as `use1`, `use2` and `sae1`.
 - Made the Windows RDP launcher select the native SDL client on Wayland and
   the X11 client on X11, while RDP and Web now open directly from Holodeck
   Control without a short-lived terminal.

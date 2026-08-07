@@ -88,11 +88,34 @@
       },
       "gitlab": {
         "title": "GitLab",
-        "description": "Configura autenticación y un perfil Git/SSH separado para los proyectos de trabajo."
+        "description": "Ingresá la URL de la instancia o del grupo. Holodeck sólo inicia o reutiliza OAuth web/SSO de glab; no crea perfiles, claves SSH ni routing Git.",
+        "session": "Sesión OAuth/SSO: {hosts}",
+        "setup": "Ingresar con OAuth/SSO",
+        "resync": "Verificar o renovar sesión"
       },
       "aws": {
         "title": "AWS",
-        "description": "Crea perfiles SSO, inicia sesión y consulta la identidad activa sin mostrar credenciales."
+        "description": "Un solo flujo inicia SSO y genera automáticamente dos perfiles por cuenta/rol: uno para us-east-1 y otro para us-east-2.",
+        "setup": "Ingresar y generar use1/use2",
+        "resync": "Ingresar y resincronizar",
+        "manage_aliases": "Administrar alias y regiones",
+        "hide_aliases": "Ocultar alias y regiones",
+        "alias_title": "Alias y regiones por cuenta/rol",
+        "alias_description": "Holodeck crea use1 y use2 automáticamente para cada cuenta/rol. Desde acá podés conservar ambas, dejar sólo una o agregar otras regiones.",
+        "pending_count": "{count} asignaciones todavía requieren confirmar su región.",
+        "alias_requires_sync": "Completá una vez Ingresar y resincronizar para descubrir las cuentas y roles que necesita el editor.",
+        "alias_waiting": "Completá el flujo SSO en la terminal. Este panel abrirá automáticamente el editor de alias y regiones.",
+        "alias_field": "Alias",
+        "region_field": "Regiones cliente AWS",
+        "region_help": "Podés elegir una o varias. Separalas por coma; por ejemplo: us-east-1, us-east-2.",
+        "region_pending": "Pendiente de confirmación. Valor anterior no confirmado: {regions}. Elegí al menos una región para generar perfiles.",
+        "alias_current": "Perfil actual: {profile}",
+        "alias_pending": "Perfiles pendientes hasta confirmar al menos una región.",
+        "recommend": "Recomendar",
+        "original": "Original",
+        "recommend_all": "Recomendar todos",
+        "original_all": "Restaurar originales",
+        "save_aliases": "Guardar alias, regiones y regenerar"
       },
       "windows": {
         "title": "Windows VM",
@@ -120,7 +143,10 @@
     "terminal_opened": "La aplicación se abrió en una terminal. Seguí allí el build y cualquier pedido de privilegios.",
     "integration_terminal": "La integración se abrió en una terminal. Al terminar, usá Actualizar para refrescar su estado.",
     "graphical_action_started": "Se está abriendo el cliente gráfico. No hace falta mantener una terminal abierta.",
-    "windows_rdp_display_saved": "Se guardó el tamaño de RDP. Se usará al abrir o iniciar Windows."
+    "windows_rdp_display_saved": "Se guardó el tamaño de RDP. Se usará al abrir o iniciar Windows.",
+    "aws_aliases_saved": "Se confirmaron los alias y regiones locales y se regeneraron los perfiles AWS, uno por cada región elegida.",
+    "aws_sync_waiting": "Completá AWS SSO en la terminal. Holodeck Control está esperando y se actualizará automáticamente.",
+    "aws_sync_ready": "La sincronización AWS terminó. El editor de alias y regiones está listo."
   },
   "error": {
     "unknown": "Error desconocido del backend.",
@@ -131,6 +157,10 @@
     "command_not_allowed": "La acción solicitada no está en la lista de comandos permitidos del frontend.",
     "command_not_started": "Noctalia no pudo iniciar el comando del backend.",
     "invalid_plan": "El backend devolvió un plan con un target no soportado.",
-    "terminal_not_started": "Noctalia no pudo abrir la acción en una terminal."
+    "terminal_not_started": "Noctalia no pudo abrir la acción en una terminal.",
+    "alias_request_unavailable": "Noctalia no pudo resolver su directorio local para preparar los alias.",
+    "alias_request_failed": "Noctalia no pudo preparar la solicitud local de alias: {detail}",
+    "aws_region_required": "Elegí al menos una región para {account} · {role}.",
+    "aws_sync_not_detected": "No se detectó la sincronización AWS después de cinco minutos. Revisá la salida de la terminal y volvé a intentar."
   }
 }

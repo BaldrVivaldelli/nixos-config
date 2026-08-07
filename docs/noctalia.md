@@ -49,9 +49,14 @@ como la del Control Center y divide el uso en **Resumen**, **Sistema** e
 **Integraciones**. Esta última vista muestra un proveedor por vez para evitar
 una pantalla larga y saturada. Para los providers sólo lee nombres, host y
 disponibilidad; la autenticación, las claves y las credenciales siguen en
-`holodeck`, AWS CLI y `windowsvm`. Las acciones interactivas se abren en una
-terminal y al volver se actualizan con el botón de recarga del encabezado. Los
-lanzadores gráficos RDP y Web se abren directamente desde el panel.
+`holodeck`, AWS CLI y `windowsvm`. AWS presenta una sola acción que inicia SSO
+y descubre todas las cuentas y roles asignados. Cada combinación genera por
+defecto dos perfiles, uno en `us-east-1` y otro en `us-east-2`. El editor permite
+conservar ambos, dejar sólo uno o agregar otras regiones; cada región produce
+su propio sufijo y los alias pueden recomendarse individualmente o en conjunto.
+Las acciones interactivas se abren en una terminal y al volver se actualizan con
+el botón de recarga del encabezado. Los lanzadores gráficos RDP y Web se abren
+directamente desde el panel.
 
 La UI de Noctalia puede guardar un override que deshabilite un plugin. Home
 Manager garantiza que esté instalado y habilitado en la configuración base,

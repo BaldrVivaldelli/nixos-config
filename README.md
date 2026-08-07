@@ -83,12 +83,28 @@ Para aplicar solamente la configuración de usuario, sin reconstruir NixOS:
 ./install.sh home-manager
 ```
 
+Para regenerar el perfil de usuario y recargar inmediatamente el plugin de
+Holodeck Control se puede usar un único comando:
+
+```bash
+holodeck-regenerate
+```
+
+La primera vez, antes de que el comando quede instalado en el perfil, se puede
+ejecutar su equivalente desde el repositorio: `./install.sh regenerate`. El
+flujo hace un solo build y switch de Home Manager y, si ambos terminan bien,
+deshabilita y vuelve a habilitar `holodeck/control` en Noctalia.
+
 Después de la primera activación quedan disponibles `hmbuild`, `hmswitch` y
 `hmverify`.
 
 El perfil instala Zsh, Starship, Git, Python, Node.js, AWS CLI, Chromium,
-VSCodium, Niri, Noctalia y Holodeck, entre otras herramientas de usuario. Niri
-inicia Noctalia automáticamente dentro de su sesión.
+VSCodium, Kiro, Niri, Noctalia y Holodeck, entre otras herramientas de usuario.
+Niri inicia Noctalia automáticamente dentro de su sesión.
+
+También instala `detect-secrets` y activa un hook que bloquea credenciales antes
+del commit. `nix flake check` repite el escaneo sobre todo el repositorio; ver
+[docs/security.md](docs/security.md).
 
 El mismo `switch` instala y habilita el plugin **Holodeck Control** de Noctalia. Se
 puede abrir desde el launcher con `Mod+Space` buscando `Holodeck Control`; su
@@ -105,10 +121,17 @@ controles y al seleccionarlo abre el mismo panel.
 El panel Luau guarda la intención declarativa en `holodeck.local.json`, muestra
 el plan del backend y abre la aplicación en una terminal visible. Nix valida
 ese IR antes del build y sigue siendo la única capa que construye y activa la
-configuración. La misma pantalla integra los perfiles GitHub/GitLab, AWS SSO y
-los controles de la Windows VM sin exponer credenciales. La navegación separa
-**Resumen**, **Sistema** e **Integraciones** y usa controles nativos de Noctalia,
-por lo que respeta la escala, paleta y accesibilidad de la shell. Ver
+configuración. La misma pantalla integra los perfiles GitHub, la sesión GitLab,
+AWS SSO y los controles de la Windows VM sin exponer credenciales. AWS SSO se
+inicia con un único botón y descubre todas las cuentas y roles asignados. La URL
+no está declarada en el repositorio: se solicita únicamente si no existe una
+sesión reutilizable en la configuración AWS local. Después de sincronizar, el
+editor muestra los perfiles `use1` y `use2` creados automáticamente para cada
+cuenta/rol; además permite aceptar una recomendación corta, escribir un alias,
+dejar sólo una región o agregar otras. La navegación separa
+**Resumen**, **Sistema** e **Integraciones**
+y usa controles nativos de Noctalia, por lo que respeta la escala, paleta y
+accesibilidad de la shell. Ver
 [docs/holodeck-control.md](docs/holodeck-control.md).
 
 Al terminar, alcanza con cerrar la sesión de KDE y entrar a Niri desde SDDM; no

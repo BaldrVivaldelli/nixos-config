@@ -6,16 +6,13 @@ sensible deben vivir fuera del repo.
 
 ## Archivos ignorados
 
-`.gitignore` bloquea:
+`.gitignore` bloquea, entre otros:
 
 - outputs de Nix como `result`
 - caches locales
-- `.env`
-- `.ssh`
-- `.gnupg`
-- llaves privadas
-- certificados
-- archivos `.gpg`, `.pgp`, `.asc`, `.age`, `.kdbx`
+- archivos `.env`, credenciales cloud y estado de autenticación local
+- `.ssh`, `.gnupg`, llaves privadas, keyrings y perfiles VPN
+- tokens, passwords, estados de Terraform y copias de respaldo
 - directorios `secrets`, `private`, `.secrets`, `.private`
 - estado generado por Holodeck bajo `.config/holodeck`
 - inventario de máquina `inventory.local.nix`
@@ -32,21 +29,29 @@ contenido de archivos AWS. Sus acciones se ejecutan en una terminal mediante
 un enum cerrado y listas de argumentos, nunca mediante comandos construidos con
 datos recibidos desde Luau.
 
-## Hook pre-commit
+## Escaneo automático
 
-Activar:
+El perfil de Home Manager instala `detect-secrets` y configura automáticamente:
 
 ```bash
-git config core.hooksPath .githooks
+git config --local core.hooksPath .githooks
 ```
 
-El hook analiza archivos stageados y bloquea:
+El hook versionado analiza los archivos stageados y bloquea paths sensibles,
+llaves privadas, passwords, tokens y claves de proveedores conocidos. Si el
+detector no está disponible, el commit falla de forma cerrada.
 
-- paths con nombres tipicos de secretos
-- contenido que parece llave privada
-- tokens tipo GitHub, GitLab, AWS o Slack
+`nix flake check` ejecuta además `secret-scan` sobre todo el source, incluso si
+alguien omitió el hook con `--no-verify`. `.secrets.baseline` contiene solamente
+hashes de falsos positivos revisados —digests Nix de imágenes y extensiones—,
+nunca los valores en texto plano. Tanto el hook como el check excluyen ese
+archivo del escaneo heurístico para que el detector no confunda sus propios
+hashes con secretos.
 
-Si bloquea un commit, mover ese material a estado local fuera del repo.
+Ningún detector heurístico puede reconocer literalmente cualquier secreto. Si
+un secreto real llegó a un commit, agregarlo a `.gitignore` o borrarlo después
+no lo quita del historial: hay que revocarlo o rotarlo inmediatamente y limpiar
+el historial publicado.
 
 ## Holodeck
 
@@ -62,10 +67,21 @@ llaves publicas ya subidas a GitHub o GitLab.
 
 ## AWS
 
-Home Manager instala `awscli2` y helpers de shell, pero no declara perfiles,
-tokens ni credenciales. Esos datos deben seguir viviendo en estado local como
-`~/.aws/config`, `~/.aws/credentials`, el navegador o el keyring usado por AWS
-SSO.
+Home Manager instala `awscli2` y helpers de shell. Holodeck puede generar
+perfiles no secretos dentro de un bloque delimitado de `~/.aws/config`, pero no
+escribe tokens ni credenciales: éstos siguen en el cache local de AWS CLI bajo
+`~/.aws/sso/cache`, el navegador o el keyring usado por AWS SSO. Al
+resincronizar se reemplaza sólo el bloque administrado y se preservan las demás
+secciones de configuración. La URL y región SSO no se incluyen en el
+inventario ni en el paquete Nix: se obtienen de la configuración AWS local o se
+piden durante la primera sincronización.
+
+Los alias y regiones confirmadas desde Holodeck se guardan sólo en
+`~/.config/holodeck/aws-aliases.json`. El archivo contiene claves opacas y esas
+preferencias, no tokens, URLs ni IDs de cuenta. Noctalia escribe un borrador
+transitorio en su directorio local de estado; el backend valida todas las
+claves y valores, regenera el bloque AWS y elimina el borrador al completar la
+operación.
 
 ## Windows VM
 
@@ -92,6 +108,7 @@ El modo de pantalla RDP guardado en el IR es un enum cerrado (`half` o
 - No commitear tokens, passwords ni llaves privadas.
 - No guardar `.env` reales en el repo.
 - No commitear exports privados de GPG.
+- No regenerar `.secrets.baseline` a ciegas para silenciar un hallazgo.
 - Usar un secret manager o archivos locales ignorados por Git.
 - Si un secreto fue commiteado, rotarlo. Borrarlo del commit no alcanza si ya
   fue publicado.

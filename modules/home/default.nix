@@ -15,9 +15,7 @@ in
     useGlobalPkgs = true;
     useUserPackages = true;
     backupFileExtension = "hm-bak";
-    extraSpecialArgs = {
-      inherit inputs user holodeckIr;
-    };
+    extraSpecialArgs = { inherit inputs user holodeckIr; };
     users.${user.username} = import ../../home;
   };
 }

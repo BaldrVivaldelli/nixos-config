@@ -69,6 +69,39 @@ pnpm-debug.log*
 .env
 .env.*
 !.env.example
+*.env
+!*.env.example
+.envrc.local
+
+# Local credentials and authentication state
+.aws/
+.azure/
+.docker/config.json
+.kube/
+.config/gcloud/
+.config/gh/hosts.yml
+.config/glab-cli/config.yml
+.netrc
+.npmrc
+.pypirc
+.vault-token
+auth.json
+credentials
+credentials.*
+*-credentials.json
+service-account*.json
+*.secret
+*.secrets
+*.token
+*.password
+
+# Infrastructure state can contain rendered credentials
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+*.auto.tfvars
+*.auto.tfvars.json
 
 # Local editor/runtime noise
 *.swp
@@ -86,11 +119,19 @@ id_ed25519.*
 *.pem
 *.p12
 *.pfx
+*.jks
+*.keystore
 *.gpg
 *.pgp
 *.asc
 *.age
 *.kdbx
+*.ovpn
+
+# Backups may retain secrets removed from the current file
+*.bak
+*.backup
+*.orig
 
 # Secret folders if one ever appears by accident
 secrets/
