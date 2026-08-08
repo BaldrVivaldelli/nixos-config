@@ -4,6 +4,23 @@
 
 ### Added
 
+- Added a guarded **WIPE WindowsVM** panel action that requires typed
+  confirmation, deletes the complete guest storage, preserves the shared folder
+  and pinned runtime image, and recreates Windows from the current credential
+  inputs with rollback if initial container creation fails.
+- Added a confirmed Windows password-replacement action to Holodeck Control that
+  uses the current masked textbox value, keeps a sparse recovery copy, updates
+  the existing guest on first boot and preserves its storage.
+- Added exact-candidate activation manifests and an explicit
+  `install.sh recover MANIFEST` flow for Home Manager and existing NixOS hosts.
+- Added an allowlisted flake snapshot helper that preserves tracked working-tree
+  changes and selected local intent while excluding `.git`, caches and unrelated
+  ignored state from the Nix store.
+- Added declarative local and online wallpaper access to Noctalia, using
+  `~/Pictures/Wallpaper` as the searchable local library, a native picker in
+  the bar and the official Wallhaven browser without storing API keys in Git.
+- Declared stable launcher prefixes for Noctalia's calculator, emoji, session,
+  local-wallpaper and open-window providers.
 - Added `holodeck-regenerate` and the matching `install.sh regenerate` target
   to rebuild and activate Home Manager once, then reload Holodeck Control in
   Noctalia only after a successful activation.
@@ -61,6 +78,20 @@
 
 ### Changed
 
+- Moved RDP username/password entry into the Holodeck Windows card using
+  Noctalia's masked input and a validated one-shot handoff through the private
+  user runtime directory, without persisting credentials or opening a second
+  dialog.
+- Made non-interactive apply flows require a generated local inventory, split
+  the real impure `#existing` target from its synthetic check fixture and build
+  NixOS/Home Manager once before activating those exact store paths.
+- Removed the declarative Windows VM password, pinned and verified its runtime
+  image identity, required explicit opt-in for non-loopback publishing and
+  removed the redundant Docker socket ACL service.
+- Forced FreeRDP windows into Niri's scrolling tiling layout so half-width RDP
+  sessions open as undecorated regular columns instead of centered floating
+  windows with a local FreeRDP title bar and use dynamic resolution so the
+  remote framebuffer follows its tile.
 - Stopped inferring AWS client regions from the IAM Identity Center region.
   Every account-role assignment now generates both `us-east-1` and `us-east-2`
   profiles by default, while the editor can keep both, retain one or add more.
@@ -107,6 +138,18 @@
   generic `home/default.nix` and `homeConfigurations.default` entrypoints.
 - Made NixOS-WSL and its installer derive user, hostname and repository path
   from the shared inventory.
+
+### Fixed
+
+- Fixed exact NixOS generation activation on hosts whose global Nix
+  configuration disables flakes, avoiding the legacy `nixos-rebuild` re-exec
+  path that depended on an ambient `nixos-config` entry in `NIX_PATH`.
+- Fixed declarative Docker image loading when the archive-provided tag differs
+  from the pinned runtime tag by verifying the archive identity, applying the
+  stable local tag and refusing mismatched image contents.
+- Fixed the Windows RDP launcher failing before opening FreeRDP by removing the
+  mutually exclusive `smart-sizing` and `dynamic-resolution` combination, and
+  retained the masked panel password for retries until the Windows view closes.
 
 ## 2026-08-01 - Reproducible Home Manager defaults
 

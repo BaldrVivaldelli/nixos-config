@@ -30,7 +30,8 @@ let
 
   dockerImages = map (image: rec {
     name = if image.finalImageName == null then image.imageName else image.finalImageName;
-    tag = image.finalImageTag;
+    archiveTag = image.finalImageTag;
+    tag = if image.runtimeTag == null then archiveTag else image.runtimeTag;
     ref = "${name}:${tag}";
     marker = builtins.replaceStrings [ "/" ":" "@" ] [ "-" "-" "-" ] ref;
     file = dockerImage image;
@@ -92,6 +93,13 @@ in
               example = "16";
             };
 
+            runtimeTag = lib.mkOption {
+              type = lib.types.nullOr lib.types.str;
+              default = null;
+              description = "Stable local tag used at runtime; defaults to finalImageTag.";
+              example = "nixos-0123456789ab";
+            };
+
             os = lib.mkOption {
               type = lib.types.str;
               default = "linux";
@@ -150,14 +158,67 @@ in
 
           script = lib.concatMapStringsSep "\n" (image: ''
             marker=${lib.escapeShellArg "/var/lib/docker-load-images/${image.marker}"}
+            archive_ref=$(${pkgs.gnutar}/bin/tar -xOf ${image.file} manifest.json \
+              | ${pkgs.jq}/bin/jq -er '.[0].RepoTags[0]')
+            archive_ref="''${archive_ref#docker.io/}"
+            archive_ref="''${archive_ref#index.docker.io/}"
+            config_path=$(${pkgs.gnutar}/bin/tar -xOf ${image.file} manifest.json \
+              | ${pkgs.jq}/bin/jq -er '.[0].Config')
+            config_hash="''${config_path%.json}"
+            if [[ ! "$config_hash" =~ ^[0-9a-f]{64}$ ]]; then
+              echo "Invalid Docker config digest in ${image.file}: $config_path" >&2
+              exit 1
+            fi
+            config_json=$(${pkgs.gnutar}/bin/tar -xOf ${image.file} "$config_path")
+            actual_config_hash=$(printf '%s' "$config_json" \
+              | ${pkgs.coreutils}/bin/sha256sum | ${pkgs.coreutils}/bin/cut -d ' ' -f 1)
+            if [ "$actual_config_hash" != "$config_hash" ]; then
+              echo "Docker config payload does not match its digest in ${image.file}" >&2
+              exit 1
+            fi
+
+            expected_fingerprint=$(printf '%s' "$config_json" \
+              | ${pkgs.jq}/bin/jq -ceS \
+                '{architecture,os,created,config,rootfs:{type:.rootfs.type,diff_ids:.rootfs.diff_ids}}' \
+              | ${pkgs.coreutils}/bin/sha256sum | ${pkgs.coreutils}/bin/cut -d ' ' -f 1)
+
+            image_fingerprint() {
+              local metadata
+              metadata=$(${config.virtualisation.docker.package}/bin/docker image inspect "$1" 2>/dev/null || true)
+              if [ -z "$metadata" ]; then
+                return 0
+              fi
+              printf '%s' "$metadata" \
+                | ${pkgs.jq}/bin/jq -ceS \
+                  '.[0] | {architecture:.Architecture,os:.Os,created:.Created,config:.Config,rootfs:{type:.RootFS.Type,diff_ids:.RootFS.Layers}}' \
+                | ${pkgs.coreutils}/bin/sha256sum | ${pkgs.coreutils}/bin/cut -d ' ' -f 1
+            }
+
+            loaded_fingerprint=$(image_fingerprint ${lib.escapeShellArg image.ref})
 
             if [ -f "$marker" ] \
               && [ "$(cat "$marker")" = ${lib.escapeShellArg image.storePath} ] \
-              && ${config.virtualisation.docker.package}/bin/docker image inspect ${lib.escapeShellArg image.ref} >/dev/null 2>&1; then
+              && [ "$loaded_fingerprint" = "$expected_fingerprint" ]; then
               echo "Docker image ${image.ref} already loaded"
             else
               echo "Loading Docker image ${image.ref}"
-              ${config.virtualisation.docker.package}/bin/docker load --input ${image.file}
+              archive_fingerprint=$(image_fingerprint "$archive_ref")
+              if [ "$archive_fingerprint" != "$expected_fingerprint" ]; then
+                ${config.virtualisation.docker.package}/bin/docker load --input ${image.file}
+                archive_fingerprint=$(image_fingerprint "$archive_ref")
+              fi
+              if [ "$archive_fingerprint" != "$expected_fingerprint" ]; then
+                echo "Docker archive ${image.file} loaded an unexpected image identity" >&2
+                echo "Expected fingerprint: $expected_fingerprint" >&2
+                echo "Found fingerprint:    ''${archive_fingerprint:-missing}" >&2
+                exit 1
+              fi
+              ${config.virtualisation.docker.package}/bin/docker tag "$archive_ref" ${lib.escapeShellArg image.ref}
+              loaded_fingerprint=$(image_fingerprint ${lib.escapeShellArg image.ref})
+              if [ "$loaded_fingerprint" != "$expected_fingerprint" ]; then
+                echo "Docker image ${image.ref} does not match its declared archive" >&2
+                exit 1
+              fi
               printf '%s\n' ${lib.escapeShellArg image.storePath} > "$marker"
             fi
           '') dockerImages;

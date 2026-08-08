@@ -6,6 +6,8 @@ import argparse
 import os
 import shutil
 import subprocess
+import tempfile
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -132,7 +134,7 @@ def ensure_install_inputs_tracked(repo: Path) -> None:
         )
 
 
-def check_flake(repo: Path) -> None:
+def check_flake(source: Path) -> None:
     ui.heading("==> Validando la flake fijada en flake.lock")
     run(
         [
@@ -141,10 +143,62 @@ def check_flake(repo: Path) -> None:
             "nix-command flakes",
             "flake",
             "check",
-            "path:.",
+            f"path:{source}",
         ],
-        cwd=repo,
+        cwd=source,
     )
+
+
+@contextmanager
+def prepared_flake_source(repo: Path):
+    configured_source = os.environ.get("NIXOS_CONFIG_FLAKE_SOURCE")
+    owns_source = configured_source is None
+
+    if configured_source is not None:
+        source = Path(configured_source).expanduser().resolve()
+        temporary_root = Path(
+            os.environ.get("TMPDIR", tempfile.gettempdir())
+        ).resolve()
+        is_managed_temporary = (
+            source.parent == temporary_root
+            and source.name.startswith("nixos-config-source.")
+        )
+        if not (str(source).startswith("/nix/store/") or is_managed_temporary):
+            raise HolodeckError(
+                "NIXOS_CONFIG_FLAKE_SOURCE no es un snapshot administrado."
+            )
+    else:
+        preparer = repo / "prepare-flake-source.sh"
+        if not preparer.is_file():
+            raise HolodeckError(
+                "Falta prepare-flake-source.sh; no se evaluará el checkout completo."
+            )
+        result = subprocess.run(
+            ["bash", str(preparer)],
+            cwd=repo,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise HolodeckError(
+                result.stderr.strip() or "No se pudo preparar el snapshot de la flake."
+            )
+        source = Path(result.stdout.strip()).resolve()
+
+    try:
+        yield validate_repo(source)
+    finally:
+        if owns_source:
+            temporary_root = Path(
+                os.environ.get("TMPDIR", tempfile.gettempdir())
+            ).resolve()
+            if (
+                source.parent == temporary_root
+                and source.name.startswith("nixos-config-source.")
+            ):
+                shutil.rmtree(source)
 
 
 def is_wsl_environment() -> bool:
@@ -167,26 +221,27 @@ def install_wsl(repo: Path) -> None:
         )
     ensure_install_inputs_tracked(repo)
 
-    check_flake(repo)
+    with prepared_flake_source(repo) as source:
+        check_flake(source)
 
-    ui.heading("==> Preparando la primera generación de #wsl")
-    print(
-        "Se usa 'boot' porque cambia el usuario predeterminado de nixos "
-        f"a {DEFAULT_WSL_USER}."
-    )
-    run(
-        [
-            "sudo",
-            "nixos-rebuild",
-            "boot",
-            "--flake",
-            "path:.#wsl",
-            "--option",
-            "experimental-features",
-            "nix-command flakes",
-        ],
-        cwd=repo,
-    )
+        ui.heading("==> Preparando la primera generación de #wsl")
+        print(
+            "Se usa 'boot' porque cambia el usuario predeterminado de nixos "
+            f"a {DEFAULT_WSL_USER}."
+        )
+        run(
+            [
+                "sudo",
+                "nixos-rebuild",
+                "boot",
+                "--flake",
+                f"path:{source}#wsl",
+                "--option",
+                "experimental-features",
+                "nix-command flakes",
+            ],
+            cwd=source,
+        )
 
     print(
         f"""
@@ -204,10 +259,10 @@ otro nombre:
   wsl -d NixOS
 
 La nueva sesión debería abrir como {DEFAULT_WSL_USER}@{DEFAULT_WSL_HOST_NAME}.
-Las actualizaciones siguientes se aplican con:
+Las actualizaciones siguientes se aplican con el mismo snapshot seguro:
 
   cd {DEFAULT_REPO_PATH}
-  sudo nixos-rebuild switch --flake path:.#wsl
+  ./install.sh nixos wsl
 """.strip()
     )
 

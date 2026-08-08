@@ -24,6 +24,8 @@ local COMMANDS = {
   windowsUp = CONFIGCTL .. " action windows-up",
   windowsStatus = CONFIGCTL .. " action windows-status",
   windowsRdp = CONFIGCTL .. " action windows-rdp",
+  windowsPasswordReset = CONFIGCTL .. " action windows-password-reset",
+  windowsWipe = CONFIGCTL .. " action windows-wipe",
   windowsWeb = CONFIGCTL .. " action windows-web",
   windowsLogs = CONFIGCTL .. " action windows-logs",
   windowsDown = CONFIGCTL .. " action windows-down",
@@ -48,6 +50,10 @@ local statusExists = false
 local selectedTargetIndex = 0
 local selectedModeIndex = 0
 local selectedRdpDisplayModeIndex = 0
+local rdpUsername = "Docker"
+local rdpPassword = ""
+local rdpPasswordRevision = 0
+local rdpCredentialRequestPath = ""
 local persistedTarget = "home-manager"
 local persistedMode = "dark"
 local irPath = ""
@@ -58,6 +64,10 @@ local currentError = ""
 local planSummary = ""
 local pendingPlan = nil
 local confirmingApply = false
+local confirmingWindowsPasswordReset = false
+local confirmingWindowsWipe = false
+local windowsWipeConfirmation = ""
+local windowsWipeConfirmationRevision = 0
 local activeView = "overview"
 local activeIntegration = "github"
 local awsAliasEditorOpen = false
@@ -208,6 +218,8 @@ end
 local function fail(message)
   busy = false
   confirmingApply = false
+  confirmingWindowsPasswordReset = false
+  confirmingWindowsWipe = false
   currentError = message ~= nil and tostring(message) or tr("error.unknown")
   notice = ""
   render()
@@ -276,6 +288,123 @@ local function openGraphicalAction(action)
   else
     notice = ""
     currentError = tr("error.command_not_started")
+  end
+  render()
+end
+
+local function clearWindowsRdpPassword()
+  rdpPassword = ""
+  rdpPasswordRevision = rdpPasswordRevision + 1
+  confirmingWindowsPasswordReset = false
+  confirmingWindowsWipe = false
+  windowsWipeConfirmation = ""
+  windowsWipeConfirmationRevision = windowsWipeConfirmationRevision + 1
+end
+
+local function windowsRdpCredentialsReady()
+  return rdpCredentialRequestPath ~= ""
+    and rdpUsername ~= ""
+    and rdpPassword ~= ""
+    and string.find(rdpUsername, "\n", 1, true) == nil
+    and string.find(rdpUsername, "\r", 1, true) == nil
+    and string.find(rdpPassword, "\n", 1, true) == nil
+    and string.find(rdpPassword, "\r", 1, true) == nil
+end
+
+local function prepareWindowsCredentials()
+  if rdpCredentialRequestPath == "" then
+    fail(tr("error.rdp_request_unavailable"))
+    return false
+  end
+  if not windowsRdpCredentialsReady() then
+    fail(tr("error.rdp_credentials_required"))
+    return false
+  end
+
+  local encoded, encodeError = noctalia.json.encode({
+    schemaVersion = 1,
+    createdAtMs = noctalia.nowMs(),
+    username = rdpUsername,
+    password = rdpPassword,
+  })
+  if type(encoded) ~= "string" then
+    fail(tr("error.rdp_request_failed", { detail = tostring(encodeError or "") }))
+    return false
+  end
+  local written, writeError = noctalia.writeFile(rdpCredentialRequestPath, encoded)
+  if written ~= true then
+    fail(tr("error.rdp_request_failed", { detail = tostring(writeError or "") }))
+    return false
+  end
+  return true
+end
+
+local function openWindowsRdpAction(action)
+  local command = COMMANDS[action]
+  if command == nil then
+    fail(tr("error.command_not_allowed"))
+    return
+  end
+  if not prepareWindowsCredentials() then
+    return
+  end
+
+  local opened = noctalia.runAsync(command)
+  if opened then
+    notice = tr("notice.graphical_action_started")
+    currentError = ""
+  else
+    noctalia.removeFile(rdpCredentialRequestPath)
+    notice = ""
+    currentError = tr("error.command_not_started")
+  end
+  render()
+end
+
+local function openWindowsPasswordResetAction()
+  local command = COMMANDS.windowsPasswordReset
+  if command == nil then
+    fail(tr("error.command_not_allowed"))
+    return
+  end
+  if not prepareWindowsCredentials() then
+    return
+  end
+
+  confirmingWindowsPasswordReset = false
+  local opened = noctalia.runInTerminal(command)
+  if opened then
+    notice = tr("notice.windows_password_reset_started")
+    currentError = ""
+  else
+    noctalia.removeFile(rdpCredentialRequestPath)
+    notice = ""
+    currentError = tr("error.terminal_not_started")
+  end
+  render()
+end
+
+local function openWindowsWipeAction()
+  local command = COMMANDS.windowsWipe
+  if command == nil then
+    fail(tr("error.command_not_allowed"))
+    return
+  end
+  if not prepareWindowsCredentials() then
+    return
+  end
+
+  confirmingWindowsWipe = false
+  windowsWipeConfirmation = ""
+  windowsWipeConfirmationRevision = windowsWipeConfirmationRevision + 1
+  local opened = noctalia.runInTerminal(command)
+  if opened then
+    notice = tr("notice.windows_wipe_started")
+    currentError = ""
+  else
+    noctalia.removeFile(rdpCredentialRequestPath)
+    notice = ""
+    currentError = tr("error.terminal_not_started")
   end
   render()
 end
@@ -1022,7 +1151,7 @@ local function integrationDetail()
   if activeIntegration == "windows" then
     local integration = integrations.windowsVm or {}
     local available = enabled and integration.available == true
-    return card({
+    local children = {
       integrationDetailHeader(tr("panel.integrations.windows.title"), "device-desktop", integration),
       ui.label({ text = tr("panel.integrations.windows.description"), color = "on_surface_variant", maxLines = 3 }),
       ui.label({
@@ -1032,6 +1161,69 @@ local function integrationDetail()
         fontSize = 13,
         color = "on_surface_variant",
         maxLines = 3,
+      }),
+      ui.separator({ spacing = 2 }),
+      ui.label({
+        text = tr("panel.integrations.windows.access_title"),
+        fontWeight = "bold",
+        color = "on_surface",
+      }),
+      ui.label({
+        text = tr("panel.integrations.windows.access_description"),
+        fontSize = 13,
+        color = "on_surface_variant",
+        maxLines = 3,
+      }),
+      ui.label({
+        text = tr("panel.integrations.windows.username"),
+        color = "on_surface_variant",
+        fontSize = 11,
+      }),
+      ui.input({
+        key = "windows-rdp-username",
+        value = rdpUsername,
+        placeholder = tr("panel.integrations.windows.username_placeholder"),
+        controlSize = "sm",
+        enabled = available,
+        onChange = function(value)
+          rdpUsername = value
+          confirmingWindowsPasswordReset = false
+          confirmingWindowsWipe = false
+        end,
+      }),
+      ui.label({
+        text = tr("panel.integrations.windows.password"),
+        color = "on_surface_variant",
+        fontSize = 11,
+      }),
+      ui.input({
+        key = "windows-rdp-password-" .. tostring(rdpPasswordRevision),
+        value = rdpPassword,
+        placeholder = tr("panel.integrations.windows.password_placeholder"),
+        password = true,
+        controlSize = "sm",
+        enabled = available,
+        onChange = function(value)
+          rdpPassword = value
+          confirmingWindowsPasswordReset = false
+          confirmingWindowsWipe = false
+        end,
+      }),
+      ui.button({
+        text = tr("panel.integrations.windows.password_reset"),
+        glyph = "key",
+        variant = "secondary",
+        controlSize = "sm",
+        enabled = available,
+        onClick = "onWindowsPasswordResetClicked",
+      }),
+      ui.button({
+        text = "WIPE WindowsVM",
+        glyph = "trash",
+        variant = "destructive",
+        controlSize = "sm",
+        enabled = available,
+        onClick = "onWindowsWipeClicked",
       }),
       ui.separator({ spacing = 2 }),
       ui.label({
@@ -1104,7 +1296,94 @@ local function integrationDetail()
           onClick = "onWindowsDownClicked",
         }),
       }),
-    })
+    }
+
+    if confirmingWindowsPasswordReset then
+      table.insert(children, 12, ui.column({
+        fill = "error/0.10",
+        radius = 8,
+        padding = 10,
+        gap = 8,
+      }, {
+        ui.label({
+          text = tr("panel.integrations.windows.password_reset_confirm_title"),
+          color = "on_surface",
+          fontWeight = "bold",
+        }),
+        ui.label({
+          text = tr("panel.integrations.windows.password_reset_confirm_body"),
+          color = "on_surface_variant",
+          fontSize = 12,
+          maxLines = 6,
+        }),
+        ui.row({ gap = 8 }, {
+          ui.button({
+            text = tr("panel.integrations.windows.password_reset_cancel"),
+            variant = "ghost",
+            controlSize = "sm",
+            flexGrow = 1,
+            onClick = "onWindowsPasswordResetCancelClicked",
+          }),
+          ui.button({
+            text = tr("panel.integrations.windows.password_reset_confirm"),
+            variant = "destructive",
+            controlSize = "sm",
+            flexGrow = 1,
+            onClick = "onWindowsPasswordResetConfirmClicked",
+          }),
+        }),
+      }))
+    end
+
+    if confirmingWindowsWipe then
+      table.insert(children, 13, ui.column({
+        fill = "error/0.14",
+        radius = 8,
+        padding = 10,
+        gap = 8,
+      }, {
+        ui.label({
+          text = tr("panel.integrations.windows.wipe_confirm_title"),
+          color = "error",
+          fontWeight = "bold",
+        }),
+        ui.label({
+          text = tr("panel.integrations.windows.wipe_confirm_body"),
+          color = "on_surface_variant",
+          fontSize = 12,
+          maxLines = 7,
+        }),
+        ui.input({
+          key = "windows-wipe-confirmation-" .. tostring(windowsWipeConfirmationRevision),
+          value = windowsWipeConfirmation,
+          placeholder = "WIPE",
+          controlSize = "sm",
+          onChange = function(value)
+            windowsWipeConfirmation = value
+            render()
+          end,
+        }),
+        ui.row({ gap = 8 }, {
+          ui.button({
+            text = tr("panel.integrations.windows.wipe_cancel"),
+            variant = "ghost",
+            controlSize = "sm",
+            flexGrow = 1,
+            onClick = "onWindowsWipeCancelClicked",
+          }),
+          ui.button({
+            text = tr("panel.integrations.windows.wipe_confirm"),
+            variant = "destructive",
+            controlSize = "sm",
+            enabled = windowsWipeConfirmation == "WIPE",
+            flexGrow = 1,
+            onClick = "onWindowsWipeConfirmClicked",
+          }),
+        }),
+      }))
+    end
+
+    return card(children)
   end
 
   local integration = integrations.github or {}
@@ -1272,6 +1551,9 @@ render = function()
 end
 
 local function showView(view)
+  if activeView == "integrations" and activeIntegration == "windows" and view ~= "integrations" then
+    clearWindowsRdpPassword()
+  end
   activeView = view
   if view ~= "system" then
     confirmingApply = false
@@ -1282,6 +1564,9 @@ local function showView(view)
 end
 
 local function selectIntegration(id)
+  if activeIntegration == "windows" and id ~= "windows" then
+    clearWindowsRdpPassword()
+  end
   activeIntegration = id
   render()
 end
@@ -1293,6 +1578,14 @@ function onOpen(_context)
   if type(pluginData) == "string" and pluginData ~= "" then
     awsAliasRequestPath = pluginData .. "/aws-alias-request.json"
   end
+  local runtimeDir = noctalia.getenv("XDG_RUNTIME_DIR")
+  if type(runtimeDir) == "string" and string.sub(runtimeDir, 1, 1) == "/" then
+    rdpCredentialRequestPath = runtimeDir .. "/holodeck-control-windows-rdp.json"
+  else
+    rdpCredentialRequestPath = ""
+  end
+  rdpUsername = "Docker"
+  clearWindowsRdpPassword()
   activeView = "overview"
   render()
   loadStatus(false)
@@ -1562,7 +1855,7 @@ function onAwsAliasesSaveClicked()
 end
 
 function onWindowsUpClicked()
-  openTerminalAction("windowsUp")
+  openWindowsRdpAction("windowsUp")
 end
 
 function onWindowsStatusClicked()
@@ -1570,7 +1863,67 @@ function onWindowsStatusClicked()
 end
 
 function onWindowsRdpClicked()
-  openGraphicalAction("windowsRdp")
+  openWindowsRdpAction("windowsRdp")
+end
+
+function onWindowsPasswordResetClicked()
+  if not windowsRdpCredentialsReady() then
+    fail(tr("error.rdp_credentials_required"))
+    return
+  end
+  confirmingWindowsPasswordReset = true
+  confirmingWindowsWipe = false
+  currentError = ""
+  notice = ""
+  render()
+end
+
+function onWindowsPasswordResetCancelClicked()
+  confirmingWindowsPasswordReset = false
+  notice = tr("notice.windows_password_reset_cancelled")
+  render()
+end
+
+function onWindowsPasswordResetConfirmClicked()
+  if not confirmingWindowsPasswordReset then
+    return
+  end
+  openWindowsPasswordResetAction()
+end
+
+function onWindowsWipeClicked()
+  if not windowsRdpCredentialsReady() then
+    fail(tr("error.rdp_credentials_required"))
+    return
+  end
+  confirmingWindowsPasswordReset = false
+  confirmingWindowsWipe = true
+  windowsWipeConfirmation = ""
+  windowsWipeConfirmationRevision = windowsWipeConfirmationRevision + 1
+  currentError = ""
+  notice = ""
+  render()
+end
+
+function onWindowsWipeCancelClicked()
+  confirmingWindowsWipe = false
+  windowsWipeConfirmation = ""
+  windowsWipeConfirmationRevision = windowsWipeConfirmationRevision + 1
+  notice = tr("notice.windows_wipe_cancelled")
+  render()
+end
+
+function onWindowsWipeConfirmClicked()
+  if not confirmingWindowsWipe then
+    return
+  end
+  if windowsWipeConfirmation ~= "WIPE" then
+    currentError = tr("error.windows_wipe_confirmation_required")
+    notice = ""
+    render()
+    return
+  end
+  openWindowsWipeAction()
 end
 
 function onWindowsRdpDisplayModeChanged(index, _text)
@@ -1613,5 +1966,6 @@ function onWindowsDownClicked()
 end
 
 function onCloseClicked()
+  clearWindowsRdpPassword()
   panel.close()
 end

@@ -66,21 +66,17 @@ tiempo de ejecución. El paquete Python no agrega dependencias de terceros.
 
 ## Instalación
 
-### Con Nix
+### Con Home Manager
 
 Desde la raíz del repositorio que contiene este proyecto:
 
 ```bash
-nix --extra-experimental-features "nix-command flakes" \
-  run path:.#holodeck -- help
-```
-
-En una instalación administrada por este repositorio, Home Manager instala el
-comando como parte del perfil de usuario:
-
-```bash
 ./install.sh home-manager
+holodeck help
 ```
+
+El instalador usa un snapshot allowlisted y Home Manager instala el comando
+como parte del perfil de usuario.
 
 ### Desarrollo sin instalar
 
@@ -216,9 +212,6 @@ NixOS-WSL:
 
 ```bash
 ./install.sh nixos wsl
-
-nix --extra-experimental-features "nix-command flakes" \
-  run path:.#holodeck-system-nixos -- install --target wsl
 ```
 
 Ese backend no inspecciona, particiona, formatea ni monta discos. Consultar el
@@ -253,8 +246,7 @@ PYTHONPATH=core:backends/nixos \
 La evaluación completa se ejecuta desde la raíz del repositorio:
 
 ```bash
-nix --extra-experimental-features "nix-command flakes" \
-  flake check path:. --print-build-logs
+./prepare-flake-source.sh --check --print-build-logs
 ```
 
 ## Desarrollo

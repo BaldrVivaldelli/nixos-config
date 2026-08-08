@@ -57,12 +57,26 @@ como el hostname y la zona horaria se resuelven desde el inventario efectivo.
 `nixosConfigurations.existing` es un overlay de instalación, no un host con
 hardware propio. Durante `apply-nixos-system.sh`, toma la ruta de la
 configuración NixOS activa mediante `NIXOS_EXISTING_CONFIGURATION` y agrega el
-perfil Niri. En evaluaciones puras usa un contenedor sintético para que la flake
-siga siendo comprobable y portable.
+perfil Niri. Sin esa variable, `nixosConfigurations.existing` no se publica.
+Los checks usan `existingTest`, un fixture sintético separado que nunca puede
+confundirse con la configuración física.
 
-El target completo de `install.sh` construye este sistema y Home Manager antes
-de activar cualquiera de los dos. El repo no copia ni genera el hardware config
-del equipo.
+El target completo de `install.sh` toma un único snapshot, construye candidatos
+exactos de este sistema y Home Manager y recién entonces activa esos mismos
+store paths. Cada operación conserva la revisión, el digest exacto del
+snapshot y los candidatos en un manifiesto privado bajo
+`$XDG_STATE_HOME/nixos-config/operations`; `install.sh recover MANIFEST`
+reactiva las generaciones anteriores. El repo no copia ni genera el hardware
+config del equipo.
+
+## Frontera del source
+
+`prepare-flake-source.sh` copia el contenido actual de los archivos versionados
+y agrega únicamente `inventory.local.nix` y `holodeck.local.json` desde el
+estado ignorado. `.git`, caches, resultados y cualquier otro archivo ignorado
+no entran al snapshot. Un archivo fuente nuevo y todavía sin seguimiento hace
+fallar el preflight para evitar una evaluación incompleta o una copia accidental
+del checkout completo.
 
 ## Backends
 

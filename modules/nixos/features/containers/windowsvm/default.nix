@@ -1,4 +1,4 @@
-{ lib, ... }:
+{ config, lib, ... }:
 
 {
   imports = [
@@ -12,7 +12,7 @@
 
     image = lib.mkOption {
       type = lib.types.str;
-      default = "dockurr/windows:latest";
+      default = "dockurr/windows:nixos-3633f055f31a";
       description = "Docker image reference used by the windowsvm command.";
     };
 
@@ -21,6 +21,13 @@
       default = "";
       internal = true;
       description = "Nix store path to the declared Docker image archive, if available.";
+    };
+
+    imageDigest = lib.mkOption {
+      type = lib.types.str;
+      default = "";
+      internal = true;
+      description = "Pinned registry digest for the declared Docker image.";
     };
 
     containerName = lib.mkOption {
@@ -59,12 +66,6 @@
       description = "Default Windows user created during automatic installation.";
     };
 
-    password = lib.mkOption {
-      type = lib.types.str;
-      default = "admin";
-      description = "Default Windows password created during automatic installation.";
-    };
-
     language = lib.mkOption {
       type = lib.types.str;
       default = "English";
@@ -89,6 +90,12 @@
       description = "Host address used to expose the web viewer and RDP ports.";
     };
 
+    allowRemoteAccess = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Allow publishing Windows VM ports on a non-loopback address.";
+    };
+
     webPort = lib.mkOption {
       type = lib.types.port;
       default = 8006;
@@ -102,4 +109,17 @@
     };
 
   };
+
+  config.assertions = [
+    {
+      assertion =
+        !config.features.containers.windowsVm.enable
+        || config.features.containers.windowsVm.bindAddress == "127.0.0.1"
+        || config.features.containers.windowsVm.allowRemoteAccess;
+      message = ''
+        A non-loopback Windows VM bindAddress requires
+        features.containers.windowsVm.allowRemoteAccess = true.
+      '';
+    }
+  ];
 }

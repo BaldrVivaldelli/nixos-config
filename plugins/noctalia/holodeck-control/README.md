@@ -62,6 +62,8 @@ holodeckctl action aws-sync
 holodeckctl action windows-up
 holodeckctl action windows-status
 holodeckctl action windows-rdp
+holodeckctl action windows-password-reset
+holodeckctl action windows-wipe
 holodeckctl action windows-web
 holodeckctl action windows-logs
 holodeckctl action windows-down
@@ -70,8 +72,26 @@ holodeckctl action windows-down
 The non-JSON `apply` and interactive `action` commands run in a terminal so
 output, authentication, choices and any privilege prompt remain visible. The
 RDP and Web actions are graphical launchers and run detached from the panel,
-without opening a disposable terminal. Status only returns provider/profile
-metadata; it excludes emails, key paths and secrets.
+without opening a disposable terminal. The Windows view uses Noctalia's native
+masked password input and writes a fresh, short-lived request below the private
+`XDG_RUNTIME_DIR`; `holodeckctl` opens it without following symlinks, unlinks it
+before starting `windowsvm`, and never returns or persists its contents. The
+masked field remains only in panel memory for retries and is cleared when the
+user leaves the Windows view or closes the panel. Status
+only returns provider/profile metadata; it excludes emails, key paths and
+secrets.
+
+The explicit **Replace Windows password** action requires a second confirmation
+and opens a visible terminal. It stops the VM, creates a recoverable sparse disk
+copy, schedules a one-time guest password replacement, recreates only Docker
+container metadata, and starts the preserved Windows storage again. It then
+uses FreeRDP authentication-only mode to verify the exact textbox credential;
+the old-state copy is removed on success and retained for recovery on failure.
+
+**WIPE WindowsVM** is a separate destructive flow. It requires typing `WIPE`,
+deletes the complete guest storage, and creates a fresh VM with the current
+username/password inputs. The shared directory and Nix-pinned runtime image are
+preserved; a failed initial container creation restores the quarantined storage.
 Alias text never enters a command string. The panel writes a transient JSON
 request in its Noctalia state directory, then invokes the fixed
 `aws-aliases-apply` command; the backend validates and removes that request.

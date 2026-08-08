@@ -30,9 +30,10 @@ let
 
   dockerImages = map (image: rec {
     name = if image.finalImageName == null then image.imageName else image.finalImageName;
-    tag = image.finalImageTag;
+    tag = if image.runtimeTag == null then image.finalImageTag else image.runtimeTag;
     ref = "${name}:${tag}";
     file = dockerImage image;
+    digest = image.imageDigest;
   }) cfg.images;
 
   windowsVmImageFiles = lib.filter (image: image.ref == vm.image) dockerImages;
@@ -40,4 +41,7 @@ in
 {
   config.features.containers.windowsVm.imageFile =
     if windowsVmImageFiles == [ ] then "" else toString (lib.head windowsVmImageFiles).file;
+
+  config.features.containers.windowsVm.imageDigest =
+    if windowsVmImageFiles == [ ] then "" else (lib.head windowsVmImageFiles).digest;
 }

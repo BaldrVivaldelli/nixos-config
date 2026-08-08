@@ -104,6 +104,7 @@ La vista de integraciones reúne:
   recomendación, conservar ambas regiones, dejar sólo una o agregar otras
   separadas por coma; las elecciones sobreviven a las resincronizaciones;
 - **Windows VM**: disponibilidad de `windowsvm`, inicio, estado, RDP, visor web,
+  reemplazo explícito de la password local, recreación total mediante WIPE,
   logs y detención.
 
 `Configurar todo` reutiliza el wizard existente de `holodeck` para configurar
@@ -112,9 +113,23 @@ resincronizar AWS SSO;
 `Diagnóstico` ejecuta `holodeck doctor`. Las operaciones interactivas se abren en una
 terminal y al finalizar se puede usar la recarga del encabezado para releer el
 estado. **RDP** y **Web** son lanzadores gráficos: se ejecutan directamente sin
-crear una terminal efímera; RDP usa el cliente SDL nativo en Wayland. Los
-botones usan tamaños semánticos de Noctalia, la acción principal de cada vista
-queda destacada y **Detener** usa explícitamente el estilo destructivo.
+crear una terminal efímera. La vista Windows contiene usuario, contraseña
+enmascarada y tamaño de sesión; cada solicitud efímera se consume en el
+siguiente lanzamiento y se entrega al cliente SDL nativo mediante el runtime
+privado del usuario. El campo permanece en memoria para permitir
+reintentos mientras la vista Windows siga abierta y se limpia al salir de ella
+o cerrar el panel. **Reemplazar contraseña de Windows** pide una segunda
+confirmación, abre una terminal visible, preserva el storage y usa exactamente
+los valores de esos campos para sustituir la credencial del guest en su próximo
+arranque. Los botones usan tamaños semánticos de Noctalia, la acción principal de
+cada vista queda destacada y **Detener** usa explícitamente el estilo
+destructivo.
+
+**WIPE WindowsVM** es una acción destructiva independiente: exige el usuario y
+password de los inputs, una segunda confirmación escribiendo `WIPE` y una
+terminal visible. Elimina el guest completo y lo instala desde cero, pero
+preserva `shared` y la imagen runtime declarativa. Si la creación inicial del
+contenedor falla, restaura el storage anterior desde una cuarentena atómica.
 
 Windows aparece disponible después de aplicar `./install.sh` con la opción 1,
 porque `windowsvm` pertenece al perfil del sistema NixOS. GitHub, GitLab y AWS

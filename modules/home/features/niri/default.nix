@@ -31,6 +31,15 @@ let
         default-window-height { fixed 920; }
     }
 
+    // FreeRDP advertises a fixed initial size, which makes Niri auto-float it.
+    // Keep RDP sessions in the scrolling tiling layout like regular windows.
+    window-rule {
+        match app-id=r#"^com\.freerdp\.client\.sdl[23]$"#
+        match app-id=r#"^(sdl-freerdp|xfreerdp)$"#
+        open-floating false
+        default-column-width { proportion 0.5; }
+    }
+
     debug {
         honor-xdg-activation-with-invalid-serial
     }

@@ -111,30 +111,63 @@
         ];
       };
       existingConfigurationPath = builtins.getEnv "NIXOS_EXISTING_CONFIGURATION";
-      existingConfigurationModule =
-        if existingConfigurationPath == "" then
+      existingOverlayModules = [
+        ./modules/nixos/features
+        ./modules/nixos/profiles/niri-desktop
+        {
+          features.containers = {
+            enable = true;
+            engine = "docker";
+            users = [ defaultHomeUser.username ];
+            windowsVm.enable = true;
+          };
+        }
+      ];
+      existingTest = nixpkgs.lib.nixosSystem {
+        inherit system;
+        modules = [
           {
             boot.isContainer = true;
             system.stateVersion = "26.05";
           }
-        else
-          builtins.toPath existingConfigurationPath;
-      existing = nixpkgs.lib.nixosSystem {
+        ]
+        ++ existingOverlayModules;
+      };
+      existingTestWindowsVmPackage = lib.findFirst (
+        package: lib.getName package == "windowsvm"
+      ) (throw "existingTest must install windowsvm") existingTest.config.environment.systemPackages;
+      insecureWindowsVmTest = nixpkgs.lib.nixosSystem {
         inherit system;
         modules = [
-          existingConfigurationModule
-          ./modules/nixos/features
-          ./modules/nixos/profiles/niri-desktop
           {
-            features.containers = {
-              enable = true;
-              engine = "docker";
-              users = [ defaultHomeUser.username ];
-              windowsVm.enable = true;
-            };
+            boot.isContainer = true;
+            system.stateVersion = "26.05";
+          }
+        ]
+        ++ existingOverlayModules
+        ++ [
+          {
+            features.containers.windowsVm.bindAddress = "0.0.0.0";
           }
         ];
       };
+      insecureWindowsVmEvaluation = builtins.tryEval (
+        builtins.deepSeq insecureWindowsVmTest.config.system.build.toplevel.drvPath true
+      );
+      existing =
+        if existingConfigurationPath == "" then
+          throw ''
+            nixosConfigurations.existing requiere NIXOS_EXISTING_CONFIGURATION.
+            Usá ./apply-nixos-system.sh o ./install.sh existing-nixos.
+          ''
+        else
+          nixpkgs.lib.nixosSystem {
+            inherit system;
+            modules = [
+              (builtins.toPath existingConfigurationPath)
+            ]
+            ++ existingOverlayModules;
+          };
       holodeck = pkgs.callPackage ./packages/holodeck {
         coreSource = ./holodeck/core;
       };
@@ -230,8 +263,12 @@
       homeConfigurations = homeConfigurationsByUsername // {
         default = homeProfile;
       };
-      nixosConfigurations.wsl = wsl;
-      nixosConfigurations.existing = existing;
+      nixosConfigurations = {
+        inherit wsl;
+      }
+      // lib.optionalAttrs (existingConfigurationPath != "") {
+        inherit existing;
+      };
 
       checks.${system} = {
         home-profile =
@@ -253,14 +290,51 @@
           assert
             homeProfile.config.programs.noctalia.settings.theme.builtin == holodeckIr.appearance.theme.builtin;
           assert homeProfile.config.programs.noctalia.settings.theme.mode == holodeckIr.appearance.theme.mode;
-          assert homeProfile.config.programs.noctalia.settings.plugins.enabled == [ "holodeck/control" ];
+          assert
+            homeProfile.config.programs.noctalia.settings.plugins.enabled == [
+              "holodeck/control"
+              "noctalia/wallhaven"
+            ];
+          assert
+            homeProfile.config.programs.noctalia.settings.wallpaper.directory
+            == "${defaultHomeUser.homeDirectory}/Pictures/Wallpaper";
+          assert
+            homeProfile.config.programs.noctalia.settings.wallpaper.default.path
+            == "${defaultHomeUser.homeDirectory}/Pictures/Wallpaper/nave-wallpaper.png";
+          assert
+            homeProfile.config.programs.noctalia.settings.shell.launcher.providers == {
+              calculator = {
+                prefix = "calc";
+                global = true;
+              };
+              emoji = {
+                prefix = "emo";
+                global = false;
+              };
+              session = {
+                prefix = "session";
+                global = false;
+              };
+              wallpaper = {
+                prefix = "wall";
+                global = false;
+              };
+              windows = {
+                prefix = "win";
+                global = false;
+              };
+            };
+          assert builtins.elem "wallpaper" homeProfile.config.programs.noctalia.settings.bar.main.end;
+          assert builtins.elem "noctalia/wallhaven:wallhaven"
+            homeProfile.config.programs.noctalia.settings.bar.main.end;
           assert builtins.elem "holodeck/control:config"
             homeProfile.config.programs.noctalia.settings.bar.main.end;
           assert builtins.hasAttr "noctalia/plugins/holodeck-control" homeProfile.config.xdg.dataFile;
           assert builtins.hasAttr "holodeck-control" homeProfile.config.xdg.desktopEntries;
           assert lib.any (package: lib.getName package == "holodeckctl") homeProfile.config.home.packages;
-          assert lib.any (package: lib.getName package == "holodeck-regenerate")
-            homeProfile.config.home.packages;
+          assert lib.any (
+            package: lib.getName package == "holodeck-regenerate"
+          ) homeProfile.config.home.packages;
           assert homeProfile.config.homeFeatures.niri.enable;
           assert homeProfile.config.home.sessionVariables.NIXOS_OZONE_WL == "1";
           assert homeProfile.config.programs.vscodium.enable;
@@ -330,22 +404,63 @@
             touch "$out"
           '';
 
-        existing-profile =
-          assert existing.config.programs.niri.enable;
-          assert existing.config.services.displayManager.defaultSession == "niri";
-          assert !existing.config.services.displayManager.autoLogin.enable;
-          assert existing.config.features.containers.enable;
-          assert existing.config.features.containers.engine == "docker";
-          assert existing.config.features.containers.users == [ defaultHomeUser.username ];
-          assert existing.config.features.containers.windowsVm.enable;
-          assert existing.config.features.containers.windowsVm.bindAddress == "127.0.0.1";
-          assert existing.config.virtualisation.docker.enable;
-          assert builtins.elem defaultHomeUser.username existing.config.users.groups.docker.members;
-          assert builtins.elem "tun" existing.config.boot.kernelModules;
-          assert lib.any (
-            package: lib.getName package == "windowsvm"
-          ) existing.config.environment.systemPackages;
-          pkgs.runCommand "existing-profile-check" { } ''
+        existing-test-profile =
+          assert existingTest.config.programs.niri.enable;
+          assert existingTest.config.services.displayManager.defaultSession == "niri";
+          assert !existingTest.config.services.displayManager.autoLogin.enable;
+          assert existingTest.config.features.containers.enable;
+          assert existingTest.config.features.containers.engine == "docker";
+          assert existingTest.config.features.containers.users == [ defaultHomeUser.username ];
+          assert existingTest.config.features.containers.windowsVm.enable;
+          assert existingTest.config.features.containers.windowsVm.bindAddress == "127.0.0.1";
+          assert !existingTest.config.features.containers.windowsVm.allowRemoteAccess;
+          assert !(existingTest.config.features.containers.windowsVm ? password);
+          assert !lib.hasSuffix ":latest" existingTest.config.features.containers.windowsVm.image;
+          assert existingTest.config.features.containers.windowsVm.imageFile != "";
+          assert lib.hasPrefix "sha256:" existingTest.config.features.containers.windowsVm.imageDigest;
+          assert existingTest.config.virtualisation.docker.enable;
+          assert builtins.elem defaultHomeUser.username existingTest.config.users.groups.docker.members;
+          assert !(existingTest.config.systemd.services ? docker-socket-user-access);
+          assert lib.hasInfix "RepoTags[0]" existingTest.config.systemd.services.docker-load-images.script;
+          assert lib.hasInfix "expected_fingerprint="
+            existingTest.config.systemd.services.docker-load-images.script;
+          assert lib.hasInfix "image_fingerprint()"
+            existingTest.config.systemd.services.docker-load-images.script;
+          assert lib.hasInfix "docker tag \"$archive_ref\""
+            existingTest.config.systemd.services.docker-load-images.script;
+          assert
+            !lib.hasInfix "docker tag \"$expected_id\"" existingTest.config.systemd.services.docker-load-images.script;
+          assert !insecureWindowsVmEvaluation.success;
+          assert builtins.elem "tun" existingTest.config.boot.kernelModules;
+          assert existingTestWindowsVmPackage != null;
+          pkgs.runCommand "existing-test-profile-check" { nativeBuildInputs = [ pkgs.gnugrep ]; } ''
+            grep -F 'unset WINDOWSVM_PASSWORD' ${existingTestWindowsVmPackage}/bin/windowsvm
+            grep -F '"+dynamic-resolution"' ${existingTestWindowsVmPackage}/bin/windowsvm
+            grep -F 'password-reset)' ${existingTestWindowsVmPackage}/bin/windowsvm
+            grep -F 'wipe)' ${existingTestWindowsVmPackage}/bin/windowsvm
+            grep -F 'WINDOWSVM_WIPE_CONFIRM=WIPE' ${existingTestWindowsVmPackage}/bin/windowsvm
+            grep -F 'Refusing to wipe an unsafe storage path' ${existingTestWindowsVmPackage}/bin/windowsvm
+            grep -F 'VIRT_TOOLS_DATA_DIR="$firstboot_tools_dir" virt-customize' ${existingTestWindowsVmPackage}/bin/windowsvm
+            grep -F -- '--firstboot "$firstboot_script"' ${existingTestWindowsVmPackage}/bin/windowsvm
+            grep -F -- '--env-file "$container_environment"' ${existingTestWindowsVmPackage}/bin/windowsvm
+            grep -F '"+auth-only"' ${existingTestWindowsVmPackage}/bin/windowsvm
+            grep -F 'cp --reflink=auto --sparse=always' ${existingTestWindowsVmPackage}/bin/windowsvm
+            if grep -F -- '-e "PASSWORD=' ${existingTestWindowsVmPackage}/bin/windowsvm; then
+              echo "windowsvm must not place the Windows password in Docker argv" >&2
+              exit 1
+            fi
+            if grep -F 'docker image rm' ${existingTestWindowsVmPackage}/bin/windowsvm; then
+              echo "windowsvm wipe must preserve the Nix-pinned runtime image" >&2
+              exit 1
+            fi
+            if grep -F 'zenity' ${existingTestWindowsVmPackage}/bin/windowsvm; then
+              echo "windowsvm must not open a second graphical password dialog" >&2
+              exit 1
+            fi
+            if grep -F 'smart-sizing' ${existingTestWindowsVmPackage}/bin/windowsvm; then
+              echo "windowsvm must not combine smart sizing with dynamic resolution" >&2
+              exit 1
+            fi
             touch "$out"
           '';
 
@@ -413,6 +528,7 @@
             {
               nativeBuildInputs = [
                 pkgs.bash
+                pkgs.git
                 pkgs.python3
               ];
             }

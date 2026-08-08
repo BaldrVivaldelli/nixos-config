@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import configparser
+import json
 import os
 import re
 import shlex
 import shutil
+import stat
 import subprocess
+import time
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any, TextIO
@@ -22,6 +25,9 @@ Runner = Callable[..., subprocess.CompletedProcess[str]]
 Input = Callable[[str], str]
 Which = Callable[..., str | None]
 GITLAB_HOST_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$")
+RDP_REQUEST_FILENAME = "holodeck-control-windows-rdp.json"
+RDP_REQUEST_MAX_BYTES = 8192
+RDP_REQUEST_MAX_AGE_MS = 30_000
 
 
 ACTION_COMMANDS: dict[str, tuple[str, ...]] = {
@@ -33,6 +39,8 @@ ACTION_COMMANDS: dict[str, tuple[str, ...]] = {
     "windows-up": ("windowsvm", "up"),
     "windows-status": ("windowsvm", "status"),
     "windows-rdp": ("windowsvm", "rdp"),
+    "windows-password-reset": ("windowsvm", "password-reset"),
+    "windows-wipe": ("windowsvm", "wipe"),
     "windows-web": ("windowsvm", "web"),
     "windows-logs": ("windowsvm", "logs"),
     "windows-down": ("windowsvm", "down"),
@@ -56,6 +64,128 @@ def _home(environ: Mapping[str, str]) -> Path:
 
 def _config_home(environ: Mapping[str, str]) -> Path:
     return Path(environ.get("XDG_CONFIG_HOME", str(_home(environ) / ".config"))).expanduser()
+
+
+def _consume_rdp_request(environ: Mapping[str, str]) -> dict[str, str] | None:
+    runtime_value = environ.get("XDG_RUNTIME_DIR", "")
+    if not runtime_value:
+        return None
+
+    runtime_dir = Path(runtime_value)
+    request_path = runtime_dir / RDP_REQUEST_FILENAME
+    if not request_path.exists():
+        return None
+
+    try:
+        runtime_status = runtime_dir.stat(follow_symlinks=False)
+    except OSError as exc:
+        raise ConfigCtlError(
+            "invalid-rdp-request", "no se pudo validar XDG_RUNTIME_DIR"
+        ) from exc
+    if (
+        not runtime_dir.is_absolute()
+        or not stat.S_ISDIR(runtime_status.st_mode)
+        or runtime_status.st_uid != os.getuid()
+        or runtime_status.st_mode & 0o077
+    ):
+        raise ConfigCtlError(
+            "invalid-rdp-request",
+            "XDG_RUNTIME_DIR no es un directorio privado del usuario actual",
+        )
+
+    descriptor = -1
+    try:
+        descriptor = os.open(
+            request_path,
+            os.O_RDONLY | os.O_CLOEXEC | getattr(os, "O_NOFOLLOW", 0),
+        )
+        request_status = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(request_status.st_mode)
+            or request_status.st_uid != os.getuid()
+            or request_status.st_size > RDP_REQUEST_MAX_BYTES
+        ):
+            raise ConfigCtlError(
+                "invalid-rdp-request", "la solicitud RDP efímera no es segura"
+            )
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "rb") as request_file:
+            descriptor = -1
+            raw = request_file.read(RDP_REQUEST_MAX_BYTES + 1)
+    except ConfigCtlError:
+        raise
+    except OSError as exc:
+        raise ConfigCtlError(
+            "invalid-rdp-request", "no se pudo leer la solicitud RDP efímera"
+        ) from exc
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        try:
+            request_path.unlink()
+        except FileNotFoundError:
+            pass
+        except OSError:
+            pass
+
+    if len(raw) > RDP_REQUEST_MAX_BYTES:
+        raise ConfigCtlError(
+            "invalid-rdp-request", "la solicitud RDP efímera es demasiado grande"
+        )
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ConfigCtlError(
+            "invalid-rdp-request", "la solicitud RDP efímera no es JSON válido"
+        ) from exc
+
+    if not isinstance(payload, dict) or set(payload) != {
+        "schemaVersion",
+        "createdAtMs",
+        "username",
+        "password",
+    }:
+        raise ConfigCtlError(
+            "invalid-rdp-request", "la solicitud RDP efímera tiene campos inválidos"
+        )
+    created_at = payload["createdAtMs"]
+    if isinstance(created_at, bool) or not isinstance(created_at, (int, float)):
+        raise ConfigCtlError(
+            "invalid-rdp-request", "la solicitud RDP efímera no tiene una fecha válida"
+        )
+    now_ms = time.time_ns() // 1_000_000
+    if (
+        isinstance(payload["schemaVersion"], bool)
+        or payload["schemaVersion"] != 1
+        or not (-5_000 <= now_ms - created_at <= RDP_REQUEST_MAX_AGE_MS)
+    ):
+        raise ConfigCtlError(
+            "invalid-rdp-request", "la solicitud RDP efímera venció"
+        )
+
+    username = payload["username"]
+    password = payload["password"]
+    if (
+        not isinstance(username, str)
+        or not username
+        or len(username) > 128
+        or username != username.strip()
+        or any(character in username for character in ("\0", "\r", "\n"))
+    ):
+        raise ConfigCtlError(
+            "invalid-rdp-request", "el usuario RDP de la solicitud no es válido"
+        )
+    if (
+        not isinstance(password, str)
+        or not password
+        or len(password) > 4096
+        or any(character in password for character in ("\0", "\r", "\n"))
+    ):
+        raise ConfigCtlError(
+            "invalid-rdp-request", "la contraseña RDP de la solicitud no es válida"
+        )
+
+    return {"username": username, "password": password}
 
 
 def _command_path(name: str, environ: Mapping[str, str], which: Which) -> str | None:
@@ -285,8 +415,30 @@ def execute_action(
         )
 
     argv[0] = executable
+    child_environment: dict[str, str] | None = None
+    if action in {
+        "windows-up",
+        "windows-rdp",
+        "windows-password-reset",
+        "windows-wipe",
+    }:
+        rdp_request = _consume_rdp_request(environ)
+        if rdp_request is not None:
+            child_environment = dict(environ)
+            child_environment["WINDOWSVM_USER"] = rdp_request["username"]
+            child_environment["WINDOWSVM_PASSWORD"] = rdp_request["password"]
+            if action == "windows-wipe":
+                child_environment["WINDOWSVM_WIPE_CONFIRM"] = "WIPE"
+
     try:
-        completed = runner(argv, check=False, shell=False, text=True)
+        runner_options: dict[str, Any] = {
+            "check": False,
+            "shell": False,
+            "text": True,
+        }
+        if child_environment is not None:
+            runner_options["env"] = child_environment
+        completed = runner(argv, **runner_options)
     except OSError as exc:
         raise ConfigCtlError(
             "exec-failed", f"no se pudo iniciar {argv[0]}: {exc}", exit_code=1

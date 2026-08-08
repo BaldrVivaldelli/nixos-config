@@ -157,21 +157,17 @@ Desde una sesión NixOS-WSL:
 ./install.sh nixos wsl
 ```
 
-También se puede ejecutar el backend directamente:
-
-```bash
-nix --extra-experimental-features "nix-command flakes" \
-  run path:.#holodeck-system-nixos -- install --target wsl
-```
+El script prepara un snapshot seguro antes de ejecutar el backend; la ejecución
+directa con `path:.` se evita para no copiar `.git` ni otros ignorados al store.
 
 El selector genérico `install.sh` conserva el contrato
 `holodeck-system-<backend>` para integraciones externas. El backend NixOS de
 este repo acepta solamente `wsl`; no tiene parámetros ni código de discos.
 
-Las actualizaciones del sistema WSL se aplican con:
+Las actualizaciones del sistema WSL se aplican con el mismo entrypoint:
 
 ```bash
-sudo nixos-rebuild switch --flake path:.#wsl
+./install.sh nixos wsl
 ```
 
 ## Estructura
@@ -182,6 +178,7 @@ inventory.nix
 inventory.local.nix  # generado localmente e ignorado por Git
 holodeck.local.json  # IR generado por el panel, ignorado por Git
 configure-inventory.sh
+prepare-flake-source.sh
 install.sh
 apply-nixos-system.sh
 home/default.nix
@@ -210,8 +207,7 @@ reutilizables. El único host NixOS publicado actualmente es `#wsl`.
 ```bash
 ./verify-user-only.sh
 ./verify-no-desktop.sh
-nix --extra-experimental-features "nix-command flakes" \
-  flake check path:. --print-build-logs
+./prepare-flake-source.sh --check --print-build-logs
 ```
 
 CI ejecuta los mismos límites antes de evaluar la flake.

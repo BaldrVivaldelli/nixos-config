@@ -30,15 +30,16 @@ sólo se reemplaza explícitamente con `--force`.
 
 `install.sh existing-nixos`, `install.sh home-manager` y `install.sh nixos wsl`
 ofrecen este preflight automáticamente cuando falta el archivo y hay una
-terminal. Sin TTY mantienen los defaults, de modo que CI no queda esperando
-input.
+terminal. Sin TTY fallan de forma cerrada e indican ejecutar
+`./install.sh configure --yes`; los defaults quedan reservados para fixtures y
+evaluaciones portables, no para aplicar una máquina por accidente.
 
-Como el archivo local está ignorado por Git, las evaluaciones manuales que deban
-verlo deben usar una flake de tipo path:
+Como el archivo local está ignorado por Git, las evaluaciones deben pasar por el
+snapshot allowlisted:
 
 ```bash
-nix flake check path:.
-sudo nixos-rebuild switch --flake path:.#wsl
+./prepare-flake-source.sh --check
+./install.sh nixos wsl
 ```
 
 La configuración efectiva usa una clave lógica llamada `personal`:

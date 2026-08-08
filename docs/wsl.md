@@ -54,16 +54,16 @@ Usa el script de la raiz:
 ./install.sh nixos wsl
 ```
 
-El selector delega en:
+El selector prepara un snapshot allowlisted y delega en:
 
 ```bash
-nix run path:.#holodeck-system-nixos -- install --target wsl
+nix run path:/tmp/nixos-config-source…#holodeck-system-nixos -- install --target wsl
 ```
 
 El backend usa el NixOS-WSL fijado en `flake.lock`, valida la flake y ejecuta:
 
 ```bash
-sudo nixos-rebuild boot --flake path:.#wsl
+sudo nixos-rebuild boot --flake path:/tmp/nixos-config-source…#wsl
 ```
 
 Despues hay que salir de WSL y completar el ciclo de reinicio desde PowerShell
@@ -79,7 +79,7 @@ holodeck setup
 
 ```bash
 cd /ruta/detectada/al/nixos-config
-sudo nixos-rebuild switch --flake path:.#wsl
+./install.sh nixos wsl
 ```
 
 ## VS Code / Kiro desde Windows

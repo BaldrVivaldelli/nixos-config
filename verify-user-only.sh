@@ -86,8 +86,8 @@ for pattern in "${identity_patterns[@]}"; do
   fi
 done
 
-if ! grep -Fq -- '--flake "path:$repo_dir#default"' apply-home.sh; then
-  echo "Error: apply-home.sh no usa el alias portable homeConfigurations.default." >&2
+if ! grep -Fq -- '--flake "path:$source_dir#default"' apply-home.sh; then
+  echo "Error: apply-home.sh no usa el snapshot seguro ni el alias portable homeConfigurations.default." >&2
   exit 1
 fi
 

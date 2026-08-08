@@ -71,7 +71,7 @@ Despues correr una build. Si el hash no coincide, Nix va a mostrar el hash
 esperado. Reemplazarlo en el JSON y volver a construir.
 
 ```bash
-sudo nixos-rebuild build --flake path:.#<host>
+./apply-nixos-system.sh build
 ```
 
 ## Activar como editor por defecto

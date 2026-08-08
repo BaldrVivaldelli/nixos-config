@@ -45,7 +45,40 @@ in
           source = "builtin";
         };
 
-        plugins.enabled = [ "holodeck/control" ];
+        wallpaper = {
+          enabled = true;
+          directory = "${config.home.homeDirectory}/Pictures/Wallpaper";
+          fill_mode = "crop";
+          default.path = "${config.home.homeDirectory}/Pictures/Wallpaper/nave-wallpaper.png";
+        };
+
+        shell.launcher.providers = {
+          calculator = {
+            prefix = "calc";
+            global = true;
+          };
+          emoji = {
+            prefix = "emo";
+            global = false;
+          };
+          session = {
+            prefix = "session";
+            global = false;
+          };
+          wallpaper = {
+            prefix = "wall";
+            global = false;
+          };
+          windows = {
+            prefix = "win";
+            global = false;
+          };
+        };
+
+        plugins.enabled = [
+          "holodeck/control"
+          "noctalia/wallhaven"
+        ];
 
         # Keep Noctalia's default end lane and add Holodeck beside the native
         # Control Center and session actions. The compact asset is designed for
@@ -60,6 +93,8 @@ in
           "volume"
           "brightness"
           "battery"
+          "wallpaper"
+          "noctalia/wallhaven:wallhaven"
           "holodeck/control:config"
           "control-center"
           "session"

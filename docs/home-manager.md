@@ -51,9 +51,11 @@ es `./install.sh existing-nixos`. Para aplicar únicamente Home Manager:
 ./install.sh home-manager
 ```
 
-`install.sh` ejecuta primero `verify-user-only.sh`, después
-`apply-home.sh build` y finalmente `apply-home.sh switch`. Si un paso falla,
-los siguientes no se ejecutan.
+`install.sh` ejecuta `verify-user-only.sh`, prepara un único snapshot, construye
+`homeConfigurations.default.activationPackage` con un out-link persistente y
+activa exactamente esa generación. Antes registra la generación actual en un
+manifiesto privado. Si la activación falla, muestra el comando
+`./install.sh recover MANIFEST` que restaura y reactiva la generación anterior.
 
 Para aplicar ese mismo flujo y recargar Holodeck Control al final:
 
@@ -61,9 +63,10 @@ Para aplicar ese mismo flujo y recargar Holodeck Control al final:
 holodeck-regenerate
 ```
 
-Su equivalente desde el checkout es `./install.sh regenerate`. No ejecuta un
-segundo `apply-home.sh switch`: `install.sh home-manager` ya incluye la
-activación. Sólo reinicia el plugin cuando Home Manager terminó correctamente.
+Su equivalente desde el checkout es `./install.sh regenerate`. No vuelve a
+evaluar ni activa una segunda generación: `install.sh home-manager` ya activa
+el candidato exacto. Sólo reinicia el plugin cuando Home Manager terminó
+correctamente.
 
 `apply-home.sh` siempre usa `homeConfigurations.default`; el nombre real, el
 home y la ruta del repositorio se derivan del inventario. La flake conserva
@@ -97,10 +100,10 @@ la clave dinámica `home-manager.users.<username>` dentro de NixOS-WSL. El host
 elige la identidad mediante `inventory.hosts.wsl.user` y desactiva las features
 `developerTools`, `niri` y `noctalia` para no instalar aplicaciones gráficas;
 las herramientas de terminal se declaran mediante sus features NixOS. Los
-cambios del sistema WSL se aplican con:
+cambios del sistema WSL se aplican con el entrypoint seguro:
 
 ```bash
-sudo nixos-rebuild switch --flake path:.#wsl
+./install.sh nixos wsl
 ```
 
 ## AWS

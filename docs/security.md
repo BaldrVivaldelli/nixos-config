@@ -83,21 +83,54 @@ transitorio en su directorio local de estado; el backend valida todas las
 claves y valores, regenera el bloque AWS y elimina el borrador al completar la
 operación.
 
+## Frontera de evaluación Nix
+
+Los entrypoints no evalúan `path:.` sobre el checkout completo. Preparan un
+snapshot con los archivos versionados actuales y un allowlist explícito de
+`inventory.local.nix` y `holodeck.local.json`. Así `.git`, caches, outputs y
+otros ignorados no se copian al Nix store. `./prepare-flake-source.sh --check`
+aplica la misma regla a la validación manual.
+
 ## Windows VM
 
-La password por defecto de la VM es declarativa:
+La password de Windows/RDP no es una opción Nix ni tiene default. `windowsvm`
+la lee de `WINDOWSVM_PASSWORD_FILE`, de `WINDOWSVM_PASSWORD` o de un prompt
+silencioso. Holodeck usa un campo enmascarado dentro de su vista Windows: escribe
+una solicitud de un solo uso en el `XDG_RUNTIME_DIR` privado, el backend la abre
+sin seguir symlinks, la elimina antes de lanzar `windowsvm` y nunca incluye la
+credencial en argv, el IR o el repo. El panel conserva el valor sólo en memoria
+para reintentos dentro de la vista Windows y lo limpia al salir de la vista o
+cerrar el panel. Para uso habitual por CLI se prefiere un
+archivo local con permisos restrictivos; nunca debe agregarse al repo.
 
-```nix
-features.containers.windowsVm.password = "admin";
-```
+La acción explícita de reemplazo toma el valor del mismo textbox, detiene la VM,
+crea una copia sparse recuperable y programa un `Set-LocalUser` de primer
+arranque sobre el disco existente. El script host vive en un directorio privado
+temporal, la password viaja codificada dentro del batch de un solo uso y
+`virt-customize --no-logfile --no-network` evita log de build y red. Al recrear
+el contenedor, `docker run` recibe las variables mediante un env-file privado
+efímero, no por argv. Docker conserva la password vigente en `Config.Env` del
+contenedor por contrato de Dockurr. La validación final usa FreeRDP `auth-only`
+con argumentos por stdin: si Windows acepta exactamente la nueva credencial se
+elimina la copia que contiene el estado anterior; si falla o vence el timeout,
+se conserva para recovery y la operación termina con error.
 
-Es comoda para una VM local, pero no debe tratarse como secreto real. Para usos
-mas sensibles, cambiarla en la configuracion o por entorno local y evitar
-commitear credenciales personales.
+`WIPE WindowsVM` tiene una frontera distinta: es irreversible una vez creado el
+contenedor nuevo. El panel exige escribir `WIPE`; el backend agrega un marcador
+cerrado y `windowsvm` vuelve a validarlo. Antes de borrar, el helper rechaza
+symlinks, rutas amplias o sensibles, storage ajeno y directorios que no tengan
+los marcadores de Dockurr. El storage viejo se mueve a una cuarentena hermana y
+se restaura si falla la creación inicial. `shared` y la imagen runtime de Nix no
+forman parte del borrado.
+
+La imagen runtime tiene un tag local estable y su ID se compara con el config
+digest del archive fijado por Nix antes de crear o arrancar el contenedor. Un
+contenedor existente con otra identidad se rechaza en vez de arrancarse.
 
 Los puertos web y RDP usan `features.containers.windowsVm.bindAddress =
-"127.0.0.1"` por default. No cambiarlo a `0.0.0.0` sin definir antes controles
-de red y credenciales adecuadas.
+"127.0.0.1"` por default. Cualquier otro valor requiere además el opt-in
+`features.containers.windowsVm.allowRemoteAccess = true`; no habilitarlo sin
+controles de red y credenciales adecuadas.
 
 El modo de pantalla RDP guardado en el IR es un enum cerrado (`half` o
 `fullscreen`). `holodeckctl` lo valida antes de pasarlo como argumento a

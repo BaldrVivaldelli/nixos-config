@@ -47,7 +47,6 @@ El backend `holodeck-system-nixos` se conserva para NixOS-WSL:
 
 ```bash
 ./install.sh nixos wsl
-nix run path:.#holodeck-system-nixos -- install --target wsl
 ```
 
 Ya no ofrece un target `desktop`, opciones de disco ni dependencias de
@@ -57,7 +56,7 @@ Ya no ofrece un target `desktop`, opciones de disco ni dependencias de
 
 `install.sh ubuntu`, por ejemplo, busca primero
 `holodeck-system-ubuntu` en `PATH` y luego la app
-`path:.#holodeck-system-ubuntu`. Así se mantiene el mecanismo extensible sin
+la app `holodeck-system-ubuntu` dentro del snapshot seguro. Así se mantiene el mecanismo extensible sin
 mezclarlo con el core portable.
 
 ## Pruebas

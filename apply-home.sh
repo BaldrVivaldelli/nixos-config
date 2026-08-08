@@ -4,6 +4,8 @@ set -euo pipefail
 repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 mode="${1:-switch}"
 readonly required_nix_features="nix-command flakes"
+source_dir="${NIXOS_CONFIG_FLAKE_SOURCE:-}"
+owns_source=0
 
 note() {
   if [[ -t 2 && -z "${NO_COLOR+x}" && "${TERM:-}" != "dumb" ]]; then
@@ -48,6 +50,33 @@ command -v nix >/dev/null 2>&1 || {
   exit 1
 }
 
+if [[ -z "$source_dir" ]]; then
+  source_dir="$(bash "$repo_dir/prepare-flake-source.sh")"
+  owns_source=1
+else
+  case "$source_dir" in
+    /nix/store/*|"${TMPDIR:-/tmp}"/nixos-config-source.*) ;;
+    *)
+      echo "Error: NIXOS_CONFIG_FLAKE_SOURCE no es un snapshot administrado." >&2
+      exit 1
+      ;;
+  esac
+fi
+[[ -f "$source_dir/flake.nix" ]] || {
+  echo "Error: el snapshot de la flake no contiene flake.nix: $source_dir" >&2
+  exit 1
+}
+
+cleanup() {
+  if [[ "$owns_source" -eq 1 ]]; then
+    case "$source_dir" in
+      "${TMPDIR:-/tmp}"/nixos-config-source.*) rm -rf -- "$source_dir" ;;
+      *) echo "Error: se rechazó limpiar una ruta temporal inesperada: $source_dir" >&2 ;;
+    esac
+  fi
+}
+trap cleanup EXIT
+
 # Home Manager ejecuta otros procesos `nix` internamente. NIX_CONFIG hace que
 # esos procesos hijos tambien reciban las features, sin tocar /etc/nix/nix.conf.
 # Se usa `experimental-features` por compatibilidad con versiones antiguas de Nix.
@@ -73,9 +102,9 @@ home_manager_args=("$mode")
 if [[ "$mode" == "switch" ]]; then
   home_manager_args+=( -b hm-bak )
 fi
-home_manager_args+=(--flake "path:$repo_dir#default")
+home_manager_args+=(--flake "path:$source_dir#default")
 
-exec nix \
+nix \
   --extra-experimental-features "$required_nix_features" \
-  run "path:$repo_dir#home-manager" -- \
+  run "path:$source_dir#home-manager" -- \
   "${home_manager_args[@]}"

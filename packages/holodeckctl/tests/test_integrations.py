@@ -5,6 +5,7 @@ import io
 import json
 import subprocess
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from typing import Any
@@ -28,7 +29,9 @@ class IntegrationTests(unittest.TestCase):
             "HOME": str(self.home),
             "PATH": str(self.bin),
             "XDG_CONFIG_HOME": str(self.home / ".config"),
+            "XDG_RUNTIME_DIR": str(self.home / "runtime"),
         }
+        Path(self.environment["XDG_RUNTIME_DIR"]).mkdir(mode=0o700)
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
@@ -165,6 +168,164 @@ class IntegrationTests(unittest.TestCase):
                 stdout=io.StringIO(),
             )
         self.assertEqual("invalid-rdp-display-mode", raised.exception.code)
+
+    def test_windows_rdp_consumes_ephemeral_panel_credentials(self) -> None:
+        executable = self.add_command("windowsvm")
+        request = Path(self.environment["XDG_RUNTIME_DIR"]) / (
+            "holodeck-control-windows-rdp.json"
+        )
+        request.write_text(
+            json.dumps(
+                {
+                    "schemaVersion": 1,
+                    "createdAtMs": time.time_ns() // 1_000_000,
+                    "username": "Docker",
+                    "password": "runtime-only",
+                }
+            ),
+            encoding="utf-8",
+        )
+        calls: list[tuple[list[str], dict[str, Any]]] = []
+
+        def runner(
+            argv: list[str], **kwargs: Any
+        ) -> subprocess.CompletedProcess[str]:
+            calls.append((argv, kwargs))
+            return subprocess.CompletedProcess(argv, 0)
+
+        result = execute_action(
+            "windows-rdp",
+            self.environment,
+            rdp_display_mode="fullscreen",
+            runner=runner,
+            stdout=io.StringIO(),
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertFalse(request.exists())
+        self.assertEqual(
+            [str(executable), "rdp", "fullscreen"],
+            calls[0][0],
+        )
+        self.assertEqual("Docker", calls[0][1]["env"]["WINDOWSVM_USER"])
+        self.assertEqual(
+            "runtime-only", calls[0][1]["env"]["WINDOWSVM_PASSWORD"]
+        )
+        self.assertNotIn("runtime-only", repr(result))
+
+    def test_windows_password_reset_uses_only_ephemeral_panel_credentials(self) -> None:
+        executable = self.add_command("windowsvm")
+        request = Path(self.environment["XDG_RUNTIME_DIR"]) / (
+            "holodeck-control-windows-rdp.json"
+        )
+        request.write_text(
+            json.dumps(
+                {
+                    "schemaVersion": 1,
+                    "createdAtMs": time.time_ns() // 1_000_000,
+                    "username": "Docker",
+                    "password": "replacement-from-textbox",
+                }
+            ),
+            encoding="utf-8",
+        )
+        calls: list[tuple[list[str], dict[str, Any]]] = []
+
+        def runner(
+            argv: list[str], **kwargs: Any
+        ) -> subprocess.CompletedProcess[str]:
+            calls.append((argv, kwargs))
+            return subprocess.CompletedProcess(argv, 0)
+
+        result = execute_action(
+            "windows-password-reset",
+            self.environment,
+            runner=runner,
+            stdout=io.StringIO(),
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertFalse(request.exists())
+        self.assertEqual([str(executable), "password-reset"], calls[0][0])
+        self.assertEqual("Docker", calls[0][1]["env"]["WINDOWSVM_USER"])
+        self.assertEqual(
+            "replacement-from-textbox",
+            calls[0][1]["env"]["WINDOWSVM_PASSWORD"],
+        )
+        self.assertNotIn("replacement-from-textbox", repr(result))
+
+    def test_windows_wipe_routes_textbox_credentials_with_explicit_confirmation(
+        self,
+    ) -> None:
+        executable = self.add_command("windowsvm")
+        request = Path(self.environment["XDG_RUNTIME_DIR"]) / (
+            "holodeck-control-windows-rdp.json"
+        )
+        request.write_text(
+            json.dumps(
+                {
+                    "schemaVersion": 1,
+                    "createdAtMs": time.time_ns() // 1_000_000,
+                    "username": "Docker",
+                    "password": "fresh-install-password",
+                }
+            ),
+            encoding="utf-8",
+        )
+        calls: list[tuple[list[str], dict[str, Any]]] = []
+
+        def runner(
+            argv: list[str], **kwargs: Any
+        ) -> subprocess.CompletedProcess[str]:
+            calls.append((argv, kwargs))
+            return subprocess.CompletedProcess(argv, 0)
+
+        result = execute_action(
+            "windows-wipe",
+            self.environment,
+            runner=runner,
+            stdout=io.StringIO(),
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertFalse(request.exists())
+        self.assertEqual([str(executable), "wipe"], calls[0][0])
+        self.assertEqual("Docker", calls[0][1]["env"]["WINDOWSVM_USER"])
+        self.assertEqual(
+            "fresh-install-password",
+            calls[0][1]["env"]["WINDOWSVM_PASSWORD"],
+        )
+        self.assertEqual("WIPE", calls[0][1]["env"]["WINDOWSVM_WIPE_CONFIRM"])
+        self.assertNotIn("fresh-install-password", repr(result))
+
+    def test_windows_rdp_rejects_and_removes_stale_panel_credentials(self) -> None:
+        self.add_command("windowsvm")
+        request = Path(self.environment["XDG_RUNTIME_DIR"]) / (
+            "holodeck-control-windows-rdp.json"
+        )
+        request.write_text(
+            json.dumps(
+                {
+                    "schemaVersion": 1,
+                    "createdAtMs": 0,
+                    "username": "Docker",
+                    "password": "stale-secret",
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        with self.assertRaises(ConfigCtlError) as raised:
+            execute_action(
+                "windows-rdp",
+                self.environment,
+                runner=lambda *_args, **_kwargs: self.fail("runner must not execute"),
+                stdout=io.StringIO(),
+            )
+
+        self.assertEqual("invalid-rdp-request", raised.exception.code)
+        self.assertFalse(request.exists())
+        self.assertNotIn("stale-secret", str(raised.exception))
 
     def test_aws_action_selects_only_a_discovered_profile(self) -> None:
         executable = self.add_command("aws")

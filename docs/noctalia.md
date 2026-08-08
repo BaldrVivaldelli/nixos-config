@@ -24,6 +24,43 @@ noctalia
 Noctalia y Niri quedan forzadas a `false` en el host WSL porque allí no hay una
 sesión Wayland de escritorio.
 
+## Wallpapers
+
+Noctalia usa `~/Pictures/Wallpaper` como biblioteca local y
+`nave-wallpaper.png` como fondo predeterminado. La barra incluye dos accesos:
+
+- El selector nativo `wallpaper`, que busca por nombre dentro de la biblioteca
+  local. También se puede abrir con `Mod+Space` y el prefijo `/wall`.
+- El plugin oficial `noctalia/wallhaven`, que permite buscar, previsualizar,
+  descargar y aplicar imágenes de Wallhaven. Las descargas quedan disponibles
+  también en el selector local.
+
+Los cambios hechos desde la UI o mediante `noctalia msg wallpaper-set` se
+guardan en el estado local de Noctalia y pueden reemplazar el fondo
+predeterminado sin modificar el repositorio. Una imagen propia se aplica con:
+
+```bash
+noctalia msg wallpaper-set "$HOME/Pictures/Wallpaper/mi-fondo.png"
+```
+
+Wallhaven funciona sin API key para búsquedas normales. Una clave opcional se
+debe ingresar sólo en la configuración local del plugin y nunca en el repo.
+
+## Providers del launcher
+
+Los providers nativos quedan declarados en Nix con prefijos estables:
+
+- `/calc` para cálculos y conversiones.
+- `/emo` para buscar emojis.
+- `/session` para acciones de sesión.
+- `/wall` para buscar wallpapers locales.
+- `/win` para buscar y enfocar ventanas abiertas.
+
+La calculadora participa además en la búsqueda global; los demás providers se
+activan sólo con su prefijo para mantener el launcher limpio. Wallhaven no es
+un provider del launcher: es un plugin oficial con panel y botón propios, y
+también queda habilitado declarativamente.
+
 ## Plugin Holodeck Control
 
 Home Manager instala el plugin `holodeck/control` desde un path inmutable

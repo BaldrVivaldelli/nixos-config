@@ -14,6 +14,15 @@ Atajos principales:
 El perfil también instala `brightnessctl`, `playerctl` y `wireplumber`, usados
 por los atajos multimedia incluidos en la configuración base.
 
+Las sesiones de FreeRDP se fuerzan al layout en mosaico. El modo `half` abre
+Windows como una columna normal al 50% dentro del desplazamiento horizontal de
+Niri, en lugar de una ventana flotante centrada. El modo `fullscreen` conserva
+su comportamiento de pantalla completa. El helper deshabilita las decoraciones
+locales de FreeRDP, así que la columna no incluye una barra de título propia.
+`dynamic-resolution` negocia el tamaño remoto al redimensionar la columna. No
+se combina con `smart-sizing`, porque FreeRDP 3 considera esas opciones
+mutuamente excluyentes y rechaza el lanzamiento.
+
 ## Sesión predeterminada de NixOS
 
 Home Manager instala la configuración personal, pero registrar y elegir la

@@ -77,12 +77,13 @@ class WslSafetyTests(unittest.TestCase):
 
 
 class FlakeCheckTests(unittest.TestCase):
-    def test_uses_path_flake_so_local_inventory_is_visible(self) -> None:
+    def test_uses_explicit_prepared_source(self) -> None:
         with patch.object(system_install, "run") as run:
             check_flake(Path("/tmp/repo"))
 
         command = run.call_args.args[0]
-        self.assertEqual(command[-1], "path:.")
+        self.assertEqual(command[-1], "path:/tmp/repo")
+        self.assertEqual(run.call_args.kwargs["cwd"], Path("/tmp/repo"))
 
 
 if __name__ == "__main__":

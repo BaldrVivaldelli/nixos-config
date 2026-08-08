@@ -25,6 +25,8 @@ holodeckctl action aws-sync
 holodeckctl action windows-up
 holodeckctl action windows-status
 holodeckctl action windows-rdp
+holodeckctl action windows-password-reset
+holodeckctl action windows-wipe
 holodeckctl action windows-web
 holodeckctl action windows-logs
 holodeckctl action windows-down

@@ -6,8 +6,9 @@
 ./install.sh existing-nixos
 ```
 
-Este comando verifica y construye primero NixOS y Home Manager, y luego activa
-ambos. También instala Docker, `windowsvm` y sus completions. Para validar sólo
+Este comando verifica y construye primero candidatos exactos de NixOS y Home
+Manager, y luego activa esos mismos store paths. También instala Docker,
+`windowsvm` y sus completions. Para validar sólo
 el sistema sin activarlo:
 
 ```bash
@@ -38,24 +39,35 @@ holodeck-regenerate
 ## NixOS-WSL
 
 ```bash
-sudo nixos-rebuild build --flake path:.#wsl
-sudo nixos-rebuild switch --flake path:.#wsl
+./install.sh nixos wsl
 ```
 
-La primera preparación puede hacerse con `./install.sh nixos wsl`.
+El backend valida y activa desde el mismo snapshot seguro.
+
+## Recovery
+
+Cada aplicación centralizada imprime la ruta de su manifiesto. Ante una
+activación fallida —o si se necesita volver explícitamente a las generaciones
+registradas— ejecutar:
+
+```bash
+./install.sh recover /ruta/al/manifest
+```
+
+El recovery valida que el manifiesto sea un archivo privado del usuario,
+restaura primero Home Manager y luego NixOS, siempre por store path exacto.
 
 ## Checks
 
 ```bash
 ./verify-user-only.sh
 ./verify-no-desktop.sh
-nix --extra-experimental-features "nix-command flakes" \
-  flake check path:. --print-build-logs
+./prepare-flake-source.sh --check --print-build-logs
 ```
 
 El primer script comprueba el límite de la configuración Home Manager. El
 segundo rechaza instaladores destructivos, Disko y patrones de almacenamiento.
-El check de la flake evalúa además `#existing`, `#wsl` y ejecuta las pruebas de
+El check de la flake evalúa el fixture aislado `existingTest`, `#wsl` y ejecuta las pruebas de
 Holodeck, instaladores, `holodeckctl` y el plugin Luau. El artefacto del
 plugin se compila con Luau y se valida con el binario de Noctalia fijado.
 
@@ -77,7 +89,7 @@ nix --extra-experimental-features "nix-command flakes" fmt
 
 ```bash
 nix --extra-experimental-features "nix-command flakes" flake update
-nix --extra-experimental-features "nix-command flakes" flake check path:.
+./prepare-flake-source.sh --check
 ```
 
 Revisar siempre `flake.lock` antes de activar el perfil o el sistema WSL.

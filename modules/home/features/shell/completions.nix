@@ -22,6 +22,7 @@ let
     "down"
     "help"
     "logs"
+    "password-reset"
     "rdp"
     "remove"
     "rm"
@@ -30,6 +31,7 @@ let
     "stop"
     "up"
     "web"
+    "wipe"
   ];
 
   holodeckCommands = [
