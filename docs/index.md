@@ -25,6 +25,8 @@ físicas desde cero.
 - [Git](git.md)
 - [Python](python.md)
 - [Node.js](nodejs.md)
+- [Go](go.md)
+- [Rust](rust.md)
 - [Lean](lean.md)
 - [Gráficos y GPU](graphics.md)
 - [VSCodium](vscodium.md)

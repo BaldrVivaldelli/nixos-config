@@ -56,6 +56,8 @@ in
   features.git.enable = true;
   features.python.enable = true;
   features.nodejs.enable = true;
+  features.go.enable = true;
+  features.rust.enable = true;
   features.lean.enable = true;
   features.holodeck.enable = true;
 

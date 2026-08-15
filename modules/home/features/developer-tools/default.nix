@@ -38,6 +38,9 @@ in
       python3
       uv
       nodejs
+      go
+      rustc
+      cargo
       elan
 
       # Aplicaciones gráficas instalables en el perfil del usuario.
