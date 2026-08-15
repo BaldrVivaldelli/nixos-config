@@ -58,6 +58,7 @@ in
   features.nodejs.enable = true;
   features.go.enable = true;
   features.rust.enable = true;
+  features.cpp.enable = true;
   features.lean.enable = true;
   features.holodeck.enable = true;
 

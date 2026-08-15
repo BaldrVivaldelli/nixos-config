@@ -27,6 +27,7 @@ físicas desde cero.
 - [Node.js](nodejs.md)
 - [Go](go.md)
 - [Rust](rust.md)
+- [C y C++](cpp.md)
 - [Lean](lean.md)
 - [Gráficos y GPU](graphics.md)
 - [VSCodium](vscodium.md)

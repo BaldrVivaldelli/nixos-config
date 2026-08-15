@@ -23,6 +23,7 @@ nixosConfigurations.wsl
 - `features.nodejs`
 - `features.go`
 - `features.rust`
+- `features.cpp`
 - `features.lean`
 - `features.holodeck`
 - Home Manager `developer`: zsh, aliases, completions, fzf, zoxide, direnv,

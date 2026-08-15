@@ -15,6 +15,7 @@ Todas se importan automaticamente, pero solo aplican cambios cuando su opcion
 | Node.js | `features.nodejs` | Instala Node.js con npm y npx para desarrollo. |
 | Go | `features.go` | Instala el toolchain de Go. |
 | Rust | `features.rust` | Instala rustc y Cargo para desarrollo. |
+| C/C++ | `features.cpp` | Instala GCC/G++, herramientas de build, GDB y clang-tools. |
 | Lean | `features.lean` | Instala elan para proyectos Lean y Lake. |
 | Graphics | `features.graphics` | Habilita aceleracion grafica y agrega `gpu-doctor`. |
 | VSCodium | `features.vscodium` | Instala VSCodium y extensiones pinneadas. |
@@ -34,6 +35,7 @@ features.python.enable = true;
 features.nodejs.enable = true;
 features.go.enable = true;
 features.rust.enable = true;
+features.cpp.enable = true;
 features.lean.enable = true;
 features.graphics.enable = true;
 features.vscodium.enable = true;
@@ -51,6 +53,7 @@ features.containers.enable = true;
 - Detalles de Node.js: [nodejs.md](nodejs.md).
 - Detalles de Go: [go.md](go.md).
 - Detalles de Rust: [rust.md](rust.md).
+- Detalles de C/C++: [cpp.md](cpp.md).
 - Detalles de Lean: [lean.md](lean.md).
 - Detalles de graficos y GPU: [graphics.md](graphics.md).
 - Detalles de VSCodium: [vscodium.md](vscodium.md).
@@ -58,10 +61,10 @@ features.containers.enable = true;
 - Detalles de Docker, Podman o Windows VM: [containers.md](containers.md).
 
 En `#existing` están activas `desktop = niri`, `containers = docker` y
-`containers.windowsVm`. Browser, Git, Go, Holodeck, Lean, Node.js, Python, Rust y
-VSCodium permanecen apagadas en la capa NixOS porque el perfil `developer` de
-Home Manager ya instala sus equivalentes. `graphics` también queda apagada
-hasta elegir explícitamente el driver de la máquina.
+`containers.windowsVm`. Browser, C/C++, Git, Go, Holodeck, Lean, Node.js,
+Python, Rust y VSCodium permanecen apagadas en la capa NixOS porque el perfil
+`developer` de Home Manager ya instala sus equivalentes. `graphics` también
+queda apagada hasta elegir explícitamente el driver de la máquina.
 
 ## Patron recomendado para nuevas features
 

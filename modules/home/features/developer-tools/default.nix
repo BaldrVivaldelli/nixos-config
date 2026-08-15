@@ -41,6 +41,14 @@ in
       go
       rustc
       cargo
+      gcc
+      binutils
+      gnumake
+      cmake
+      ninja
+      pkg-config
+      gdb
+      clang-tools
       elan
 
       # Aplicaciones gráficas instalables en el perfil del usuario.

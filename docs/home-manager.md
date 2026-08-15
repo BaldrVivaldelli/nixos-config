@@ -14,8 +14,8 @@ El inventario efectivo elige un usuario lógico y su `homeProfile`. Si existe,
 - shell Zsh, fzf, zoxide y direnv;
 - Starship;
 - AWS CLI y helpers;
-- herramientas de desarrollo (incluidos Go, rustc y Cargo), aplicaciones,
-  Niri, Noctalia y Holodeck.
+- herramientas de desarrollo (incluidos Go, Rust y el toolchain C/C++),
+  aplicaciones, Niri, Noctalia y Holodeck.
 
 Niri y Noctalia se administran juntos: Niri inicia la shell automáticamente y
 Home Manager valida el archivo `~/.config/niri/config.kdl` durante el build.
