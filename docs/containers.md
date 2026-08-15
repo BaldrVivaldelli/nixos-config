@@ -117,16 +117,19 @@ Cuando esta activa:
 ## Comando windowsvm
 
 Al migrar desde la configuración anterior hay que eliminar cualquier opción
-Nix `windowsVm.password` y preparar `WINDOWSVM_PASSWORD_FILE`. Un contenedor
-existente se reutiliza sólo si su image ID coincide con el archive fijado; si
-no coincide, `windowsvm` lo rechaza y muestra el comando explícito para
-recrearlo sin borrar automáticamente su storage.
+Nix `windowsVm.password`. La primera creación pide la password una sola vez;
+también puede recibirla mediante `WINDOWSVM_PASSWORD_FILE`. Un contenedor
+existente migra la credencial que Docker ya conserva después de una
+autenticación exitosa y se reutiliza sólo si su image ID coincide con el archive
+fijado; si no coincide, `windowsvm` lo rechaza y muestra el comando explícito
+para recrearlo sin borrar automáticamente su storage.
 
 ```text
 windowsvm up [half|fullscreen]  Start the container and open RDP or web viewer
 windowsvm start    Start without opening a client
 windowsvm rdp [half|fullscreen] Open FreeRDP at the selected size
 windowsvm web      Open the Dockurr web viewer
+windowsvm unlock   Unlock the local Windows account and restart
 windowsvm password-reset  Replace the local Windows password and restart
 windowsvm wipe     Delete the Windows guest disk and create a fresh VM
 windowsvm status   Show Docker container status
@@ -145,12 +148,10 @@ Zsh completa tanto el comando como sus subcomandos. Si se acaba de aplicar el
 perfil, abrir una terminal nueva o ejecutar `exec zsh` antes de probar
 `windowsvm <Tab>`.
 
-Si el contenedor es nuevo, abre el visor web para la instalacion inicial. Cuando
-Windows llegue al escritorio:
-
-```bash
-windowsvm rdp
-```
+Si el contenedor es nuevo, abre el visor web para mostrar la instalación
+inicial, espera hasta que Dockurr informe que Windows arrancó correctamente,
+realiza una preparación RDP única y abre FreeRDP automáticamente. No hace falta
+volver a ejecutar otro comando al llegar al escritorio.
 
 ## Directorios usados
 
@@ -158,15 +159,21 @@ Por defecto:
 
 ```text
 ~/containers/windows/storage
+~/containers/windows/storage/.windowsvm-credentials.json
 ~/containers/windows/shared
 ~/containers/windows/storage-backups
 ```
 
-`shared` se monta dentro de Windows como `C:\Shared`.
-`storage-backups` recibe una copia sparse de `data.img` antes de cada reemplazo
-de password. Esa copia contiene el estado anterior de Windows: el helper la
-elimina automáticamente sólo después de que Windows acepta la password nueva
-por RDP; si la validación falla o se interrumpe, conserva la ruta para recovery.
+`shared` se monta dentro de Windows como `C:\Shared`. El archivo oculto de
+credenciales pertenece al usuario, usa modo `0600`, nunca entra al repo y se
+elimina junto con el guest mediante `windowsvm wipe`. No se muestra ni se carga
+en el panel: `windowsvm` lo consume directamente.
+
+`storage-backups` recibe una copia sparse de `data.img` antes de cada desbloqueo
+o reemplazo de password. Esa copia contiene el estado anterior de Windows: el
+helper la elimina automáticamente sólo después de que Windows acepta la
+credencial por RDP; si la validación falla o se interrumpe, conserva la ruta
+para recovery.
 
 Se pueden sobreescribir por entorno:
 
@@ -198,9 +205,52 @@ WINDOWSVM_RDP_CLIENT
 WINDOWSVM_RDP_DISPLAY_MODE
 WINDOWSVM_RDP_TIMEOUT
 WINDOWSVM_RDP_ATTEMPTS
+WINDOWSVM_INSTALL_TIMEOUT
+WINDOWSVM_ACCOUNT_UNLOCK_TIMEOUT
 WINDOWSVM_PASSWORD_RESET_TIMEOUT
 WINDOWSVM_WIPE_CONFIRM
 ```
+
+## Acceso automático y desbloqueo de la cuenta RDP
+
+La primera ejecución administrada guarda la credencial y marca la política RDP
+del guest como pendiente. Cuando Windows queda disponible, `windowsvm up`
+detiene la VM una sola vez, crea una copia sparse, programa como `SYSTEM` el
+desbloqueo de la cuenta y configura `Account lockout threshold = 0`. Microsoft
+documenta que [ese valor evita que la cuenta vuelva a bloquearse](https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-10/security/threat-protection/security-policy-settings/account-lockout-threshold).
+En este perfil
+la decisión se limita a una VM personal cuyos puertos RDP y web están enlazados
+a `127.0.0.1`; no debe combinarse con `allowRemoteAccess` sin reevaluar la
+política de fuerza bruta.
+
+Después de validar RDP, la credencial pasa a schema 2 con
+`rdpPolicyVersion = 1`, se elimina la copia temporal y las aperturas siguientes
+sólo inician Windows y FreeRDP. Holodeck informa el estado sin devolver la
+password, oculta los inputs y presenta un único botón **Abrir Windows**. Una VM
+nueva puede esperar hasta `WINDOWSVM_INSTALL_TIMEOUT` —3600 segundos por
+default— sin pedir otro clic.
+
+`windowsvm unlock` conserva la contraseña y desbloquea la cuenta local indicada
+por `WINDOWSVM_USER`. Detiene limpiamente la VM, crea una copia sparse
+recuperable de `data.img`, programa una acción de primer arranque como `SYSTEM`
+y vuelve a iniciar Windows. La acción usa el proveedor ADSI WinNT para establecer
+`IsAccountLocked = false`, que es el mecanismo de desbloqueo documentado por
+[Microsoft](https://learn.microsoft.com/es-es/windows/win32/adsi/winnt-account-lockout).
+
+La contraseña guardada —o una sobreescritura explícita— sólo se usa después del
+arranque para validar las credenciales por RDP. Un rechazo explícito detiene la
+validación sin reintentos automáticos, evitando volver a bloquear la cuenta. Si
+la validación funciona se elimina la copia temporal; si falla, se conserva para
+recovery. Este comando queda disponible como reparación avanzada de CLI; el
+flujo normal de Holodeck lo ejecuta automáticamente cuando hace falta.
+
+Sólo puede ejecutarse un lanzamiento u operación de mantenimiento (`up`, `rdp`,
+`unlock`, `password-reset` o `wipe`) a la vez. Un lock privado en
+`XDG_RUNTIME_DIR` rechaza clics duplicados antes de que puedan detener Windows o
+abrir dos sesiones. La
+validación `auth-only` también tiene un límite duro: si FreeRDP confirma éxito
+pero queda colgado al cerrar, el helper acepta la validación y termina el
+proceso; este workaround evita dejar Holodeck esperando indefinidamente.
 
 ## Reemplazo de la password de Windows
 
@@ -211,20 +261,21 @@ modifica una cuenta ya instalada. `windowsvm password-reset` cubre ese caso:
 1. detiene limpiamente la VM;
 2. crea una copia sparse recuperable de `data.img` fuera del directorio montado;
 3. usa `virt-customize --firstboot` para inyectar un batch de un solo uso que
-   ejecuta `Set-LocalUser` como SYSTEM en el siguiente arranque; el ejecutor
+   ejecuta `Set-LocalUser` y limpia el bloqueo de la cuenta como SYSTEM en el
+   siguiente arranque; el ejecutor
    `rhsrvany.exe` se construye de forma reproducible desde el nixpkgs fijado;
 4. elimina sólo el contenedor Docker anterior, no el storage;
 5. lo recrea con `USERNAME` y `PASSWORD` actuales y vuelve a iniciar Windows;
-6. valida la password exacta con FreeRDP en modo `auth-only`; ante éxito elimina
-   la copia anterior y ante timeout la conserva sin afirmar que el cambio quedó
-   aplicado.
+6. valida la password exacta con FreeRDP en modo `auth-only`; ante un rechazo
+   explícito no reintenta, ante éxito elimina la copia anterior y ante timeout
+   la conserva sin afirmar que el cambio quedó aplicado.
 
-La vista Windows de Holodeck expone esta operación como **Reemplazar contraseña
-de Windows**, usando exactamente los campos usuario y password del panel y una
-segunda confirmación. La operación se muestra en una terminal porque copiar y
-editar el disco puede tardar. El script de primer arranque no se reintenta en
-bucle si PowerShell falla; en ese caso la terminal conserva la ruta de la copia
-para recuperación.
+La vista Windows de Holodeck mantiene esta operación dentro de **Cambiar
+credencial o borrar la VM**, fuera del recorrido normal. Usa exactamente la
+nueva password escrita y una segunda confirmación. La operación se muestra en
+una terminal porque copiar y editar el disco puede tardar. El script de primer
+arranque no se reintenta en bucle si PowerShell falla; en ese caso la terminal
+conserva la ruta de la copia para recuperación.
 
 Dockurr documenta `USERNAME` y `PASSWORD` como opciones de instalación en su
 [README oficial](https://github.com/dockur/windows). `virt-customize` requiere
@@ -233,9 +284,10 @@ la VM apagada y ejecuta `--firstboot` dentro del guest según su
 
 ## WIPE WindowsVM
 
-El panel expone **WIPE WindowsVM** como una operación separada e irreversible.
-Usa exactamente el usuario y password de los inputs y exige escribir `WIPE` en
-una segunda confirmación. El backend además requiere internamente
+El panel expone **WIPE WindowsVM** dentro de la gestión avanzada como una
+operación separada e irreversible. Usa exactamente el usuario y password nuevos
+de los inputs y exige escribir `WIPE` en una segunda confirmación. El backend
+además requiere internamente
 `WINDOWSVM_WIPE_CONFIRM=WIPE` antes de aceptar el comando.
 
 El wipe valida primero Docker, KVM, la imagen runtime y que el storage sea un
@@ -259,12 +311,15 @@ Por CLI la misma protección requiere una confirmación explícita:
 WINDOWSVM_WIPE_CONFIRM=WIPE windowsvm wipe
 ```
 
-`WINDOWSVM_PASSWORD_FILE` es la opción preferida para una credencial local. Si
-no se define ni ese archivo ni `WINDOWSVM_PASSWORD`, los comandos que necesitan
-la credencial la piden con un prompt silencioso en una terminal. Holodeck ofrece
-usuario y contraseña enmascarada dentro de la propia vista Windows y los entrega
-como credenciales efímeras de un solo uso. No existe una password Nix por
-default.
+`WINDOWSVM_PASSWORD_FILE` y `WINDOWSVM_PASSWORD` son sobreescrituras explícitas.
+Si no se definen, `windowsvm` usa el archivo privado asociado al storage; para
+contenedores anteriores puede leer inicialmente el mismo valor que Docker ya
+conserva en `Config.Env`. Si tampoco existe, pide la credencial con un prompt
+silencioso. Holodeck sólo muestra los campos durante el onboarding o al abrir la
+gestión avanzada; después los mantiene ocultos y reutiliza la copia sin
+mostrarla. Un valor nuevo se entrega como solicitud efímera de un solo uso.
+`password-reset` y `wipe` no aceptan la copia implícita: requieren escribir una
+nueva password. No existe una password Nix por default.
 
 `WINDOWSVM_RDP_CLIENT` sólo hace falta para diagnóstico o una selección manual;
 acepta `sdl-freerdp` y `xfreerdp`. En el uso normal el helper detecta el tipo de

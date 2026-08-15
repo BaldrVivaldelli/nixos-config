@@ -82,6 +82,37 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(["gitlab.com"], status["gitlab"]["hosts"])
         self.assertEqual([], status["gitlab"]["profiles"])
         self.assertTrue(status["windowsVm"]["available"])
+        self.assertFalse(status["windowsVm"]["credentialStored"])
+
+    def test_windows_status_reports_onboarding_without_exposing_the_secret(self) -> None:
+        self.add_command("windowsvm")
+        storage = self.home / "containers" / "windows" / "storage"
+        storage.mkdir(parents=True)
+        credential = storage / ".windowsvm-credentials.json"
+        credential.write_text(
+            json.dumps(
+                {
+                    "schemaVersion": 2,
+                    "username": "Holodeck",
+                    "password": "never-report-this",
+                    "rdpPolicyVersion": 1,
+                }
+            ),
+            encoding="utf-8",
+        )
+        credential.chmod(0o600)
+
+        status = integration_status(self.environment)
+
+        self.assertTrue(status["windowsVm"]["configured"])
+        self.assertTrue(status["windowsVm"]["credentialStored"])
+        self.assertEqual("Holodeck", status["windowsVm"]["credentialUsername"])
+        self.assertTrue(status["windowsVm"]["rdpResilience"])
+        self.assertNotIn("never-report-this", repr(status))
+
+        credential.chmod(0o644)
+        unsafe_status = integration_status(self.environment)
+        self.assertFalse(unsafe_status["windowsVm"]["credentialStored"])
 
     def test_aws_profiles_reads_names_without_credentials(self) -> None:
         aws_dir = self.home / ".aws"
@@ -253,6 +284,67 @@ class IntegrationTests(unittest.TestCase):
             calls[0][1]["env"]["WINDOWSVM_PASSWORD"],
         )
         self.assertNotIn("replacement-from-textbox", repr(result))
+
+    def test_windows_unlock_uses_only_ephemeral_panel_credentials(self) -> None:
+        executable = self.add_command("windowsvm")
+        request = Path(self.environment["XDG_RUNTIME_DIR"]) / (
+            "holodeck-control-windows-rdp.json"
+        )
+        request.write_text(
+            json.dumps(
+                {
+                    "schemaVersion": 1,
+                    "createdAtMs": time.time_ns() // 1_000_000,
+                    "username": "Docker",
+                    "password": "unlock-validation-secret",
+                }
+            ),
+            encoding="utf-8",
+        )
+        calls: list[tuple[list[str], dict[str, Any]]] = []
+
+        def runner(
+            argv: list[str], **kwargs: Any
+        ) -> subprocess.CompletedProcess[str]:
+            calls.append((argv, kwargs))
+            return subprocess.CompletedProcess(argv, 0)
+
+        result = execute_action(
+            "windows-unlock",
+            self.environment,
+            runner=runner,
+            stdout=io.StringIO(),
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertFalse(request.exists())
+        self.assertEqual([str(executable), "unlock"], calls[0][0])
+        self.assertEqual("Docker", calls[0][1]["env"]["WINDOWSVM_USER"])
+        self.assertEqual(
+            "unlock-validation-secret", calls[0][1]["env"]["WINDOWSVM_PASSWORD"]
+        )
+        self.assertNotIn("unlock-validation-secret", repr(result))
+
+    def test_windows_unlock_can_defer_to_the_private_vm_credential(self) -> None:
+        executable = self.add_command("windowsvm")
+        calls: list[tuple[list[str], dict[str, Any]]] = []
+
+        def runner(
+            argv: list[str], **kwargs: Any
+        ) -> subprocess.CompletedProcess[str]:
+            calls.append((argv, kwargs))
+            return subprocess.CompletedProcess(argv, 0)
+
+        result = execute_action(
+            "windows-unlock",
+            self.environment,
+            runner=runner,
+            stdout=io.StringIO(),
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual([str(executable), "unlock"], calls[0][0])
+        self.assertNotIn("env", calls[0][1])
 
     def test_windows_wipe_routes_textbox_credentials_with_explicit_confirmation(
         self,

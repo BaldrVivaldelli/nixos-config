@@ -4,6 +4,23 @@
 
 ### Added
 
+- Added a one-time Windows onboarding flow modeled after Omarchy's one-click
+  launcher, but with a private credential instead of embedding the password in
+  Compose. Holodeck hides the fields after setup, waits through a fresh install,
+  configures local RDP lockout resilience once, and auto-recovers a locked
+  account before opening the graphical session.
+- Added a private per-VM RDP credential file with strict ownership, mode-0600,
+  schema and symlink checks. Holodeck removes its credential fields after the
+  first successful setup or authentication, while `WIPE` removes the secret
+  with the guest storage and requires a new explicit credential.
+- Added a private non-blocking maintenance lock and a bounded FreeRDP
+  authentication probe, preventing duplicate unlock/reset/WIPE actions from
+  repeatedly restarting Windows and handling successful `auth-only` sessions
+  that fail to terminate on their own.
+- Added an automatic Holodeck account-recovery path and advanced `windowsvm
+  unlock` command that preserve the password, schedule the documented ADSI
+  WinNT unlock as `SYSTEM`, keep a sparse recovery copy until validation
+  succeeds, and stop retrying explicit credential rejections.
 - Added a guarded **WIPE WindowsVM** panel action that requires typed
   confirmation, deletes the complete guest storage, preserves the shared folder
   and pinned runtime image, and recreates Windows from the current credential
@@ -80,8 +97,8 @@
 
 - Moved RDP username/password entry into the Holodeck Windows card using
   Noctalia's masked input and a validated one-shot handoff through the private
-  user runtime directory, without persisting credentials or opening a second
-  dialog.
+  user runtime directory, without persisting credentials in the panel, IR or
+  repository and without opening a second dialog.
 - Made non-interactive apply flows require a generated local inventory, split
   the real impure `#existing` target from its synthetic check fixture and build
   NixOS/Home Manager once before activating those exact store paths.

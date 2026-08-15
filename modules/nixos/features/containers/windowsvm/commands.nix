@@ -17,9 +17,11 @@ let
       pkgs.freerdp
       pkgs.glibc.bin
       pkgs.guestfs-tools
+      pkgs.gnugrep
       pkgs.gnutar
       pkgs.jq
       pkgs.shadow
+      pkgs.util-linux
       pkgs.xdg-utils
     ];
     text = ''
@@ -56,9 +58,13 @@ let
       keyboard=''${WINDOWSVM_KEYBOARD:-$keyboard}
       rdp_timeout=''${WINDOWSVM_RDP_TIMEOUT:-90}
       rdp_attempts=''${WINDOWSVM_RDP_ATTEMPTS:-10}
+      install_timeout=''${WINDOWSVM_INSTALL_TIMEOUT:-3600}
       rdp_display_mode=''${WINDOWSVM_RDP_DISPLAY_MODE:-half}
       password_reset_timeout=''${WINDOWSVM_PASSWORD_RESET_TIMEOUT:-240}
+      account_unlock_timeout=''${WINDOWSVM_ACCOUNT_UNLOCK_TIMEOUT:-240}
       container_created=0
+      maintenance_lock_fd=""
+      rdp_policy_version=0
 
       has_active_docker_group() {
         [[ " $(id -nG) " == *" docker "* ]]
@@ -106,6 +112,7 @@ let
         start    Start the container without opening a client
         rdp      Open FreeRDP in half or fullscreen mode
         web      Open the Dockurr web viewer
+        unlock   Unlock the existing local Windows account and restart
         password-reset
                  Replace the existing local Windows password without deleting its disk
         wipe     Irreversibly delete the Windows guest disk and create a fresh VM
@@ -122,9 +129,9 @@ let
         WINDOWSVM_RAM_SIZE     RAM assigned to the VM
         WINDOWSVM_DISK_SIZE    Disk size assigned to the VM
         WINDOWSVM_USER         RDP username, default Docker
-        WINDOWSVM_PASSWORD     RDP password for this process only
-        WINDOWSVM_PASSWORD_FILE  File containing the RDP password
-        WINDOWSVM_BACKUP_DIR   Password-reset disk backups, default beside storage
+        WINDOWSVM_PASSWORD     Explicit RDP password override
+        WINDOWSVM_PASSWORD_FILE  File containing an explicit RDP password override
+        WINDOWSVM_BACKUP_DIR   Account-recovery disk backups, default beside storage
         WINDOWSVM_LANGUAGE     Windows installation language
         WINDOWSVM_REGION       Windows installation region
         WINDOWSVM_KEYBOARD     Windows keyboard layout
@@ -132,8 +139,13 @@ let
         WINDOWSVM_RDP_DISPLAY_MODE  RDP size: half or fullscreen, default half
         WINDOWSVM_RDP_TIMEOUT  Seconds to wait for RDP from "up", default 90
         WINDOWSVM_RDP_ATTEMPTS RDP connection attempts from "up", default 10
+        WINDOWSVM_INSTALL_TIMEOUT  Seconds to wait for the first Windows installation, default 3600
         WINDOWSVM_PASSWORD_RESET_TIMEOUT  Seconds to verify the replacement, default 240
+        WINDOWSVM_ACCOUNT_UNLOCK_TIMEOUT  Seconds to verify the unlock, default 240
         WINDOWSVM_WIPE_CONFIRM  Must be exactly WIPE for the destructive wipe command
+
+      A validated credential is stored as .windowsvm-credentials.json inside
+      WINDOWSVM_STORAGE and reused until that VM storage is wiped.
       USAGE
       }
 
@@ -155,7 +167,156 @@ let
         rm -f "$docker_error"
       }
 
+      acquire_maintenance_lock() {
+        local lock_file
+        local runtime_dir
+
+        if [ -n "$maintenance_lock_fd" ]; then
+          return 0
+        fi
+
+        runtime_dir=''${XDG_RUNTIME_DIR:-}
+        if [ -z "$runtime_dir" ] \
+          || [ -L "$runtime_dir" ] \
+          || [ ! -d "$runtime_dir" ] \
+          || [ "$(stat -c '%u' -- "$runtime_dir" 2>/dev/null || true)" != "$(id -u)" ]; then
+          echo "A private, user-owned XDG_RUNTIME_DIR is required for Windows VM maintenance." >&2
+          return 1
+        fi
+        lock_file="$runtime_dir/windowsvm-$(id -u)-$container_name-maintenance.lock"
+        if [ -L "$lock_file" ] \
+          || { [ -e "$lock_file" ] && [ ! -f "$lock_file" ]; }; then
+          echo "Refusing to use an unsafe Windows VM maintenance lock: $lock_file" >&2
+          return 1
+        fi
+        exec {maintenance_lock_fd}>"$lock_file"
+        chmod 600 "$lock_file"
+        if ! flock --nonblock "$maintenance_lock_fd"; then
+          echo "Another Windows VM launch or maintenance operation is already running." >&2
+          echo "Wait for its window or terminal to finish before retrying." >&2
+          return 1
+        fi
+      }
+
+      credentials_path() {
+        printf '%s/.windowsvm-credentials.json\n' "''${storage_dir%/}"
+      }
+
+      load_stored_credentials() {
+        local credential_file
+        local credential_json
+        local credential_mode
+        local current_uid
+
+        credential_file=$(credentials_path)
+        if [ -L "$credential_file" ] || [ ! -f "$credential_file" ]; then
+          echo "The stored Windows credential is not a regular file: $credential_file" >&2
+          return 1
+        fi
+
+        current_uid=$(id -u)
+        credential_mode=$(stat -c '%a' -- "$credential_file")
+        if [ "$(stat -c '%u' -- "$credential_file")" != "$current_uid" ] \
+          || [ "$credential_mode" != "600" ]; then
+          echo "The stored Windows credential must be owned by the current user with mode 600: $credential_file" >&2
+          return 1
+        fi
+
+        if ! credential_json=$(jq -ce \
+          'if type == "object"
+            and keys == ["password", "schemaVersion", "username"]
+            and .schemaVersion == 1
+            and (.username | type == "string" and length > 0)
+            and (.password | type == "string" and length > 0)
+          then . + {rdpPolicyVersion: 0}
+          elif type == "object"
+            and keys == ["password", "rdpPolicyVersion", "schemaVersion", "username"]
+            and .schemaVersion == 2
+            and (.rdpPolicyVersion | type == "number" and floor == . and . >= 0)
+            and (.username | type == "string" and length > 0)
+            and (.password | type == "string" and length > 0)
+          then . else error("invalid Windows credential") end' \
+          "$credential_file"); then
+          echo "The stored Windows credential is invalid: $credential_file" >&2
+          return 1
+        fi
+
+        username=$(printf '%s' "$credential_json" | jq -r '.username')
+        password=$(printf '%s' "$credential_json" | jq -r '.password')
+        rdp_policy_version=$(printf '%s' "$credential_json" | jq -r '.rdpPolicyVersion')
+        unset credential_json
+        echo "Using the private Windows credential stored with this VM."
+      }
+
+      load_container_credentials() {
+        local container_environment
+        local container_password
+        local container_username
+
+        if ! container_environment=$(docker container inspect "$container_name" 2>/dev/null); then
+          return 1
+        fi
+        if ! container_username=$(printf '%s' "$container_environment" \
+          | jq -er '.[0].Config.Env[] | select(startswith("USERNAME=")) | ltrimstr("USERNAME=")'); then
+          return 1
+        fi
+        if ! container_password=$(printf '%s' "$container_environment" \
+          | jq -er '.[0].Config.Env[] | select(startswith("PASSWORD=")) | ltrimstr("PASSWORD=")'); then
+          return 1
+        fi
+        if [ -z "$container_username" ] || [ -z "$container_password" ]; then
+          return 1
+        fi
+
+        username=$container_username
+        password=$container_password
+        rdp_policy_version=0
+        unset container_environment container_password
+        echo "Using the Windows credential already held by the existing container."
+      }
+
+      save_credentials() {
+        local credential_file
+        local credential_tmp
+
+        validate_windows_credentials
+        credential_file=$(credentials_path)
+        if [ -L "$credential_file" ] \
+          || { [ -e "$credential_file" ] && [ ! -f "$credential_file" ]; }; then
+          echo "Refusing to replace an unsafe Windows credential path: $credential_file" >&2
+          return 1
+        fi
+        if [ -f "$credential_file" ] \
+          && [ "$(stat -c '%u' -- "$credential_file")" != "$(id -u)" ]; then
+          echo "The stored Windows credential is not owned by the current user: $credential_file" >&2
+          return 1
+        fi
+
+        umask 077
+        mkdir -p -- "$storage_dir"
+        credential_tmp=$(mktemp "$storage_dir/.windowsvm-credentials.XXXXXX")
+        if ! jq -nce \
+          --arg username "$username" \
+          --arg password "$password" \
+          --argjson rdpPolicyVersion "$rdp_policy_version" \
+          '{schemaVersion: 2, username: $username, password: $password, rdpPolicyVersion: $rdpPolicyVersion}' \
+          > "$credential_tmp"; then
+          rm -f -- "$credential_tmp"
+          echo "The private Windows credential could not be encoded." >&2
+          return 1
+        fi
+        chmod 600 "$credential_tmp"
+        if ! mv -fT -- "$credential_tmp" "$credential_file"; then
+          rm -f -- "$credential_tmp"
+          echo "The private Windows credential could not be saved." >&2
+          return 1
+        fi
+        echo "The Windows credential is stored privately until this VM storage is wiped."
+      }
+
       load_password() {
+        local allow_stored=''${1:-1}
+
         if [ -n "$password" ]; then
           return
         fi
@@ -169,6 +330,13 @@ let
         elif [ -n "''${WINDOWSVM_PASSWORD:-}" ]; then
           password=$WINDOWSVM_PASSWORD
           unset WINDOWSVM_PASSWORD
+        elif [ "$allow_stored" = "1" ] \
+          && { [ -e "$(credentials_path)" ] || [ -L "$(credentials_path)" ]; }; then
+          load_stored_credentials || exit 1
+        elif [ "$allow_stored" = "1" ] \
+          && container_exists \
+          && load_container_credentials; then
+          :
         elif [ -t 0 ]; then
           printf 'Windows/RDP password: ' >&2
           IFS= read -r -s password
@@ -337,6 +505,8 @@ let
       }
 
       start_container() {
+        local persist_credentials=''${1:-1}
+
         ensure_docker
         ensure_image
 
@@ -360,6 +530,9 @@ let
         if ! create_container; then
           container_created=0
           return 1
+        fi
+        if [ "$persist_credentials" = "1" ]; then
+          save_credentials
         fi
 
         echo "Storage: $storage_dir"
@@ -408,16 +581,35 @@ let
         timeout 1 bash -c "cat < /dev/null > /dev/tcp/127.0.0.1/$rdp_port" >/dev/null 2>&1
       }
 
+      windows_boot_reported_ready() {
+        docker logs --tail 200 "$container_name" 2>&1 \
+          | grep -Eqi 'windows started (successfully|succesfully)'
+      }
+
       wait_for_rdp() {
-        deadline=$((SECONDS + rdp_timeout))
+        local timeout_seconds=''${1:-$rdp_timeout}
+        local require_install_complete=''${2:-0}
+        local deadline=$((SECONDS + timeout_seconds))
+
         while [ "$SECONDS" -lt "$deadline" ]; do
-          if port_open; then
+          if port_open \
+            && { [ "$require_install_complete" = "0" ] || windows_boot_reported_ready; }; then
             return 0
           fi
           sleep 3
         done
 
         return 1
+      }
+
+      validate_wait_timeout() {
+        local name=$1
+        local value=$2
+
+        if [[ ! "$value" =~ ^[1-9][0-9]*$ ]]; then
+          echo "$name must be a positive number of seconds." >&2
+          return 1
+        fi
       }
 
       select_rdp_client() {
@@ -510,7 +702,6 @@ let
       }
 
       open_rdp() {
-        local rdp_client
         local display_mode=$1
 
         ensure_docker
@@ -520,23 +711,47 @@ let
           exit 1
         fi
 
-        rdp_client=$(select_rdp_client)
-        run_freerdp "$rdp_client" "$display_mode"
+        ensure_rdp_resilience || return 1
+        open_rdp_with_retries "$display_mode"
       }
 
       open_rdp_with_retries() {
         local attempt
         local rdp_client
         local display_mode=$1
+        local rdp_output
+        local recovery_attempted=0
 
         rdp_client=$(select_rdp_client) || return 1
         attempt=1
 
         while [ "$attempt" -le "$rdp_attempts" ]; do
           echo "Opening RDP session ($attempt/$rdp_attempts)..."
-          if run_freerdp "$rdp_client" "$display_mode"; then
+          if rdp_output=$(run_freerdp "$rdp_client" "$display_mode" 2>&1); then
+            printf '%s\n' "$rdp_output"
+            save_credentials
             return 0
           fi
+          printf '%s\n' "$rdp_output" >&2
+          case "$rdp_output" in
+            *ERRCONNECT_ACCOUNT_LOCKED_OUT*)
+              if [ "$recovery_attempted" = "0" ]; then
+                recovery_attempted=1
+                echo "Windows reported a locked account; repairing it automatically..."
+                if unlock_account; then
+                  echo "Automatic recovery completed. Reopening RDP..."
+                  attempt=1
+                  continue
+                fi
+              fi
+              echo "Automatic account recovery did not restore RDP." >&2
+              return 1
+              ;;
+            *ERRCONNECT_LOGON_FAILURE*|*ERRCONNECT_PASSWORD_EXPIRED*|*ERRCONNECT_ACCOUNT_DISABLED*|*ERRCONNECT_ACCOUNT_EXPIRED*)
+              echo "RDP authentication was rejected; refusing automatic retries to avoid locking the account." >&2
+              return 1
+              ;;
+          esac
 
           attempt=$((attempt + 1))
           if [ "$attempt" -le "$rdp_attempts" ]; then
@@ -565,6 +780,7 @@ let
         local encoded_command
         local firstboot_script
         local powershell_command
+        local powershell_lockout_policy
         local powershell_password
         local powershell_username
         local reset_dir
@@ -582,7 +798,11 @@ let
 
         powershell_username=''${username//\'/\'\'}
         powershell_password=''${password//\'/\'\'}
-        powershell_command="\$ErrorActionPreference='Stop';\$user='$powershell_username';\$secure=ConvertTo-SecureString '$powershell_password' -AsPlainText -Force;Set-LocalUser -Name \$user -Password \$secure;Enable-LocalUser -Name \$user"
+        powershell_lockout_policy=""
+        if [ "$bind_address" = "127.0.0.1" ]; then
+          powershell_lockout_policy="net.exe accounts /lockoutthreshold:0 | Out-Null;if(\$LASTEXITCODE -ne 0){throw 'Could not disable local account lockout'};"
+        fi
+        powershell_command="\$ErrorActionPreference='Stop';\$user='$powershell_username';\$secure=ConvertTo-SecureString '$powershell_password' -AsPlainText -Force;Set-LocalUser -Name \$user -Password \$secure;Enable-LocalUser -Name \$user;$powershell_lockout_policy\$account=[ADSI]('WinNT://{0}/{1},user' -f \$env:COMPUTERNAME,\$user);\$account.IsAccountLocked=\$false;\$account.SetInfo()"
         encoded_command=$(printf '%s' "$powershell_command" \
           | iconv -f UTF-8 -t UTF-16LE \
           | base64 --wrap=0)
@@ -629,32 +849,123 @@ let
         echo "Recovery copy: $password_reset_backup"
       }
 
-      verify_password_reset() {
+      verify_guest_credentials() {
+        local verification_timeout=$1
         local attempt=1
-        local deadline=$((SECONDS + password_reset_timeout))
+        local auth_output
+        local deadline=$((SECONDS + verification_timeout))
         local rdp_client
 
         rdp_client=$(select_rdp_client) || return 1
-        echo "Waiting for Windows to apply and authenticate the replacement password..."
+        echo "Waiting for Windows to apply the account change and accept the credentials..."
         while [ "$SECONDS" -lt "$deadline" ]; do
           if port_open; then
-            echo "Checking the new credentials ($attempt)..."
-            if printf '%s\n' \
+            echo "Checking the credentials ($attempt)..."
+            if auth_output=$(printf '%s\n' \
               "/v:127.0.0.1:$rdp_port" \
               "/u:$username" \
               "/p:$password" \
               "/cert:ignore" \
               "+auth-only" \
-              "/log-level:ERROR" \
+              "/log-level:INFO" \
               "/timeout:15000" \
-              | "$rdp_client" /args-from:stdin; then
+              | timeout --signal=TERM --kill-after=3s 20s \
+                "$rdp_client" /args-from:stdin 2>&1); then
               return 0
             fi
+            printf '%s\n' "$auth_output" >&2
+            case "$auth_output" in
+              *"Authentication only, exit status 0"*|*"Authentication only, exit status SUCCESS"*)
+                echo "FreeRDP authenticated successfully but did not exit; accepting the verified credentials."
+                return 0
+                ;;
+              *ERRCONNECT_LOGON_FAILURE*|*ERRCONNECT_PASSWORD_EXPIRED*|*ERRCONNECT_ACCOUNT_DISABLED*|*ERRCONNECT_ACCOUNT_EXPIRED*)
+                echo "Windows rejected the supplied credentials; refusing automatic retries to avoid locking the account." >&2
+                return 2
+                ;;
+              *ERRCONNECT_ACCOUNT_LOCKED_OUT*)
+                echo "The account is still locked; waiting for the scheduled unlock to run..." >&2
+                ;;
+            esac
             attempt=$((attempt + 1))
           fi
           sleep 5
         done
         return 1
+      }
+
+      inject_account_unlock() (
+        set -euo pipefail
+
+        local disk_path="$storage_dir/data.img"
+        local encoded_command
+        local firstboot_script
+        local powershell_command
+        local powershell_lockout_policy
+        local powershell_username
+        local reset_dir
+        local runtime_dir
+
+        if [ ! -f "$disk_path" ]; then
+          echo "The Windows system disk was not found: $disk_path" >&2
+          return 1
+        fi
+
+        runtime_dir=''${XDG_RUNTIME_DIR:-/tmp}
+        reset_dir=$(mktemp -d "$runtime_dir/windowsvm-account-unlock.XXXXXX")
+        chmod 700 "$reset_dir"
+        trap 'rm -rf -- "$reset_dir"' EXIT
+
+        powershell_username=''${username//\'/\'\'}
+        powershell_lockout_policy=""
+        if [ "$bind_address" = "127.0.0.1" ]; then
+          powershell_lockout_policy="net.exe accounts /lockoutthreshold:0 | Out-Null;if(\$LASTEXITCODE -ne 0){throw 'Could not disable local account lockout'};"
+        fi
+        powershell_command="\$ErrorActionPreference='Stop';\$user='$powershell_username';$powershell_lockout_policy\$account=[ADSI]('WinNT://{0}/{1},user' -f \$env:COMPUTERNAME,\$user);\$account.IsAccountLocked=\$false;\$account.SetInfo()"
+        encoded_command=$(printf '%s' "$powershell_command" \
+          | iconv -f UTF-8 -t UTF-16LE \
+          | base64 --wrap=0)
+        unset powershell_command
+
+        firstboot_script="$reset_dir/unlock-account.bat"
+        umask 077
+        {
+          printf '@echo off\n'
+          printf 'powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand %s\n' "$encoded_command"
+          printf 'if errorlevel 1 echo Holodeck account unlock failed. Review the Guestfs Firstboot log.\n'
+          printf 'exit /b 0\n'
+        } > "$firstboot_script"
+        unset encoded_command
+
+        echo "Scheduling one-time RDP resilience setup and account unlock..."
+        VIRT_TOOLS_DATA_DIR="$firstboot_tools_dir" virt-customize \
+          --format raw \
+          --add "$disk_path" \
+          --no-logfile \
+          --no-network \
+          --firstboot "$firstboot_script"
+      )
+
+      create_account_unlock_backup() {
+        local backup_dir
+        local backup_timestamp
+        local disk_path="$storage_dir/data.img"
+
+        backup_dir=''${WINDOWSVM_BACKUP_DIR:-''${storage_dir%/}-backups}
+        backup_timestamp=$(date -u +%Y%m%dT%H%M%SZ)
+        umask 077
+        mkdir -p "$backup_dir"
+        account_unlock_backup=$(mktemp "$backup_dir/data-before-account-unlock-$backup_timestamp.XXXXXX.img")
+
+        echo "Creating a recoverable sparse copy before editing the Windows disk..."
+        if ! cp --reflink=auto --sparse=always --preserve=timestamps \
+          -- "$disk_path" "$account_unlock_backup"; then
+          rm -f -- "$account_unlock_backup"
+          echo "The disk backup could not be created; Windows was not modified." >&2
+          return 1
+        fi
+        chmod 600 "$account_unlock_backup"
+        echo "Recovery copy: $account_unlock_backup"
       }
 
       validate_windows_credentials() {
@@ -682,9 +993,82 @@ let
         fi
       }
 
-      reset_password() {
+      validate_account_unlock_credentials() {
+        validate_windows_credentials
+        if [[ ! "$account_unlock_timeout" =~ ^[1-9][0-9]*$ ]]; then
+          echo "WINDOWSVM_ACCOUNT_UNLOCK_TIMEOUT must be a positive number of seconds." >&2
+          return 1
+        fi
+      }
+
+      unlock_account() {
+        acquire_maintenance_lock
         ensure_docker
         load_password
+        validate_account_unlock_credentials
+
+        if ! container_exists; then
+          echo "Container $container_name does not exist. Use 'windowsvm up' to create the VM first." >&2
+          return 1
+        fi
+        if [ ! -f "$storage_dir/data.img" ]; then
+          echo "The Windows system disk was not found: $storage_dir/data.img" >&2
+          return 1
+        fi
+
+        if container_running; then
+          echo "Stopping $container_name cleanly before editing its disk..."
+          docker stop "$container_name" >/dev/null
+        fi
+
+        account_unlock_backup=""
+        if ! create_account_unlock_backup; then
+          echo "The stopped container was preserved and can be started again." >&2
+          return 1
+        fi
+
+        if ! inject_account_unlock; then
+          echo "The account unlock could not be scheduled; the stopped container was preserved." >&2
+          echo "Recovery copy: $account_unlock_backup" >&2
+          return 1
+        fi
+
+        echo "Starting Windows so the one-time account unlock can run..."
+        if ! docker start "$container_name" >/dev/null; then
+          echo "Windows could not be started; the recovery copy was retained: $account_unlock_backup" >&2
+          return 1
+        fi
+
+        if verify_guest_credentials "$account_unlock_timeout"; then
+          rdp_policy_version=1
+          save_credentials
+          rm -f -- "$account_unlock_backup"
+          echo "RDP resilience is configured and the supplied credentials were accepted."
+          echo "The temporary recovery copy was removed because validation succeeded."
+          return 0
+        fi
+
+        echo "Windows did not accept the credentials after the scheduled unlock." >&2
+        echo "The recovery copy was retained: $account_unlock_backup" >&2
+        echo "Review the VM in the web viewer before making another disk change." >&2
+        return 1
+      }
+
+      ensure_rdp_resilience() {
+        load_password
+        if [ "$rdp_policy_version" -ge 1 ]; then
+          return 0
+        fi
+
+        echo "Preparing passwordless Holodeck launches for this Windows disk..."
+        echo "This one-time step disables local account lockout, unlocks the account, and validates RDP."
+        unlock_account
+      }
+
+      reset_password() {
+        acquire_maintenance_lock
+        ensure_docker
+        load_password 0
         validate_password_reset_credentials
 
         if ! container_exists; then
@@ -715,9 +1099,11 @@ let
 
         echo "Recreating only the container metadata; Windows storage is preserved at $storage_dir."
         docker rm "$container_name" >/dev/null
-        start_container
+        start_container 0
         echo "The new password will become active during this Windows boot."
-        if verify_password_reset; then
+        if verify_guest_credentials "$password_reset_timeout"; then
+          rdp_policy_version=1
+          save_credentials
           rm -f -- "$password_reset_backup"
           echo "The exact replacement password was accepted by Windows over RDP."
           echo "The temporary recovery copy was removed because validation succeeded."
@@ -771,10 +1157,11 @@ let
         local wipe_quarantine
         local wipe_timestamp
 
+        acquire_maintenance_lock
         ensure_docker
         ensure_image
         check_devices
-        load_password
+        load_password 0
         validate_windows_credentials
         validate_wipe_storage
 
@@ -829,18 +1216,30 @@ let
 
       case "''${1:-help}" in
         up)
+          acquire_maintenance_lock
           rdp_display_mode=$(normalize_rdp_display_mode "''${2:-$rdp_display_mode}")
+          validate_wait_timeout WINDOWSVM_RDP_TIMEOUT "$rdp_timeout"
+          validate_wait_timeout WINDOWSVM_INSTALL_TIMEOUT "$install_timeout"
           start_container
 
           if [ "$container_created" = "1" ]; then
-            echo "Fresh Windows VM created. Opening the web viewer for the initial setup."
-            echo "When Windows reaches the desktop, run: windowsvm rdp"
-            open_web
-            exit 0
+            echo "Fresh Windows VM created. Opening the web viewer while installation runs."
+            echo "Holodeck will open RDP automatically when Windows is ready."
+            open_web || true
+            current_rdp_timeout=$install_timeout
+            require_install_complete=1
+          else
+            current_rdp_timeout=$rdp_timeout
+            require_install_complete=0
           fi
 
           echo "Waiting for RDP on 127.0.0.1:$rdp_port..."
-          if wait_for_rdp; then
+          if wait_for_rdp "$current_rdp_timeout" "$require_install_complete"; then
+            if ! ensure_rdp_resilience; then
+              echo "Automatic RDP preparation failed. Opening the web viewer for diagnostics." >&2
+              open_web
+              exit 1
+            fi
             if ! open_rdp_with_retries "$rdp_display_mode"; then
               echo "RDP is not accepting sessions yet. Opening the web viewer instead."
               open_web
@@ -851,14 +1250,20 @@ let
           fi
           ;;
         start)
+          acquire_maintenance_lock
           start_container
           ;;
         rdp)
+          acquire_maintenance_lock
           rdp_display_mode=$(normalize_rdp_display_mode "''${2:-$rdp_display_mode}")
+          validate_wait_timeout WINDOWSVM_RDP_TIMEOUT "$rdp_timeout"
           open_rdp "$rdp_display_mode"
           ;;
         web)
           open_web
+          ;;
+        unlock)
+          unlock_account
           ;;
         password-reset)
           reset_password

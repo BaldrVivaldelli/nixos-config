@@ -28,6 +28,7 @@ GITLAB_HOST_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$")
 RDP_REQUEST_FILENAME = "holodeck-control-windows-rdp.json"
 RDP_REQUEST_MAX_BYTES = 8192
 RDP_REQUEST_MAX_AGE_MS = 30_000
+WINDOWS_CREDENTIAL_MAX_BYTES = 8192
 
 
 ACTION_COMMANDS: dict[str, tuple[str, ...]] = {
@@ -39,6 +40,7 @@ ACTION_COMMANDS: dict[str, tuple[str, ...]] = {
     "windows-up": ("windowsvm", "up"),
     "windows-status": ("windowsvm", "status"),
     "windows-rdp": ("windowsvm", "rdp"),
+    "windows-unlock": ("windowsvm", "unlock"),
     "windows-password-reset": ("windowsvm", "password-reset"),
     "windows-wipe": ("windowsvm", "wipe"),
     "windows-web": ("windowsvm", "web"),
@@ -195,6 +197,82 @@ def _command_path(name: str, environ: Mapping[str, str], which: Which) -> str | 
         return which(name)
 
 
+def _windows_credential_state(
+    environ: Mapping[str, str],
+) -> tuple[bool, str, bool]:
+    storage = Path(
+        environ.get(
+            "WINDOWSVM_STORAGE",
+            str(_home(environ) / "containers" / "windows" / "storage"),
+        )
+    ).expanduser()
+    credential_path = storage / ".windowsvm-credentials.json"
+    descriptor = -1
+    try:
+        descriptor = os.open(
+            credential_path,
+            os.O_RDONLY | os.O_CLOEXEC | getattr(os, "O_NOFOLLOW", 0),
+        )
+        credential_status = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(credential_status.st_mode)
+            or credential_status.st_uid != os.getuid()
+            or stat.S_IMODE(credential_status.st_mode) != 0o600
+            or credential_status.st_size > WINDOWS_CREDENTIAL_MAX_BYTES
+        ):
+            return False, "", False
+        with os.fdopen(descriptor, "rb") as credential_file:
+            descriptor = -1
+            raw = credential_file.read(WINDOWS_CREDENTIAL_MAX_BYTES + 1)
+        payload = json.loads(raw.decode("utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return False, "", False
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+
+    if not isinstance(payload, dict):
+        return False, "", False
+    schema_version = payload.get("schemaVersion")
+    if schema_version == 1:
+        if set(payload) != {"schemaVersion", "username", "password"}:
+            return False, "", False
+        policy_version = 0
+    elif schema_version == 2:
+        if set(payload) != {
+            "schemaVersion",
+            "username",
+            "password",
+            "rdpPolicyVersion",
+        }:
+            return False, "", False
+        policy_version = payload.get("rdpPolicyVersion")
+        if (
+            isinstance(policy_version, bool)
+            or not isinstance(policy_version, int)
+            or policy_version < 0
+        ):
+            return False, "", False
+    else:
+        return False, "", False
+
+    username = payload.get("username")
+    password = payload.get("password")
+    if (
+        not isinstance(username, str)
+        or not username
+        or len(username) > 128
+        or username != username.strip()
+        or any(character in username for character in ("\0", "\r", "\n"))
+        or not isinstance(password, str)
+        or not password
+        or len(password) > 4096
+        or any(character in password for character in ("\0", "\r", "\n"))
+    ):
+        return False, "", False
+    return True, username, policy_version >= 1
+
+
 def _parse_profile_file(path: Path) -> dict[str, str]:
     values: dict[str, str] = {}
     try:
@@ -313,6 +391,10 @@ def integration_status(
     holodeck_available = _command_path("holodeck", environ, which) is not None
     glab = _command_path("glab", environ, which)
     gitlab_authenticated, gitlab_hosts = gitlab_auth_state(environ, glab)
+    windows_available = _command_path("windowsvm", environ, which) is not None
+    credential_stored, credential_username, rdp_resilience = (
+        _windows_credential_state(environ)
+    )
 
     return {
         "aws": {
@@ -340,8 +422,11 @@ def integration_status(
             "profiles": [],
         },
         "windowsVm": {
-            "available": _command_path("windowsvm", environ, which) is not None,
-            "configured": _command_path("windowsvm", environ, which) is not None,
+            "available": windows_available,
+            "configured": windows_available and credential_stored,
+            "credentialStored": credential_stored,
+            "credentialUsername": credential_username,
+            "rdpResilience": rdp_resilience,
         },
     }
 
@@ -419,6 +504,7 @@ def execute_action(
     if action in {
         "windows-up",
         "windows-rdp",
+        "windows-unlock",
         "windows-password-reset",
         "windows-wipe",
     }:

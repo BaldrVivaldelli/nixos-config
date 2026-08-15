@@ -93,15 +93,28 @@ aplica la misma regla a la validación manual.
 
 ## Windows VM
 
-La password de Windows/RDP no es una opción Nix ni tiene default. `windowsvm`
-la lee de `WINDOWSVM_PASSWORD_FILE`, de `WINDOWSVM_PASSWORD` o de un prompt
-silencioso. Holodeck usa un campo enmascarado dentro de su vista Windows: escribe
-una solicitud de un solo uso en el `XDG_RUNTIME_DIR` privado, el backend la abre
-sin seguir symlinks, la elimina antes de lanzar `windowsvm` y nunca incluye la
-credencial en argv, el IR o el repo. El panel conserva el valor sólo en memoria
-para reintentos dentro de la vista Windows y lo limpia al salir de la vista o
-cerrar el panel. Para uso habitual por CLI se prefiere un
-archivo local con permisos restrictivos; nunca debe agregarse al repo.
+La password de Windows/RDP no es una opción Nix ni tiene default. En la primera
+creación `windowsvm` la lee de `WINDOWSVM_PASSWORD_FILE`, de
+`WINDOWSVM_PASSWORD` o de un prompt silencioso. Después de crear la VM o de una
+autenticación RDP exitosa, guarda usuario y password en
+`$WINDOWSVM_STORAGE/.windowsvm-credentials.json`, propiedad del usuario y modo
+`0600`. El schema 2 agrega únicamente una versión de la política RDP aplicada.
+El archivo se reemplaza atómicamente, se rechazan symlinks, tipos
+inesperados, ownership ajeno, permisos más amplios y JSON con campos extra. Un
+contenedor anterior sin archivo migra su `Config.Env` sólo a través del mismo
+flujo y la copia se consolida tras una autenticación válida.
+
+El backend de status abre la copia con `O_NOFOLLOW`, valida schema, ownership y
+modo, y sólo devuelve `credentialStored`, el username no secreto y la versión
+de resiliencia; nunca serializa la password. El frontend no lee ni muestra el
+archivo y oculta los inputs una vez configurado. Si el usuario escribe una
+credencial durante el onboarding o la gestión avanzada, crea una solicitud de
+un solo uso en el `XDG_RUNTIME_DIR` privado; el backend la abre sin seguir
+symlinks, la elimina antes de lanzar `windowsvm` y nunca la incluye en argv, el
+IR o el repo. Las credenciales explícitas sólo sustituyen la copia después de
+una creación o autenticación exitosa, de modo que un typo no sobreescribe el
+secreto válido. `password-reset` y `WIPE` siempre exigen una password nueva
+explícita.
 
 La acción explícita de reemplazo toma el valor del mismo textbox, detiene la VM,
 crea una copia sparse recuperable y programa un `Set-LocalUser` de primer
@@ -112,8 +125,26 @@ el contenedor, `docker run` recibe las variables mediante un env-file privado
 efímero, no por argv. Docker conserva la password vigente en `Config.Env` del
 contenedor por contrato de Dockurr. La validación final usa FreeRDP `auth-only`
 con argumentos por stdin: si Windows acepta exactamente la nueva credencial se
-elimina la copia que contiene el estado anterior; si falla o vence el timeout,
-se conserva para recovery y la operación termina con error.
+actualiza el archivo privado y elimina la copia que contiene el estado anterior;
+si falla o vence el timeout, conserva ambos estados anteriores para recovery y
+la operación termina con error.
+
+La preparación automática y la acción avanzada de desbloqueo no cambian la
+password. Con la VM detenida crean la misma clase de copia recuperable y
+programan como `SYSTEM` un cambio ADSI WinNT `IsAccountLocked = false` junto con
+`Account lockout threshold = 0`; luego validan la credencial privada o la
+sobreescritura efímera por RDP. Esta política evita bloqueos futuros pero reduce
+la defensa del guest ante fuerza bruta, por lo que sólo se aplica al perfil
+local con RDP enlazado a `127.0.0.1`. Los rechazos explícitos de autenticación no
+se reintentan automáticamente.
+
+Los lanzamientos y operaciones offline comparten un lock no bloqueante dentro
+del `XDG_RUNTIME_DIR` privado y validado del usuario. Esto impide que dos clics
+abran sesiones duplicadas o que un desbloqueo, reemplazo o WIPE edite el mismo
+disco mientras se inicia. Cada intento `auth-only` está además envuelto en un
+timeout con terminación forzada;
+si FreeRDP registra éxito pero no sale, el helper reconoce ese estado sin
+repetir la autenticación.
 
 `WIPE WindowsVM` tiene una frontera distinta: es irreversible una vez creado el
 contenedor nuevo. El panel exige escribir `WIPE`; el backend agrega un marcador
@@ -121,7 +152,9 @@ cerrado y `windowsvm` vuelve a validarlo. Antes de borrar, el helper rechaza
 symlinks, rutas amplias o sensibles, storage ajeno y directorios que no tengan
 los marcadores de Dockurr. El storage viejo se mueve a una cuarentena hermana y
 se restaura si falla la creación inicial. `shared` y la imagen runtime de Nix no
-forman parte del borrado.
+forman parte del borrado. El archivo privado sí vive dentro de `storage`, por lo
+que se elimina con el guest y la VM nueva vuelve a requerir una password
+explícita.
 
 La imagen runtime tiene un tag local estable y su ID se compara con el config
 digest del archive fijado por Nix antes de crear o arrancar el contenedor. Un

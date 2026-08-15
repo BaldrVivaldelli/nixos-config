@@ -160,6 +160,7 @@ class CliTests(unittest.TestCase):
         self.assertIn("github-setup", payload["actions"])
         self.assertIn("aws-sync", payload["actions"])
         self.assertIn("windows-up", payload["actions"])
+        self.assertIn("windows-unlock", payload["actions"])
         self.assertIn("aws-aliases-apply", payload["commands"])
 
     def test_interactive_actions_reject_json_output(self) -> None:

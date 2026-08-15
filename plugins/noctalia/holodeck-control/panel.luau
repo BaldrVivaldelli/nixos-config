@@ -24,6 +24,7 @@ local COMMANDS = {
   windowsUp = CONFIGCTL .. " action windows-up",
   windowsStatus = CONFIGCTL .. " action windows-status",
   windowsRdp = CONFIGCTL .. " action windows-rdp",
+  windowsUnlock = CONFIGCTL .. " action windows-unlock",
   windowsPasswordReset = CONFIGCTL .. " action windows-password-reset",
   windowsWipe = CONFIGCTL .. " action windows-wipe",
   windowsWeb = CONFIGCTL .. " action windows-web",
@@ -64,8 +65,10 @@ local currentError = ""
 local planSummary = ""
 local pendingPlan = nil
 local confirmingApply = false
+local confirmingWindowsUnlock = false
 local confirmingWindowsPasswordReset = false
 local confirmingWindowsWipe = false
+local windowsCredentialEditorOpen = false
 local windowsWipeConfirmation = ""
 local windowsWipeConfirmationRevision = 0
 local activeView = "overview"
@@ -83,7 +86,13 @@ local integrations = {
   aws = { aliases = {}, available = false, configured = false, profiles = {} },
   github = { available = false, configured = false, profiles = {} },
   gitlab = { available = false, configured = false, profiles = {} },
-  windowsVm = { available = false, configured = false },
+  windowsVm = {
+    available = false,
+    configured = false,
+    credentialStored = false,
+    credentialUsername = "",
+    rdpResilience = false,
+  },
 }
 
 local render
@@ -295,8 +304,10 @@ end
 local function clearWindowsRdpPassword()
   rdpPassword = ""
   rdpPasswordRevision = rdpPasswordRevision + 1
+  confirmingWindowsUnlock = false
   confirmingWindowsPasswordReset = false
   confirmingWindowsWipe = false
+  windowsCredentialEditorOpen = false
   windowsWipeConfirmation = ""
   windowsWipeConfirmationRevision = windowsWipeConfirmationRevision + 1
 end
@@ -311,7 +322,17 @@ local function windowsRdpCredentialsReady()
     and string.find(rdpPassword, "\r", 1, true) == nil
 end
 
-local function prepareWindowsCredentials()
+local function prepareWindowsCredentials(requirePassword)
+  if rdpPassword == "" then
+    if rdpCredentialRequestPath ~= "" then
+      noctalia.removeFile(rdpCredentialRequestPath)
+    end
+    if requirePassword then
+      fail(tr("error.rdp_credentials_required"))
+      return false
+    end
+    return true
+  end
   if rdpCredentialRequestPath == "" then
     fail(tr("error.rdp_request_unavailable"))
     return false
@@ -345,7 +366,8 @@ local function openWindowsRdpAction(action)
     fail(tr("error.command_not_allowed"))
     return
   end
-  if not prepareWindowsCredentials() then
+  local integration = integrations.windowsVm or {}
+  if not prepareWindowsCredentials(integration.credentialStored ~= true) then
     return
   end
 
@@ -361,13 +383,36 @@ local function openWindowsRdpAction(action)
   render()
 end
 
+local function openWindowsUnlockAction()
+  local command = COMMANDS.windowsUnlock
+  if command == nil then
+    fail(tr("error.command_not_allowed"))
+    return
+  end
+  if not prepareWindowsCredentials(false) then
+    return
+  end
+
+  confirmingWindowsUnlock = false
+  local opened = noctalia.runInTerminal(command)
+  if opened then
+    notice = tr("notice.windows_unlock_started")
+    currentError = ""
+  else
+    noctalia.removeFile(rdpCredentialRequestPath)
+    notice = ""
+    currentError = tr("error.terminal_not_started")
+  end
+  render()
+end
+
 local function openWindowsPasswordResetAction()
   local command = COMMANDS.windowsPasswordReset
   if command == nil then
     fail(tr("error.command_not_allowed"))
     return
   end
-  if not prepareWindowsCredentials() then
+  if not prepareWindowsCredentials(true) then
     return
   end
 
@@ -390,7 +435,7 @@ local function openWindowsWipeAction()
     fail(tr("error.command_not_allowed"))
     return
   end
-  if not prepareWindowsCredentials() then
+  if not prepareWindowsCredentials(true) then
     return
   end
 
@@ -416,6 +461,15 @@ local function applyStatusPayload(payload)
   if type(payload.integrations) == "table" then
     integrations = payload.integrations
     resetAwsAliasDraft()
+    local windows = integrations.windowsVm or {}
+    if windows.credentialStored == true then
+      if type(windows.credentialUsername) == "string" and windows.credentialUsername ~= "" then
+        rdpUsername = windows.credentialUsername
+      end
+      rdpPassword = ""
+      rdpPasswordRevision = rdpPasswordRevision + 1
+      windowsCredentialEditorOpen = false
+    end
   end
   setSelectionsFromIr(payload.ir or payload.effective)
   recomputeDirty()
@@ -1151,6 +1205,8 @@ local function integrationDetail()
   if activeIntegration == "windows" then
     local integration = integrations.windowsVm or {}
     local available = enabled and integration.available == true
+    local credentialStored = integration.credentialStored == true
+    local showCredentialEditor = not credentialStored or windowsCredentialEditorOpen
     local children = {
       integrationDetailHeader(tr("panel.integrations.windows.title"), "device-desktop", integration),
       ui.label({ text = tr("panel.integrations.windows.description"), color = "on_surface_variant", maxLines = 3 }),
@@ -1163,23 +1219,48 @@ local function integrationDetail()
         maxLines = 3,
       }),
       ui.separator({ spacing = 2 }),
-      ui.label({
-        text = tr("panel.integrations.windows.access_title"),
-        fontWeight = "bold",
-        color = "on_surface",
-      }),
-      ui.label({
-        text = tr("panel.integrations.windows.access_description"),
+    }
+
+    table.insert(children, ui.label({
+      text = credentialStored
+        and tr("panel.integrations.windows.access_ready_title")
+        or tr("panel.integrations.windows.access_title"),
+      fontWeight = "bold",
+      color = "on_surface",
+    }))
+
+    if credentialStored and not showCredentialEditor then
+      table.insert(children, ui.label({
+        text = integration.rdpResilience == true
+          and tr("panel.integrations.windows.access_ready_description")
+          or tr("panel.integrations.windows.access_pending_resilience"),
         fontSize = 13,
         color = "on_surface_variant",
-        maxLines = 3,
-      }),
-      ui.label({
+        maxLines = 4,
+      }))
+      table.insert(children, ui.button({
+        text = tr("panel.integrations.windows.manage_access"),
+        glyph = "key",
+        variant = "ghost",
+        controlSize = "sm",
+        enabled = available,
+        onClick = "onWindowsCredentialManageClicked",
+      }))
+    else
+      table.insert(children, ui.label({
+        text = credentialStored
+          and tr("panel.integrations.windows.manage_access_description")
+          or tr("panel.integrations.windows.onboarding_description"),
+        fontSize = 13,
+        color = "on_surface_variant",
+        maxLines = 4,
+      }))
+      table.insert(children, ui.label({
         text = tr("panel.integrations.windows.username"),
         color = "on_surface_variant",
         fontSize = 11,
-      }),
-      ui.input({
+      }))
+      table.insert(children, ui.input({
         key = "windows-rdp-username",
         value = rdpUsername,
         placeholder = tr("panel.integrations.windows.username_placeholder"),
@@ -1187,119 +1268,65 @@ local function integrationDetail()
         enabled = available,
         onChange = function(value)
           rdpUsername = value
+          confirmingWindowsUnlock = false
           confirmingWindowsPasswordReset = false
           confirmingWindowsWipe = false
         end,
-      }),
-      ui.label({
+      }))
+      table.insert(children, ui.label({
         text = tr("panel.integrations.windows.password"),
         color = "on_surface_variant",
         fontSize = 11,
-      }),
-      ui.input({
+      }))
+      table.insert(children, ui.input({
         key = "windows-rdp-password-" .. tostring(rdpPasswordRevision),
         value = rdpPassword,
-        placeholder = tr("panel.integrations.windows.password_placeholder"),
+        placeholder = credentialStored
+          and tr("panel.integrations.windows.password_new_placeholder")
+          or tr("panel.integrations.windows.password_once_placeholder"),
         password = true,
         controlSize = "sm",
         enabled = available,
         onChange = function(value)
           rdpPassword = value
+          confirmingWindowsUnlock = false
           confirmingWindowsPasswordReset = false
           confirmingWindowsWipe = false
         end,
-      }),
-      ui.button({
-        text = tr("panel.integrations.windows.password_reset"),
-        glyph = "key",
-        variant = "secondary",
-        controlSize = "sm",
-        enabled = available,
-        onClick = "onWindowsPasswordResetClicked",
-      }),
-      ui.button({
-        text = "WIPE WindowsVM",
-        glyph = "trash",
-        variant = "destructive",
-        controlSize = "sm",
-        enabled = available,
-        onClick = "onWindowsWipeClicked",
-      }),
-      ui.separator({ spacing = 2 }),
-      ui.label({
-        text = tr("panel.integrations.windows.display_title"),
-        fontWeight = "bold",
-        color = "on_surface",
-      }),
-      ui.label({
-        text = tr("panel.integrations.windows.display_description"),
-        fontSize = 13,
-        color = "on_surface_variant",
-        maxLines = 3,
-      }),
-      ui.select({
-        key = "windows-rdp-display-mode",
-        options = rdpDisplayModeOptions,
-        selectedIndex = selectedRdpDisplayModeIndex,
-        controlSize = "sm",
-        enabled = available,
-        onChange = "onWindowsRdpDisplayModeChanged",
-      }),
-      ui.separator({ spacing = 2 }),
-      ui.row({ gap = 8 }, {
-        ui.button({
-          text = tr("panel.integrations.windows.open"),
-          variant = "primary",
-          controlSize = "sm",
-          enabled = available,
-          flexGrow = 1,
-          onClick = "onWindowsUpClicked",
-        }),
-        ui.button({
-          text = "RDP",
-          controlSize = "sm",
-          enabled = available,
-          flexGrow = 1,
-          onClick = "onWindowsRdpClicked",
-        }),
-        ui.button({
-          text = tr("panel.integrations.windows.web"),
-          controlSize = "sm",
-          enabled = available,
-          flexGrow = 1,
-          onClick = "onWindowsWebClicked",
-        }),
-      }),
-      ui.row({ gap = 8 }, {
-        ui.button({
-          text = tr("panel.integrations.windows.status"),
+      }))
+
+      if credentialStored then
+        table.insert(children, ui.row({ gap = 8 }, {
+          ui.button({
+            text = tr("panel.integrations.windows.password_reset"),
+            glyph = "key",
+            variant = "secondary",
+            controlSize = "sm",
+            enabled = available and windowsRdpCredentialsReady(),
+            flexGrow = 1,
+            onClick = "onWindowsPasswordResetClicked",
+          }),
+          ui.button({
+            text = "WIPE WindowsVM",
+            glyph = "trash",
+            variant = "destructive",
+            controlSize = "sm",
+            enabled = available and windowsRdpCredentialsReady(),
+            flexGrow = 1,
+            onClick = "onWindowsWipeClicked",
+          }),
+        }))
+        table.insert(children, ui.button({
+          text = tr("panel.integrations.windows.manage_access_cancel"),
           variant = "ghost",
           controlSize = "sm",
-          enabled = available,
-          flexGrow = 1,
-          onClick = "onWindowsStatusClicked",
-        }),
-        ui.button({
-          text = tr("panel.integrations.windows.logs"),
-          variant = "ghost",
-          controlSize = "sm",
-          enabled = available,
-          flexGrow = 1,
-          onClick = "onWindowsLogsClicked",
-        }),
-        ui.button({
-          text = tr("panel.integrations.windows.stop"),
-          variant = "destructive",
-          controlSize = "sm",
-          enabled = available,
-          flexGrow = 1,
-          onClick = "onWindowsDownClicked",
-        }),
-      }),
-    }
+          onClick = "onWindowsCredentialManageCancelClicked",
+        }))
+      end
+    end
 
     if confirmingWindowsPasswordReset then
-      table.insert(children, 12, ui.column({
+      table.insert(children, ui.column({
         fill = "error/0.10",
         radius = 8,
         padding = 10,
@@ -1336,7 +1363,7 @@ local function integrationDetail()
     end
 
     if confirmingWindowsWipe then
-      table.insert(children, 13, ui.column({
+      table.insert(children, ui.column({
         fill = "error/0.14",
         radius = 8,
         padding = 10,
@@ -1382,6 +1409,74 @@ local function integrationDetail()
         }),
       }))
     end
+
+    table.insert(children, ui.separator({ spacing = 2 }))
+    table.insert(children, ui.label({
+      text = tr("panel.integrations.windows.display_title"),
+      fontWeight = "bold",
+      color = "on_surface",
+    }))
+    table.insert(children, ui.label({
+      text = tr("panel.integrations.windows.display_description"),
+      fontSize = 13,
+      color = "on_surface_variant",
+      maxLines = 3,
+    }))
+    table.insert(children, ui.select({
+      key = "windows-rdp-display-mode",
+      options = rdpDisplayModeOptions,
+      selectedIndex = selectedRdpDisplayModeIndex,
+      controlSize = "sm",
+      enabled = available,
+      onChange = "onWindowsRdpDisplayModeChanged",
+    }))
+    table.insert(children, ui.separator({ spacing = 2 }))
+    table.insert(children, ui.row({ gap = 8 }, {
+      ui.button({
+        text = credentialStored
+          and tr("panel.integrations.windows.open")
+          or tr("panel.integrations.windows.onboarding_open"),
+        glyph = "device-desktop",
+        variant = "primary",
+        controlSize = "sm",
+        enabled = available and (credentialStored or windowsRdpCredentialsReady()),
+        flexGrow = 2,
+        onClick = "onWindowsUpClicked",
+      }),
+      ui.button({
+        text = tr("panel.integrations.windows.web"),
+        controlSize = "sm",
+        enabled = available,
+        flexGrow = 1,
+        onClick = "onWindowsWebClicked",
+      }),
+    }))
+    table.insert(children, ui.row({ gap = 8 }, {
+      ui.button({
+        text = tr("panel.integrations.windows.status"),
+        variant = "ghost",
+        controlSize = "sm",
+        enabled = available,
+        flexGrow = 1,
+        onClick = "onWindowsStatusClicked",
+      }),
+      ui.button({
+        text = tr("panel.integrations.windows.logs"),
+        variant = "ghost",
+        controlSize = "sm",
+        enabled = available,
+        flexGrow = 1,
+        onClick = "onWindowsLogsClicked",
+      }),
+      ui.button({
+        text = tr("panel.integrations.windows.stop"),
+        variant = "destructive",
+        controlSize = "sm",
+        enabled = available,
+        flexGrow = 1,
+        onClick = "onWindowsDownClicked",
+      }),
+    }))
 
     return card(children)
   end
@@ -1866,11 +1961,50 @@ function onWindowsRdpClicked()
   openWindowsRdpAction("windowsRdp")
 end
 
+function onWindowsCredentialManageClicked()
+  windowsCredentialEditorOpen = true
+  confirmingWindowsUnlock = false
+  confirmingWindowsPasswordReset = false
+  confirmingWindowsWipe = false
+  currentError = ""
+  notice = ""
+  render()
+end
+
+function onWindowsCredentialManageCancelClicked()
+  clearWindowsRdpPassword()
+  notice = tr("notice.windows_credentials_unchanged")
+  render()
+end
+
+function onWindowsUnlockClicked()
+  confirmingWindowsUnlock = true
+  confirmingWindowsPasswordReset = false
+  confirmingWindowsWipe = false
+  currentError = ""
+  notice = ""
+  render()
+end
+
+function onWindowsUnlockCancelClicked()
+  confirmingWindowsUnlock = false
+  notice = tr("notice.windows_unlock_cancelled")
+  render()
+end
+
+function onWindowsUnlockConfirmClicked()
+  if not confirmingWindowsUnlock then
+    return
+  end
+  openWindowsUnlockAction()
+end
+
 function onWindowsPasswordResetClicked()
   if not windowsRdpCredentialsReady() then
     fail(tr("error.rdp_credentials_required"))
     return
   end
+  confirmingWindowsUnlock = false
   confirmingWindowsPasswordReset = true
   confirmingWindowsWipe = false
   currentError = ""
@@ -1896,6 +2030,7 @@ function onWindowsWipeClicked()
     fail(tr("error.rdp_credentials_required"))
     return
   end
+  confirmingWindowsUnlock = false
   confirmingWindowsPasswordReset = false
   confirmingWindowsWipe = true
   windowsWipeConfirmation = ""

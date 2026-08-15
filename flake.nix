@@ -437,6 +437,23 @@
             grep -F 'unset WINDOWSVM_PASSWORD' ${existingTestWindowsVmPackage}/bin/windowsvm
             grep -F '"+dynamic-resolution"' ${existingTestWindowsVmPackage}/bin/windowsvm
             grep -F 'password-reset)' ${existingTestWindowsVmPackage}/bin/windowsvm
+            grep -F 'unlock)' ${existingTestWindowsVmPackage}/bin/windowsvm
+            grep -F 'IsAccountLocked=\$false' ${existingTestWindowsVmPackage}/bin/windowsvm
+            grep -F 'refusing automatic retries to avoid locking the account' ${existingTestWindowsVmPackage}/bin/windowsvm
+            grep -F '.windowsvm-credentials.json' ${existingTestWindowsVmPackage}/bin/windowsvm
+            grep -F 'must be owned by the current user with mode 600' ${existingTestWindowsVmPackage}/bin/windowsvm
+            grep -F 'Refusing to replace an unsafe Windows credential path' ${existingTestWindowsVmPackage}/bin/windowsvm
+            grep -F 'start_container 0' ${existingTestWindowsVmPackage}/bin/windowsvm
+            test "$(grep -Fc 'load_password 0' ${existingTestWindowsVmPackage}/bin/windowsvm)" -eq 2
+            grep -F 'flock --nonblock "$maintenance_lock_fd"' ${existingTestWindowsVmPackage}/bin/windowsvm
+            grep -F 'timeout --signal=TERM --kill-after=3s 20s' ${existingTestWindowsVmPackage}/bin/windowsvm
+            grep -F 'Authentication only, exit status SUCCESS' ${existingTestWindowsVmPackage}/bin/windowsvm
+            grep -F 'schemaVersion: 2' ${existingTestWindowsVmPackage}/bin/windowsvm
+            grep -F 'rdp_policy_version=1' ${existingTestWindowsVmPackage}/bin/windowsvm
+            grep -F 'net.exe accounts /lockoutthreshold:0' ${existingTestWindowsVmPackage}/bin/windowsvm
+            grep -F 'Holodeck will open RDP automatically when Windows is ready.' ${existingTestWindowsVmPackage}/bin/windowsvm
+            grep -F 'WINDOWSVM_INSTALL_TIMEOUT' ${existingTestWindowsVmPackage}/bin/windowsvm
+            grep -F 'repairing it automatically' ${existingTestWindowsVmPackage}/bin/windowsvm
             grep -F 'wipe)' ${existingTestWindowsVmPackage}/bin/windowsvm
             grep -F 'WINDOWSVM_WIPE_CONFIRM=WIPE' ${existingTestWindowsVmPackage}/bin/windowsvm
             grep -F 'Refusing to wipe an unsafe storage path' ${existingTestWindowsVmPackage}/bin/windowsvm

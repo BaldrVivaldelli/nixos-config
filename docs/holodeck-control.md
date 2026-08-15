@@ -103,7 +103,7 @@ La vista de integraciones reúne:
   sufijos `use1` y `use2`. El editor permite escribir un alias, aceptar una
   recomendación, conservar ambas regiones, dejar sólo una o agregar otras
   separadas por coma; las elecciones sobreviven a las resincronizaciones;
-- **Windows VM**: disponibilidad de `windowsvm`, inicio, estado, RDP, visor web,
+- **Windows VM**: onboarding único, apertura RDP automática, estado, visor web,
   reemplazo explícito de la password local, recreación total mediante WIPE,
   logs y detención.
 
@@ -112,22 +112,27 @@ GitHub y autenticar GitLab y, al terminar, siempre ofrece configurar o
 resincronizar AWS SSO;
 `Diagnóstico` ejecuta `holodeck doctor`. Las operaciones interactivas se abren en una
 terminal y al finalizar se puede usar la recarga del encabezado para releer el
-estado. **RDP** y **Web** son lanzadores gráficos: se ejecutan directamente sin
-crear una terminal efímera. La vista Windows contiene usuario, contraseña
-enmascarada y tamaño de sesión; cada solicitud efímera se consume en el
-siguiente lanzamiento y se entrega al cliente SDL nativo mediante el runtime
-privado del usuario. El campo permanece en memoria para permitir
-reintentos mientras la vista Windows siga abierta y se limpia al salir de ella
-o cerrar el panel. **Reemplazar contraseña de Windows** pide una segunda
-confirmación, abre una terminal visible, preserva el storage y usa exactamente
-los valores de esos campos para sustituir la credencial del guest en su próximo
-arranque. Los botones usan tamaños semánticos de Noctalia, la acción principal de
-cada vista queda destacada y **Detener** usa explícitamente el estilo
-destructivo.
+estado. **Abrir Windows** y **Web** son lanzadores gráficos: se ejecutan
+directamente sin crear una terminal efímera. La vista Windows muestra usuario y
+password enmascarada sólo durante el onboarding. Después de crear o autenticar
+la VM, `windowsvm` conserva la credencial en un archivo privado `0600` dentro
+del storage; el backend valida el archivo y sólo devuelve al panel un booleano,
+el username y el estado de resiliencia, nunca la password. Desde entonces los
+inputs quedan ocultos y **Abrir Windows** inicia la VM, espera RDP, aplica una
+única preparación contra bloqueos si todavía falta y abre FreeRDP.
+
+Si Windows informa excepcionalmente `ACCOUNT_LOCKED_OUT`, el mismo lanzamiento
+crea una copia sparse, programa el desbloqueo como `SYSTEM`, reinicia, valida y
+vuelve a abrir RDP sin intervención. **Cambiar credencial o borrar la VM** revela
+la gestión avanzada: **Reemplazar contraseña de Windows** conserva el storage y
+usa exactamente el valor nuevo, mientras WIPE recrea todo el guest. Los botones
+usan tamaños semánticos de Noctalia, la acción principal queda destacada y
+**Detener** usa explícitamente el estilo destructivo.
 
 **WIPE WindowsVM** es una acción destructiva independiente: exige el usuario y
-password de los inputs, una segunda confirmación escribiendo `WIPE` y una
-terminal visible. Elimina el guest completo y lo instala desde cero, pero
+una password nueva en los inputs de gestión avanzada, una segunda confirmación
+escribiendo `WIPE` y una terminal visible. Elimina el guest completo y lo
+instala desde cero, pero
 preserva `shared` y la imagen runtime declarativa. Si la creación inicial del
 contenedor falla, restaura el storage anterior desde una cuarentena atómica.
 
@@ -154,6 +159,7 @@ holodeckctl action github-setup
 holodeckctl action gitlab-setup
 holodeckctl action aws-sync
 holodeckctl action windows-up
+holodeckctl action windows-unlock
 ```
 
 `plan` valida el archivo y muestra el `argv` literal. `apply` mantiene el lock

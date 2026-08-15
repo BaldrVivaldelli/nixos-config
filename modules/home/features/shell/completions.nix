@@ -29,6 +29,7 @@ let
     "start"
     "status"
     "stop"
+    "unlock"
     "up"
     "web"
     "wipe"

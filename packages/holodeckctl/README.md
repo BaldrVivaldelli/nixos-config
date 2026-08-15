@@ -25,6 +25,7 @@ holodeckctl action aws-sync
 holodeckctl action windows-up
 holodeckctl action windows-status
 holodeckctl action windows-rdp
+holodeckctl action windows-unlock
 holodeckctl action windows-password-reset
 holodeckctl action windows-wipe
 holodeckctl action windows-web
@@ -43,9 +44,10 @@ porque el instalador existente solicita elevación durante `nixos-rebuild`.
 
 `status --json` agrega un resumen no sensible de GitHub, GitLab, AWS y
 `windowsvm`. Sólo expone perfiles GitHub, el host autenticado de GitLab,
-cuenta/rol AWS y disponibilidad de comandos. `action` acepta exclusivamente el
-enum documentado, resuelve el ejecutable y usa `shell=False`; los flujos
-interactivos no aceptan `--json`.
+cuenta/rol AWS, disponibilidad de comandos y, para Windows, si existe una
+credencial segura, su username y la versión de resiliencia RDP. Nunca devuelve
+la password. `action` acepta exclusivamente el enum documentado, resuelve el
+ejecutable y usa `shell=False`; los flujos interactivos no aceptan `--json`.
 
 `gitlab-setup` abre el flujo automático de Holodeck. Acepta la URL de la
 instancia o de un grupo; Holodeck extrae el host y `glab` reutiliza una sesión

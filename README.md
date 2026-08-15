@@ -140,8 +140,11 @@ es necesario reiniciar. Plasma permanece disponible como alternativa. Ver
 
 El mismo target habilita Docker y agrega `windowsvm` con autocompletado de Zsh.
 La primera creación se inicia con `windowsvm up`; el visor web y RDP sólo se
-publican en `127.0.0.1`. La tarjeta Windows de Holodeck permite guardar si RDP
-debe abrirse a media pantalla o en pantalla completa. Ver
+publican en `127.0.0.1`. La tarjeta Windows de Holodeck pide la credencial una
+sola vez: después la oculta y **Abrir Windows** inicia la VM, espera la primera
+instalación, prepara automáticamente RDP contra bloqueos y abre FreeRDP. La
+credencial privada vive asociada al storage y sólo vuelve a solicitarse cuando
+se elimina ese guest. Ver
 [docs/containers.md](docs/containers.md).
 
 `inventory.nix` contiene defaults portables y `inventory.local.nix` los datos
