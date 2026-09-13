@@ -111,8 +111,14 @@ cambios del sistema WSL se aplican con el entrypoint seguro:
 
 Holodeck Control inicia AWS SSO y descubre cada cuenta y rol asignados.
 `awslogin` renueva una sesión, `awscxt` selecciona y exporta un perfil,
-`awsprofiles` lista perfiles y `awswho` muestra la identidad activa. Después
-del login, cada cuenta/rol genera automáticamente perfiles `use1` y `use2`. El
+`awsprofiles` lista perfiles y `awswho` muestra la identidad activa.
+`awscxt` recuerda la selección en `$XDG_STATE_HOME/aws/last-profile` (por defecto,
+`~/.local/state/aws/last-profile`). `awslogin` usa el perfil pasado como argumento,
+`AWS_PROFILE`, `AWS_DEFAULT_PROFILE` o el último guardado, en ese orden. Si no hay
+ninguno, abre el selector; después de un login exitoso también guarda y exporta
+el perfil. Así la elección se conserva entre terminales sin guardar credenciales.
+
+Después del login, cada cuenta/rol genera automáticamente perfiles `use1` y `use2`. El
 editor permite asignar un alias personalizado o recomendado, conservar ambas
 regiones, dejar sólo una o agregar otra como `sae1`; las elecciones se conservan
 al resincronizar. Los nombres no secretos para completion se declaran con

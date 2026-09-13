@@ -82,59 +82,64 @@ Python, la validación Nix, los tests y la UI.
 
 ## Navegación e integraciones
 
-La interfaz usa los controles declarativos nativos de Noctalia y una barra
-lateral compacta, equivalente al modo compacto del Control Center, para
-organizar el flujo en tres vistas:
+La interfaz es el panel Luau nativo `holodeck/control:control` de Noctalia.
+El icono `holodeck/control:config` de la barra abre ese mismo panel; no abre un
+navegador ni una aplicación web. Se conserva la entrada del launcher.
 
-- **Resumen**: estado del IR y lectura rápida de las cuatro integraciones;
-- **Sistema**: target, apariencia, guardado del IR, plan y confirmación;
-- **Integraciones**: selector compacto y detalle de un proveedor por vez.
+El inicio presenta **Trabajo** y **Equipo** con la misma jerarquía. Trabajo
+incluye AWS, Windows, GitHub y GitLab. Equipo incluye apariencia, alcance de la
+configuración, aplicación y tamaño de Windows. Una búsqueda filtra todas las
+tareas; las mismas acciones se encuentran desplazándose por el inicio.
 
-La vista de integraciones reúne:
+El presupuesto de navegación se cuenta desde el panel abierto:
 
-- **GitHub**: perfiles detectados y configuración completa de auth, SSH y Git;
-- **GitLab**: un único botón acepta la URL de la instancia o de un grupo;
-  después extrae el host y se limita a reutilizar o abrir OAuth web/SSO, sin
-  crear perfiles, claves SSH, routing Git ni un host hardcodeado;
-- **AWS**: un único botón abre el login SSO y descubre cada combinación de
-  cuenta y rol asignada; la URL se lee de una sesión local existente o se
-  solicita en la primera ejecución, nunca desde el inventario. Cada asignación
-  genera automáticamente un perfil en `us-east-1` y otro en `us-east-2`, con
-  sufijos `use1` y `use2`. El editor permite escribir un alias, aceptar una
-  recomendación, conservar ambas regiones, dejar sólo una o agregar otras
-  separadas por coma; las elecciones sobreviven a las resincronizaciones;
-- **Windows VM**: onboarding único, apertura RDP automática, estado, visor web,
-  reemplazo explícito de la password local, recreación total mediante WIPE,
-  logs y detención.
+| Tarea | Recorrido | Clics |
+| --- | --- | --- |
+| Windows configurado | Abrir Windows | 1 |
+| AWS con perfil recordado | Entrar a AWS | 1 |
+| Seleccionar perfil AWS | Cambiar perfil → elegir perfil | 2 |
+| Alias de una cuenta | Editar alias → elegir cuenta → guardar | 3 |
+| Apariencia o alcance | Abrir tarea → elegir opción → confirmar y aplicar | 3 |
+| Aplicar configuración guardada | Aplicar cambios → confirmar | 2 |
+| Tamaño de Windows | Ventana de Windows → elegir tamaño | 2 |
+| Reemplazar contraseña o recrear Windows | Abrir tarea → confirmar | 2 |
 
-`Configurar todo` reutiliza el wizard existente de `holodeck` para configurar
-GitHub y autenticar GitLab y, al terminar, siempre ofrece configurar o
-resincronizar AWS SSO;
-`Diagnóstico` ejecuta `holodeck doctor`. Las operaciones interactivas se abren en una
-terminal y al finalizar se puede usar la recarga del encabezado para releer el
-estado. **Abrir Windows** y **Web** son lanzadores gráficos: se ejecutan
-directamente sin crear una terminal efímera. La vista Windows muestra usuario y
-password enmascarada sólo durante el onboarding. Después de crear o autenticar
-la VM, `windowsvm` conserva la credencial en un archivo privado `0600` dentro
-del storage; el backend valida el archivo y sólo devuelve al panel un booleano,
-el username y el estado de resiliencia, nunca la password. Desde entonces los
-inputs quedan ocultos y **Abrir Windows** inicia la VM, espera RDP, aplica una
-única preparación contra bloqueos si todavía falta y abre FreeRDP.
+Escritura, edición de campos y autenticación externa se consideran trabajo
+adicional. Las operaciones interactivas mantienen su terminal visible.
 
-Si Windows informa excepcionalmente `ACCOUNT_LOCKED_OUT`, el mismo lanzamiento
-crea una copia sparse, programa el desbloqueo como `SYSTEM`, reinicia, valida y
-vuelve a abrir RDP sin intervención. **Cambiar credencial o borrar la VM** revela
-la gestión avanzada: **Reemplazar contraseña de Windows** conserva el storage y
-usa exactamente el valor nuevo, mientras WIPE recrea todo el guest. Los botones
-usan tamaños semánticos de Noctalia, la acción principal queda destacada y
-**Detener** usa explícitamente el estilo destructivo.
+AWS usa el mismo archivo `~/.local/state/aws/last-profile` que los helpers de
+Zsh (`$XDG_STATE_HOME/aws/last-profile` si está definido). La selección desde el
+panel se entrega como JSON a `aws-profile-select`, que valida el nombre contra
+los perfiles existentes y lo guarda de forma atómica. `aws-login` reutiliza
+el perfil del entorno o el último guardado. No cambia variables de terminales
+que ya estaban abiertas. Sin selección, el panel ofrece elegir un perfil.
 
-**WIPE WindowsVM** es una acción destructiva independiente: exige el usuario y
-una password nueva en los inputs de gestión avanzada, una segunda confirmación
-escribiendo `WIPE` y una terminal visible. Elimina el guest completo y lo
-instala desde cero, pero
-preserva `shared` y la imagen runtime declarativa. Si la creación inicial del
-contenedor falla, restaura el storage anterior desde una cuarentena atómica.
+Renovar la sesión y sincronizar cuentas son acciones separadas. Sincronizar
+conserva el descubrimiento de cuentas/roles y las preferencias de alias y
+regiones. El editor permite buscar una cuenta y editarla individualmente;
+una acción aparte aplica los alias recomendados a todas las cuentas.
+
+La tarea de apariencia o alcance conserva las elecciones en memoria hasta
+**Confirmar y aplicar**. Ese botón ejecuta uno de cinco comandos fijos
+`apply-change`: el backend adquiere el lock, valida, guarda la opción elegida
+y ejecuta el instalador. La UI no requiere guardar y generar un plan por
+separado. Cancelar antes de confirmar no modifica el IR. Si el build falla,
+la elección queda guardada para corregir el problema y volver a aplicar.
+
+Windows conserva el onboarding de usuario y contraseña, su transporte privado
+y el acceso RDP automático. Reemplazar la contraseña y recrear la VM son tareas
+independientes con sus efectos visibles antes de confirmar. Recrear exige
+escribir exactamente `WIPE`; detener Windows también pide confirmación.
+Una instalación existente se reconoce por su disco y los marcadores de Windows,
+aunque todavía no tenga el archivo privado de credenciales. En Niri, abrir
+Windows activa su ventana RDP local si ya existe. Los fallos del proceso vuelven
+al formulario con el error visible y la contraseña vacía. Las consultas a GitLab
+tienen un límite de tiempo para que no bloqueen las demás tareas del panel.
+
+El estado de configuración se refresca cada ocho segundos mientras el inicio
+está abierto. No se interpreta la apertura de una terminal como éxito de la
+operación: los resultados interactivos siguen visibles allí. Los formularios
+conservan su estado mientras se editan.
 
 Windows aparece disponible después de aplicar `./install.sh` con la opción 1,
 porque `windowsvm` pertenece al perfil del sistema NixOS. GitHub, GitLab y AWS
@@ -153,6 +158,8 @@ holodeckctl set appearance.theme.mode light
 holodeckctl set integrations.windows.rdp.displayMode fullscreen
 holodeckctl plan --json
 holodeckctl apply
+holodeckctl apply-change theme-light
+holodeckctl aws-profile-select --json
 holodeckctl aws-aliases-apply --json
 holodeckctl action holodeck-setup
 holodeckctl action github-setup

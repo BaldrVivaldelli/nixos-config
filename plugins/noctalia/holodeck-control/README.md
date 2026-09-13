@@ -9,31 +9,27 @@ workflow. The plugin targets Noctalia `v5.0.0-beta.7` and declares plugin API
 10, which provides the keyboard focus required by the per-profile AWS alias
 and region editor as well as closure callbacks in declarative UI trees.
 
-The panel reads backend status, selects one of the two supported deployment
-targets (`home-manager` or `existing-nixos`) and the dark/light appearance mode,
-saves those choices to the IR, previews the backend plan, and asks for explicit
-confirmation before opening `apply` in a terminal. It also presents GitHub,
-GitLab, AWS and Windows VM cards backed by their existing commands.
-The GitLab action accepts an instance or group URL, extracts the authentication
-host, then delegates only web OAuth/SSO to Holodeck. It does not create a
-profile, register an SSH key, or change Git routing.
-After AWS discovery, the AWS card offers a local editor for every account/role
-assignment. The backend automatically creates `us-east-1` and `us-east-2`
-profiles for each one. Users can request the deterministic short
-recommendation, customize the semantic alias, keep both defaults, retain only
-one region, add others, or recommend all aliases at once. The backend generates
-a separate profile and suffix for every selected region and preserves those
-choices across resynchronization.
+The native panel opens from the existing `holodeck/control:config` bar widget.
+It presents Work and Computer actions at equal priority, with a searchable
+catalog and one focused task at a time. There are no overview/system/provider
+navigation layers. Common actions take one click; profile selection takes two;
+appearance and scope changes take three including confirmation, counted from
+the open panel. Data entry and external authentication are additional work.
 
-The UI follows Noctalia's native panel hierarchy: a compact Control Center-style
-navigation rail, an overview, a focused system workflow, and an integration
-picker with one provider detail at a time. It uses semantic control sizes,
-palette roles supported by the pinned shell, tooltip-labelled icon actions, and
-an explicit destructive variant for stopping the Windows VM. The original
-holographic-chamber artwork under `assets/` is shared by the launcher, README
-and panel header; a reduced companion mark keeps the same identity legible in
-the compact navigation rail. The bar uses Noctalia's native `cube-spark` glyph
-with the semantic `on_surface` color so it tracks both light and dark themes.
+AWS login reuses the profile shared with the Zsh helpers. Account discovery is
+separate from login and alias editing. Alias editing searches account/role
+assignments before showing that assignment's fields. Windows opens directly
+once configured, while initial credentials, password replacement and VM
+recreation have their own task forms. Destructive effects are shown before
+confirmation; VM recreation still requires typing `WIPE`.
+
+Appearance and deployment scope remain local drafts until the user confirms.
+A fixed `apply-change` command validates and saves the choice under the IR lock
+before running the installer. The home view refreshes configuration status;
+interactive commands retain a visible terminal for authentication and results.
+
+The HTML under `docs/` is a design reference only. Home Manager packages and
+loads `panel.luau` inside Noctalia; no browser is involved in the actual UI.
 
 ## Security boundary
 
@@ -54,6 +50,13 @@ holodeckctl --json set integrations.windows.rdp.displayMode fullscreen
 holodeckctl --json plan
 holodeckctl --json aws-aliases-apply
 holodeckctl apply
+holodeckctl apply-change theme-dark
+holodeckctl apply-change theme-light
+holodeckctl apply-change scope-user
+holodeckctl apply-change scope-system
+holodeckctl apply-change saved
+holodeckctl --json aws-profile-select
+holodeckctl action aws-login
 holodeckctl action holodeck-setup
 holodeckctl action holodeck-doctor
 holodeckctl action github-setup
@@ -93,9 +96,8 @@ and unlinks it before starting `windowsvm`. It replaces the private copy only
 after successful creation or authentication, so a typo does not overwrite the
 working secret. Status excludes emails, key paths and all secrets.
 
-The advanced **Change credential or delete VM** section contains **Replace
-Windows password**. It requires a second confirmation and opens a visible
-terminal. It stops the VM, creates a recoverable sparse disk
+The **Change Windows password** task shows its effects and credential fields
+before confirmation and opens a visible terminal. It stops the VM, creates a recoverable sparse disk
 copy, schedules a one-time guest password replacement, recreates only Docker
 container metadata, and starts the preserved Windows storage again. It then
 uses FreeRDP authentication-only mode to verify and privately persist the exact

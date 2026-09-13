@@ -8,6 +8,7 @@ import shlex
 import shutil
 import stat
 import subprocess
+import tempfile
 import time
 from collections.abc import Callable, Mapping
 from pathlib import Path
@@ -66,6 +67,65 @@ def _home(environ: Mapping[str, str]) -> Path:
 
 def _config_home(environ: Mapping[str, str]) -> Path:
     return Path(environ.get("XDG_CONFIG_HOME", str(_home(environ) / ".config"))).expanduser()
+
+
+def _aws_profile_path(environ: Mapping[str, str]) -> Path:
+    root = environ.get("XDG_STATE_HOME") or str(_home(environ) / ".local" / "state")
+    return Path(root) / "aws" / "last-profile"
+
+
+def active_aws_profile(environ: Mapping[str, str], profiles: list[str]) -> str:
+    for key in ("AWS_PROFILE", "AWS_DEFAULT_PROFILE"):
+        if environ.get(key) in profiles:
+            return environ[key]
+    try:
+        with _aws_profile_path(environ).open(encoding="utf-8") as handle:
+            profile = handle.read(4096).strip()
+    except (OSError, UnicodeError):
+        return ""
+    return profile if profile in profiles else ""
+
+
+def remember_aws_profile(environ: Mapping[str, str], profile: str) -> None:
+    if profile not in aws_profiles(environ) or "\n" in profile or "\r" in profile:
+        raise ConfigCtlError("invalid-aws-profile", "el perfil AWS ya no está disponible")
+    path = _aws_profile_path(environ)
+    try:
+        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        descriptor, temporary = tempfile.mkstemp(prefix=".last-profile.", dir=path.parent)
+        try:
+            with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                handle.write(profile + "\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary, path)
+        finally:
+            Path(temporary).unlink(missing_ok=True)
+    except OSError as exc:
+        raise ConfigCtlError("aws-profile-write-failed", "no se pudo recordar el perfil AWS") from exc
+
+
+def select_aws_profile_request(environ: Mapping[str, str]) -> dict[str, Any]:
+    root = Path(environ.get("NOCTALIA_STATE_HOME") or environ.get("XDG_STATE_HOME")
+                or str(_home(environ) / ".local" / "state"))
+    path = root / "noctalia/plugins/data/holodeck/control/aws-profile-request.json"
+    try:
+        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        with os.fdopen(descriptor, "r", encoding="utf-8") as handle:
+            info = os.fstat(handle.fileno())
+            if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_size > 8192:
+                raise ValueError("invalid request file")
+            request = json.loads(handle.read(8193))
+    except (OSError, ValueError, UnicodeError) as exc:
+        raise ConfigCtlError("invalid-aws-profile-request", "no se pudo leer la selección AWS") from exc
+    finally:
+        path.unlink(missing_ok=True)
+    if (not isinstance(request, dict) or set(request) != {"schemaVersion", "profile"}
+            or type(request["schemaVersion"]) is not int or request["schemaVersion"] != 1
+            or not isinstance(request["profile"], str)):
+        raise ConfigCtlError("invalid-aws-profile-request", "la selección AWS no es válida")
+    remember_aws_profile(environ, request["profile"])
+    return {"ok": True, "command": "aws-profile-select", "activeProfile": request["profile"]}
 
 
 def _consume_rdp_request(environ: Mapping[str, str]) -> dict[str, str] | None:
@@ -273,6 +333,46 @@ def _windows_credential_state(
     return True, username, policy_version >= 1
 
 
+def _windows_installed(environ: Mapping[str, str]) -> bool:
+    storage = Path(environ.get(
+        "WINDOWSVM_STORAGE", str(_home(environ) / "containers/windows/storage")
+    )).expanduser()
+    return (storage / "data.img").is_file() and any(
+        (storage / marker).is_file() for marker in ("windows.ver", "windows.mac")
+    )
+
+
+def _focus_windows_session(environ: Mapping[str, str], which: Which) -> bool:
+    """Reuse this VM's desktop on Niri instead of opening a competing session."""
+    niri = _command_path("niri", environ, which)
+    if niri is None or not environ.get("NIRI_SOCKET"):
+        return False
+    try:
+        response = subprocess.run(
+            [niri, "msg", "--json", "windows"], capture_output=True, text=True,
+            check=False, timeout=2, env=dict(environ),
+        )
+        if response.returncode != 0:
+            return False
+        windows = json.loads(response.stdout)
+        if not isinstance(windows, list):
+            return False
+        for window in windows:
+            if (isinstance(window, dict)
+                    and window.get("app_id") in {"com.freerdp.client.sdl3", "xfreerdp"}
+                    and window.get("title") == "FreeRDP: 127.0.0.1"
+                    and type(window.get("id")) is int):
+                focused = subprocess.run(
+                    [niri, "msg", "action", "focus-window", "--id", str(window["id"])],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    check=False, timeout=2, env=dict(environ),
+                )
+                return focused.returncode == 0
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        pass
+    return False
+
+
 def _parse_profile_file(path: Path) -> dict[str, str]:
     values: dict[str, str] = {}
     try:
@@ -355,11 +455,12 @@ def gitlab_auth_state(
             shell=False,
             text=True,
             env=dict(environ),
+            timeout=2,
         )
         candidate = configured_host.stdout.strip().lower()
         if configured_host.returncode == 0 and GITLAB_HOST_RE.fullmatch(candidate):
             host = candidate
-    except OSError:
+    except (OSError, subprocess.TimeoutExpired):
         pass
 
     status_args = [executable, "auth", "status"]
@@ -373,8 +474,9 @@ def gitlab_auth_state(
             shell=False,
             text=True,
             env=dict(environ),
+            timeout=2,
         )
-    except OSError:
+    except (OSError, subprocess.TimeoutExpired):
         return False, []
     if status.returncode != 0:
         return False, []
@@ -395,9 +497,11 @@ def integration_status(
     credential_stored, credential_username, rdp_resilience = (
         _windows_credential_state(environ)
     )
+    windows_installed = _windows_installed(environ)
 
     return {
         "aws": {
+            "activeProfile": active_aws_profile(environ, aws),
             "aliases": managed_assignments,
             "available": _command_path("aws", environ, which) is not None,
             "configured": bool(managed_assignments or aws),
@@ -423,7 +527,8 @@ def integration_status(
         },
         "windowsVm": {
             "available": windows_available,
-            "configured": windows_available and credential_stored,
+            "configured": windows_available and (credential_stored or windows_installed),
+            "installed": windows_installed,
             "credentialStored": credential_stored,
             "credentialUsername": credential_username,
             "rdpResilience": rdp_resilience,
@@ -440,6 +545,10 @@ def _select_aws_profile(
             "missing-aws-profile",
             "no hay perfiles AWS; ejecutá primero `holodeckctl action aws-sync`",
         )
+    active = active_aws_profile(environ, profiles)
+    if active:
+        stdout.write(f"Perfil AWS: {active}\n")
+        return active
     if len(profiles) == 1:
         stdout.write(f"Perfil AWS: {profiles[0]}\n")
         return profiles[0]
@@ -500,6 +609,12 @@ def execute_action(
         )
 
     argv[0] = executable
+    if action in {"windows-up", "windows-rdp"} and _focus_windows_session(environ, which):
+        # A pending textbox request must not survive a launch that reused a window.
+        _consume_rdp_request(environ)
+        stdout.write("Windows ya está abierto; se activó su ventana.\n")
+        return {"action": action, "argv": argv, "command": "action",
+                "exitCode": 0, "ok": True, "focusedExisting": True}
     child_environment: dict[str, str] | None = None
     if action in {
         "windows-up",
@@ -537,6 +652,9 @@ def execute_action(
         "exitCode": completed.returncode,
         "ok": completed.returncode == 0,
     }
+
+    if action == "aws-login" and result["ok"]:
+        remember_aws_profile(environ, profile)
 
     if action == "holodeck-setup" and result["ok"]:
         answer = input_fn("¿Configurar o sincronizar AWS SSO ahora? [S/n]: ").strip().lower()

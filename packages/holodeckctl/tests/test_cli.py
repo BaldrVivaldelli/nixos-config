@@ -136,6 +136,39 @@ class CliTests(unittest.TestCase):
         self.assertIs(kwargs["check"], False)
         self.assertEqual(self.repo, kwargs["cwd"])
 
+    def test_confirmed_ui_change_preserves_other_settings_and_applies_once(self) -> None:
+        self.invoke("--json", "set", "integrations.windows.rdp.displayMode", "fullscreen")
+        calls = []
+
+        def runner(argv, **kwargs):
+            calls.append(argv)
+            return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+        code, payload, _ = self.invoke("--json", "apply-change", "theme-light", runner=runner)
+        self.assertEqual(0, code)
+        self.assertEqual(1, len(calls))
+        self.assertEqual("home-manager", calls[0][-1])
+        _, status, _ = self.invoke("--json", "status")
+        self.assertEqual("light", status["ir"]["appearance"]["theme"]["mode"])
+        self.assertEqual("fullscreen", status["ir"]["integrations"]["windows"]["rdp"]["displayMode"])
+
+    def test_confirmed_scope_bootstraps_and_applies_the_selected_target(self) -> None:
+        calls = []
+
+        def runner(argv, **kwargs):
+            calls.append(argv)
+            return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+        code, payload, _ = self.invoke("--json", "apply-change", "scope-system", runner=runner)
+        self.assertEqual(0, code)
+        self.assertEqual("existing-nixos", calls[0][-1])
+        self.assertTrue(payload["plan"]["requiresElevation"])
+
+    def test_ui_change_rejects_unlisted_choices_before_writing(self) -> None:
+        code, payload, _ = self.invoke("--json", "apply-change", "arbitrary-command")
+        self.assertNotEqual(0, code)
+        self.assertFalse((self.repo / "holodeck.local.json").exists())
+
     def test_plan_requires_a_persisted_ir(self) -> None:
         code, payload, _ = self.invoke("--json", "plan")
 

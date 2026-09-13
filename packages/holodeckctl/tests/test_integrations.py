@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,10 @@ from holodeckctl.integrations import (
     execute_action,
     integration_status,
     provider_profiles,
+    active_aws_profile,
+    remember_aws_profile,
+    select_aws_profile_request,
+    gitlab_auth_state,
 )
 
 
@@ -123,6 +128,64 @@ class IntegrationTests(unittest.TestCase):
         )
 
         self.assertEqual(["default", "work"], aws_profiles(self.environment))
+
+    def test_windows_existing_installation_does_not_require_onboarding(self) -> None:
+        self.add_command("windowsvm")
+        storage = self.home / "existing-vm"
+        storage.mkdir()
+        self.environment["WINDOWSVM_STORAGE"] = str(storage)
+        (storage / "data.img").touch()
+        self.assertFalse(integration_status(self.environment)["windowsVm"]["installed"])
+        (storage / "windows.ver").write_text("11")
+        windows = integration_status(self.environment)["windowsVm"]
+        self.assertTrue(windows["configured"])
+        self.assertTrue(windows["installed"])
+        self.assertFalse(windows["credentialStored"])
+
+    def test_windows_open_reuses_its_existing_desktop(self) -> None:
+        self.add_command("windowsvm")
+        niri = self.add_command("niri")
+        self.environment["NIRI_SOCKET"] = "/test/niri.sock"
+        calls = []
+        def runner(argv: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+            calls.append(argv)
+            self.assertEqual(2, kwargs["timeout"])
+            windows = [
+                {"id": 9, "app_id": "com.freerdp.client.sdl3", "title": "FreeRDP: remote.example"},
+                {"id": 12, "app_id": "com.freerdp.client.sdl3", "title": "FreeRDP: 127.0.0.1"},
+            ]
+            return subprocess.CompletedProcess(argv, 0, json.dumps(windows))
+        with patch("holodeckctl.integrations.subprocess.run", side_effect=runner):
+            result = execute_action(
+                "windows-up", self.environment, stdout=io.StringIO(),
+                runner=lambda *a, **kw: self.fail("Must not launch another RDP session"),
+            )
+        self.assertTrue(result["focusedExisting"])
+        self.assertEqual([str(niri), "msg", "action", "focus-window", "--id", "12"], calls[-1])
+
+    def test_windows_can_open_when_compositor_query_times_out(self) -> None:
+        vm = self.add_command("windowsvm")
+        self.add_command("niri")
+        self.environment["NIRI_SOCKET"] = "/test/niri.sock"
+        calls = []
+        def runner(argv: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+            calls.append(argv)
+            return subprocess.CompletedProcess(argv, 0)
+        with patch("holodeckctl.integrations.subprocess.run", side_effect=subprocess.TimeoutExpired("niri", 2)):
+            result = execute_action("windows-up", self.environment, stdout=io.StringIO(), runner=runner)
+        self.assertTrue(result["ok"])
+        self.assertEqual([[str(vm), "up", "half"]], calls)
+
+    def test_gitlab_timeout_does_not_block_other_integrations(self) -> None:
+        for stage in ("config", "auth"):
+            with self.subTest(stage=stage):
+                def runner(argv: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+                    self.assertEqual(2, kwargs["timeout"])
+                    if argv[1] == stage:
+                        raise subprocess.TimeoutExpired(argv, 2)
+                    return subprocess.CompletedProcess(argv, 1, "")
+                with patch("holodeckctl.integrations.subprocess.run", side_effect=runner):
+                    self.assertEqual((False, []), gitlab_auth_state(self.environment, "glab"))
 
     def test_provider_profiles_ignores_unknown_providers(self) -> None:
         profiles = self.home / ".config" / "holodeck" / "profiles"
@@ -444,6 +507,69 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(
             [[str(executable), "sso", "login", "--profile", "work"]], calls
         )
+
+    def configure_aws_profiles(self) -> None:
+        self.add_command("aws")
+        path = self.home / ".aws" / "config"
+        path.parent.mkdir(exist_ok=True)
+        path.write_text("[profile personal]\nregion=us-east-1\n[profile work]\nregion=us-east-2\n")
+
+    def test_aws_login_reuses_the_shells_remembered_profile(self) -> None:
+        self.configure_aws_profiles()
+        self.environment["XDG_STATE_HOME"] = str(self.home / "custom-state")
+        state = self.home / "custom-state/aws/last-profile"
+        state.parent.mkdir(parents=True)
+        state.write_text("work\n")
+        calls = []
+
+        def runner(argv, **kwargs):
+            calls.append(argv)
+            return subprocess.CompletedProcess(argv, 0)
+
+        execute_action("aws-login", self.environment, runner=runner,
+                       input_fn=lambda _: self.fail("must not ask for a remembered profile"),
+                       stdout=io.StringIO())
+        self.assertEqual("work", calls[0][-1])
+        self.assertEqual("work\n", state.read_text())
+        self.assertEqual(0o600, state.stat().st_mode & 0o777)
+        self.assertEqual("work", integration_status(self.environment)["aws"]["activeProfile"])
+
+    def test_failed_login_preserves_the_remembered_profile(self) -> None:
+        self.configure_aws_profiles()
+        remember_aws_profile(self.environment, "personal")
+        env = {**self.environment, "AWS_PROFILE": "work"}
+        result = execute_action("aws-login", env,
+                                runner=lambda argv, **_: subprocess.CompletedProcess(argv, 42),
+                                stdout=io.StringIO())
+        self.assertFalse(result["ok"])
+        self.assertEqual("personal", active_aws_profile(self.environment, ["personal", "work"]))
+
+    def test_panel_profile_request_is_validated_and_consumed(self) -> None:
+        self.configure_aws_profiles()
+        self.environment["NOCTALIA_STATE_HOME"] = str(self.home / "noctalia-state")
+        request = self.home / "noctalia-state/noctalia/plugins/data/holodeck/control/aws-profile-request.json"
+        request.parent.mkdir(parents=True)
+        request.write_text(json.dumps({"schemaVersion": 1, "profile": "work"}))
+        result = select_aws_profile_request(self.environment)
+        self.assertEqual("work", result["activeProfile"])
+        self.assertFalse(request.exists())
+        request.write_text(json.dumps({"schemaVersion": 1, "profile": "not-a-profile; exit 0"}))
+        with self.assertRaises(ConfigCtlError):
+            select_aws_profile_request(self.environment)
+        self.assertFalse(request.exists())
+        self.assertEqual("work", active_aws_profile(self.environment, ["personal", "work"]))
+
+    def test_panel_profile_request_rejects_symlinks(self) -> None:
+        self.configure_aws_profiles()
+        request = self.home / ".local/state/noctalia/plugins/data/holodeck/control/aws-profile-request.json"
+        request.parent.mkdir(parents=True)
+        other = self.home / "other.json"
+        other.write_text(json.dumps({"schemaVersion": 1, "profile": "work"}))
+        request.symlink_to(other)
+        with self.assertRaises(ConfigCtlError):
+            select_aws_profile_request(self.environment)
+        self.assertTrue(other.exists())
+        self.assertEqual("", active_aws_profile(self.environment, ["personal", "work"]))
 
     def test_aws_sync_is_an_allowlisted_composite_action(self) -> None:
         executable = self.add_command("aws")

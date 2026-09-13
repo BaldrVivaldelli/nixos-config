@@ -6,7 +6,7 @@
   runCommand,
 }:
 
-runCommand "holodeck-noctalia-plugin-0.8.0"
+runCommand "holodeck-noctalia-plugin-0.9.0"
   {
     nativeBuildInputs = [
       luau

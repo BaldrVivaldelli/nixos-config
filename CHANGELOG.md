@@ -2,8 +2,20 @@
 
 ## Unreleased
 
+### Fixed
+
+- Recognize existing Windows installations before asking for onboarding, reuse
+  the local RDP window on Niri, and show launch failures in the panel with a
+  cleared password field. Bound GitLab status queries so an unavailable provider
+  cannot indefinitely block Windows or other tasks.
+
 ### Added
 
+- Added shared AWS profile selection between the Zsh helpers and Holodeck
+  Control, plus validated `aws-profile-select` and confirmed `apply-change`
+  commands in `holodeckctl` 0.8.0.
+- Added an interactive UX prototype and a documented three-click navigation
+  budget measured from the open panel.
 - Added a one-time Windows onboarding flow modeled after Omarchy's one-click
   launcher, but with a private credential instead of embedding the password in
   Compose. Holodeck hides the fields after setup, waits through a fresh install,
@@ -95,6 +107,12 @@
 
 ### Changed
 
+- Redesigned the native Holodeck Control panel for version 0.9.0 with equally
+  prominent Work and Computer actions, searchable tasks, focused forms and
+  direct access from the existing Noctalia bar widget.
+- Separated AWS login, account synchronization and alias editing, and combined
+  saving and applying a confirmed configuration choice into one action.
+- Updated the locked Nixpkgs and Home Manager inputs on the 26.05 branches.
 - Moved RDP username/password entry into the Holodeck Windows card using
   Noctalia's masked input and a validated one-shot handoff through the private
   user runtime directory, without persisting credentials in the panel, IR or
@@ -158,6 +176,9 @@
 
 ### Fixed
 
+- Persisted the AWS profile selected by `awscxt` or a successful `awslogin`,
+  allowing later terminals to reuse it instead of falling back to an absent
+  default profile. Failed logins preserve the previous selection.
 - Fixed exact NixOS generation activation on hosts whose global Nix
   configuration disables flakes, avoiding the legacy `nixos-rebuild` re-exec
   path that depended on an ambient `nixos-config` entry in `NIX_PATH`.

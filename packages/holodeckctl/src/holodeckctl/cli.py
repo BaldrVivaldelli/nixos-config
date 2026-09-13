@@ -12,7 +12,7 @@ from typing import Any, TextIO
 
 from .errors import ConfigCtlError
 from .aws_sso import apply_aws_aliases
-from .integrations import ALL_ACTIONS, execute_action, integration_status
+from .integrations import ALL_ACTIONS, execute_action, integration_status, select_aws_profile_request
 from .model import ALL_SETTABLE_KEYS, SETTERS, default_ir, digest_ir, set_value
 from .storage import atomic_write_ir, exclusive_lock, load_ir
 
@@ -20,6 +20,13 @@ DEFAULT_IR_NAME = "holodeck.local.json"
 ENV_REPO = "HOLODECK_REPO"
 ENV_IR = "HOLODECK_IR"
 ENV_LOCK_TIMEOUT = "HOLODECK_LOCK_TIMEOUT"
+UI_CHANGES = {
+    "theme-dark": ("appearance.theme.mode", "dark"),
+    "theme-light": ("appearance.theme.mode", "light"),
+    "scope-user": ("deployment.target", "home-manager"),
+    "scope-system": ("deployment.target", "existing-nixos"),
+    "saved": None,
+}
 
 Runner = Callable[..., subprocess.CompletedProcess[str]]
 
@@ -75,6 +82,9 @@ def make_parser() -> Parser:
 
     subparsers.add_parser("plan", help="muestra exactamente qué argv ejecutaría apply")
     subparsers.add_parser("apply", help="aplica el IR mediante install.sh")
+    change_parser = subparsers.add_parser("apply-change", help="guarda y aplica una elección confirmada en el panel")
+    change_parser.add_argument("change", choices=tuple(UI_CHANGES))
+    subparsers.add_parser("aws-profile-select", help="recuerda la selección AWS del panel")
     subparsers.add_parser(
         "aws-aliases-apply",
         help="valida y aplica el borrador local de alias AWS creado por Noctalia",
@@ -220,10 +230,15 @@ def _apply(
     timeout: float,
     json_output: bool,
     runner: Runner,
+    change: str | None = None,
 ) -> dict[str, Any]:
     with exclusive_lock(ir_path, timeout):
-        ir = load_ir(ir_path)
+        ir = load_ir(ir_path) if ir_path.exists() or change is None else default_ir()
+        if change is not None and UI_CHANGES[change] is not None:
+            ir = set_value(ir, *UI_CHANGES[change])
         plan = _make_plan(repo, ir)
+        if change is not None:
+            atomic_write_ir(ir_path, ir)
         try:
             if json_output:
                 completed = runner(
@@ -258,7 +273,9 @@ HELP_SUMMARIES = {
     "set": "Actualiza una clave allowlisted; inicializa el IR si todavía no existe.",
     "plan": "Valida el IR y devuelve el argv literal, sin ejecutar nada.",
     "apply": "Bloquea el IR y ejecuta install.sh por argv, sin shell ni sudo propio.",
+    "apply-change": "Valida y guarda una elección confirmada del panel y aplica la configuración.",
     "aws-aliases-apply": "Aplica alias AWS locales validados sin iniciar otra sesión SSO.",
+    "aws-profile-select": "Recuerda el perfil AWS validado elegido en el panel.",
     "action": "Ejecuta una acción integrada allowlisted por argv; la UI decide si requiere terminal.",
 }
 
@@ -355,8 +372,10 @@ def run(
         elif command == "plan":
             result = _plan(repo, ir_path)
             text = "Ejecutaría: " + " ".join(result["plan"]["argv"])
-        elif command == "apply":
-            result = _apply(repo, ir_path, timeout, json_output, runner)
+        elif command in {"apply", "apply-change"}:
+            result = _apply(repo, ir_path, timeout, json_output, runner,
+                            args.change if command == "apply-change" else None)
+            result["command"] = command
             text = (
                 "Configuración aplicada."
                 if result["ok"]
@@ -369,6 +388,11 @@ def run(
                 )
             result = apply_aws_aliases(environment)
             text = "Alias AWS aplicados."
+        elif command == "aws-profile-select":
+            if not json_output:
+                raise ConfigCtlError("usage", "aws-profile-select requiere --json")
+            result = select_aws_profile_request(environment)
+            text = "Perfil AWS seleccionado."
         elif command == "action":
             if json_output:
                 raise ConfigCtlError(
