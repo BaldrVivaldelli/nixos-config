@@ -187,6 +187,9 @@
       wallhavenSfw = pkgs.callPackage ./packages/noctalia-wallhaven-sfw {
         noctalia = inputs.noctalia.packages.${system}.default;
       };
+      dailyWallpaper = pkgs.callPackage ./packages/noctalia-daily-wallpaper {
+        noctalia = inputs.noctalia.packages.${system}.default;
+      };
       wsl = nixpkgs.lib.nixosSystem {
         inherit system;
         specialArgs = {
@@ -236,6 +239,7 @@
         inherit holodeckctl;
         holodeck-noctalia-plugin = noctaliaPlugin;
         noctalia-wallhaven-sfw = wallhavenSfw;
+        noctalia-daily-wallpaper = dailyWallpaper;
       };
 
       apps.${system} = {
@@ -276,6 +280,7 @@
 
       checks.${system} = {
         wallhaven-sfw = wallhavenSfw;
+        daily-wallpaper = dailyWallpaper;
         home-profile =
           assert builtins.hasAttr defaultHomeUser.username homeConfigurationsByUsername;
           assert homeProfile.config.home.username == defaultHomeUser.username;
@@ -299,6 +304,7 @@
             homeProfile.config.programs.noctalia.settings.plugins.enabled == [
               "holodeck/control"
               "noctalia/wallhaven"
+              "nzlov/daily-wallpaper"
             ];
           assert
             homeProfile.config.programs.noctalia.settings.wallpaper.directory
@@ -332,10 +338,13 @@
           assert builtins.elem "wallpaper" homeProfile.config.programs.noctalia.settings.bar.main.end;
           assert builtins.elem "noctalia/wallhaven:wallhaven"
             homeProfile.config.programs.noctalia.settings.bar.main.end;
+          assert builtins.elem "nzlov/daily-wallpaper:widget"
+            homeProfile.config.programs.noctalia.settings.bar.main.end;
           assert builtins.elem "holodeck/control:config"
             homeProfile.config.programs.noctalia.settings.bar.main.end;
           assert builtins.hasAttr "noctalia/plugins/holodeck-control" homeProfile.config.xdg.dataFile;
           assert builtins.hasAttr "noctalia/plugins/wallhaven-sfw" homeProfile.config.xdg.dataFile;
+          assert builtins.hasAttr "noctalia/plugins/daily-wallpaper" homeProfile.config.xdg.dataFile;
           assert builtins.hasAttr "holodeck-control" homeProfile.config.xdg.desktopEntries;
           assert lib.any (package: lib.getName package == "holodeckctl") homeProfile.config.home.packages;
           assert lib.any (

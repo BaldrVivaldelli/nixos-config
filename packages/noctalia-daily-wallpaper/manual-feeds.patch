@@ -1,0 +1,94 @@
+--- a/daily_wallpaper.luau
++++ b/daily_wallpaper.luau
+@@ -8 +7,0 @@
+-local RETENTION_SECONDS = 5 * 24 * 60 * 60
+@@ -12 +11,2 @@
+-local lastAppliedPath = ""
++local lastReadyPath = ""
++local sourceOverride = nil
+@@ -35 +35 @@
+-  local configured = noctalia.getConfig("source")
++  local configured = sourceOverride or noctalia.getConfig("source")
+@@ -104,3 +104,2 @@
+-local function applyWallpaper(path, downloaded)
+-  noctalia.setWallpaper(path)
+-  lastAppliedPath = path
++local function cacheWallpaper(path, downloaded)
++  lastReadyPath = path
+@@ -109 +108,2 @@
+-    state = "applied",
++    state = "ready",
++    source = source(),
+@@ -113,20 +113,3 @@
+-  noctalia.log(`Daily Wallpaper applied: {path}`)
+-end
+-
+-local function cleanupOldWallpapers(dir)
+-  local entries = noctalia.listDir(dir)
+-  if type(entries) ~= "table" then
+-    return
+-  end
+-
+-  local cutoff = os.time() - RETENTION_SECONDS
+-  for _, name in ipairs(entries) do
+-    if name:match("^bing%-.+%-%d%d%d%d%-%d%d%-%d%d%.jpg$") or name:match("^nasa%-%d%d%d%d%-%d%d%-%d%d%.jpg$") then
+-      local path = `{dir}/{name}`
+-      local info = noctalia.fileInfo(path)
+-      if type(info) == "table" and type(info.mtime) == "number" and info.mtime < cutoff then
+-        noctalia.removeFile(path)
+-      end
+-    end
+-  end
+-end
++  noctalia.log(`Daily Wallpaper ready: {path}`)
++end
++
+@@ -147,0 +131,9 @@
++local function trustedImageUrl(url)
++  if type(url) ~= "string" then return false end
++  if source() == "bing" then
++    return url:match("^https://www%.bing%.com/th%?id=OHR%.[%w_.%-]+$") ~= nil
++  end
++  local host = url:match("^https://([%w.%-]+)/")
++  return host ~= nil and (host == "nasa.gov" or host:sub(-9) == ".nasa.gov")
++end
++
+@@ -150 +142 @@
+-    if type(url) ~= "string" or url == "" then
++    if not trustedImageUrl(url) then
+@@ -162,3 +154 @@
+-        cleanupOldWallpapers(downloadDir())
+-        applyWallpaper(dest, true)
+-        noctalia.notify(noctalia.tr("notify.applied"), dest)
++        cacheWallpaper(dest, true)
+@@ -281 +271 @@
+-  if not force and dest == lastAppliedPath then
++  if not force and dest == lastReadyPath then
+@@ -301,2 +291 @@
+-    cleanupOldWallpapers(dir)
+-    applyWallpaper(dest, false)
++    cacheWallpaper(dest, false)
+@@ -332,0 +322,2 @@
++  if checking then return end
++  sourceOverride = nil
+@@ -338 +329,14 @@
+-  if event == "refresh" then
++  if checking then return end
++  if event == "apply" then
++    local status = noctalia.state.get("status")
++    if type(status) ~= "table" or (status.state ~= "ready" and status.state ~= "applied")
++        or status.path ~= lastReadyPath or not noctalia.fileExists(lastReadyPath) then
++      return
++    end
++    noctalia.setWallpaper(lastReadyPath)
++    noctalia.state.set("status", {
++      state = "applied", source = source(), path = lastReadyPath,
++    })
++    noctalia.notify(noctalia.tr("notify.applied"), lastReadyPath)
++  elseif event == "source-bing" or event == "source-nasa" or event == "refresh" then
++    if event ~= "refresh" then sourceOverride = event == "source-nasa" and "nasa" or "bing" end
+--- a/plugin.toml
++++ b/plugin.toml
+@@ -61 +61 @@
+-height = 250
++height = 600

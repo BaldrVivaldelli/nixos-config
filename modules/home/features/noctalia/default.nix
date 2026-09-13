@@ -23,6 +23,9 @@ let
   wallhavenSfw = pkgs.callPackage ../../../../packages/noctalia-wallhaven-sfw {
     noctalia = config.programs.noctalia.package;
   };
+  dailyWallpaper = pkgs.callPackage ../../../../packages/noctalia-daily-wallpaper {
+    noctalia = config.programs.noctalia.package;
+  };
   holodeckRegenerate = pkgs.writeShellApplication {
     name = "holodeck-regenerate";
     runtimeInputs = [ config.programs.noctalia.package ];
@@ -81,6 +84,7 @@ in
         plugins.enabled = [
           "holodeck/control"
           "noctalia/wallhaven"
+          "nzlov/daily-wallpaper"
         ];
 
         # Keep Noctalia's default end lane and add Holodeck beside the native
@@ -98,6 +102,7 @@ in
           "battery"
           "wallpaper"
           "noctalia/wallhaven:wallhaven"
+          "nzlov/daily-wallpaper:widget"
           "holodeck/control:config"
           "control-center"
           "session"
@@ -116,6 +121,7 @@ in
     xdg.dataFile."noctalia/plugins/holodeck-control".source = plugin;
     # Local sources override the upstream catalog, including after plugin updates.
     xdg.dataFile."noctalia/plugins/wallhaven-sfw".source = wallhavenSfw;
+    xdg.dataFile."noctalia/plugins/daily-wallpaper".source = dailyWallpaper;
 
     xdg.desktopEntries.holodeck-control = {
       name = "Holodeck Control";

@@ -15,6 +15,11 @@
 
 ### Added
 
+- Enable the Bing and NASA editorial daily feeds in a pinned Noctalia panel with
+  source selection, previews and explicit wallpaper application. Restrict image
+  URLs to the providers' own endpoints, preserve downloaded images, and keep
+  background refreshes from replacing the user's wallpaper.
+
 - Added shared AWS profile selection between the Zsh helpers and Holodeck
   Control, plus validated `aws-profile-select` and confirmed `apply-change`
   commands in `holodeckctl` 0.8.0.

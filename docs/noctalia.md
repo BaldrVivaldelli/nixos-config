@@ -27,13 +27,15 @@ sesión Wayland de escritorio.
 ## Wallpapers
 
 Noctalia usa `~/Pictures/Wallpaper` como biblioteca local y
-`nave-wallpaper.png` como fondo predeterminado. La barra incluye dos accesos:
+`nave-wallpaper.png` como fondo predeterminado. La barra incluye tres accesos:
 
 - El selector nativo `wallpaper`, que busca por nombre dentro de la biblioteca
   local. También se puede abrir con `Mod+Space` y el prefijo `/wall`.
 - El plugin `noctalia/wallhaven`, con un filtro SFW obligatorio aplicado por Nix,
   que permite buscar, previsualizar, descargar y aplicar imágenes de Wallhaven.
   Las descargas quedan disponibles también en el selector local.
+- `nzlov/daily-wallpaper`, con un panel para elegir **Bing** o **NASA**,
+  previsualizar su imagen del día y aplicarla manualmente.
 
 Los cambios hechos desde la UI o mediante `noctalia msg wallpaper-set` se
 guardan en el estado local de Noctalia y pueden reemplazar el fondo
@@ -57,6 +59,22 @@ plugins desde Noctalia no elimina el filtro. Las pruebas del paquete comprueban
 las peticiones y el descarte de resultados antes de descargar imágenes.
 El filtro depende de la clasificación de Wallhaven: no analiza visualmente las
 imágenes que el proveedor haya etiquetado erróneamente como SFW.
+
+Bing y NASA usan exclusivamente sus feeds editoriales oficiales del día. No son
+buscadores abiertos ni devuelven clasificaciones de edad: no existe un filtro
+SFW equivalente para ellos. La variante local acepta sólo imágenes del endpoint
+editorial de Bing o de dominios HTTPS de NASA, y rechaza URLs ajenas. Esta
+restricción sobre las fuentes no constituye un análisis visual del contenido.
+
+El plugin del día está fijado en Nix y tiene prioridad sobre el catálogo remoto.
+Habilitarlo, cambiar de fuente o refrescar una vista nunca cambia el fondo por
+sí solo: hace falta pulsar **Aplicar fondo**. Las imágenes descargadas se guardan
+en `~/Pictures/Wallpaper/daily-wallpaper` y no se borran automáticamente.
+Desde el panel abierto, seleccionar fuente y aplicar requiere dos clics.
+
+Los demás plugins de fondos del catálogo trabajan con archivos locales, vídeos
+o una biblioteca de Wallpaper Engine ya descargada desde Steam; no agregan
+otros buscadores online a esta instalación.
 
 ## Providers del launcher
 
