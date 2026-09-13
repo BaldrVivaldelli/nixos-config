@@ -184,6 +184,9 @@
         noctalia = inputs.noctalia.packages.${system}.default;
         inherit holodeckctl;
       };
+      wallhavenSfw = pkgs.callPackage ./packages/noctalia-wallhaven-sfw {
+        noctalia = inputs.noctalia.packages.${system}.default;
+      };
       wsl = nixpkgs.lib.nixosSystem {
         inherit system;
         specialArgs = {
@@ -232,6 +235,7 @@
         home-manager = homeManagerCli;
         inherit holodeckctl;
         holodeck-noctalia-plugin = noctaliaPlugin;
+        noctalia-wallhaven-sfw = wallhavenSfw;
       };
 
       apps.${system} = {
@@ -271,6 +275,7 @@
       };
 
       checks.${system} = {
+        wallhaven-sfw = wallhavenSfw;
         home-profile =
           assert builtins.hasAttr defaultHomeUser.username homeConfigurationsByUsername;
           assert homeProfile.config.home.username == defaultHomeUser.username;
@@ -330,6 +335,7 @@
           assert builtins.elem "holodeck/control:config"
             homeProfile.config.programs.noctalia.settings.bar.main.end;
           assert builtins.hasAttr "noctalia/plugins/holodeck-control" homeProfile.config.xdg.dataFile;
+          assert builtins.hasAttr "noctalia/plugins/wallhaven-sfw" homeProfile.config.xdg.dataFile;
           assert builtins.hasAttr "holodeck-control" homeProfile.config.xdg.desktopEntries;
           assert lib.any (package: lib.getName package == "holodeckctl") homeProfile.config.home.packages;
           assert lib.any (

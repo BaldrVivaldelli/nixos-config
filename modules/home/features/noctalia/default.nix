@@ -20,6 +20,9 @@ let
     noctalia = config.programs.noctalia.package;
     inherit holodeckctl;
   };
+  wallhavenSfw = pkgs.callPackage ../../../../packages/noctalia-wallhaven-sfw {
+    noctalia = config.programs.noctalia.package;
+  };
   holodeckRegenerate = pkgs.writeShellApplication {
     name = "holodeck-regenerate";
     runtimeInputs = [ config.programs.noctalia.package ];
@@ -111,6 +114,8 @@ in
     # and community sources. The Nix-store symlink keeps the plugin immutable
     # without replacing those upstream catalogs.
     xdg.dataFile."noctalia/plugins/holodeck-control".source = plugin;
+    # Local sources override the upstream catalog, including after plugin updates.
+    xdg.dataFile."noctalia/plugins/wallhaven-sfw".source = wallhavenSfw;
 
     xdg.desktopEntries.holodeck-control = {
       name = "Holodeck Control";

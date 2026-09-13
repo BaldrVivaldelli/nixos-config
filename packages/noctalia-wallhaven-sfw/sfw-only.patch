@@ -1,0 +1,39 @@
+--- a/panel.luau
++++ b/panel.luau
+@@ -8 +8 @@
+-local CACHE_DIR = (noctalia.getenv("XDG_STATE_HOME") or ((noctalia.getenv("HOME") or "") .. "/.local/state")) .. "/noctalia/wallhaven/thumbs"
++local CACHE_DIR = (noctalia.getenv("XDG_STATE_HOME") or ((noctalia.getenv("HOME") or "") .. "/.local/state")) .. "/noctalia/wallhaven/sfw-thumbs"
+@@ -86 +86 @@
+-  return apiKey() ~= ""
++  return false
+@@ -90,3 +90,3 @@
+-  if not nsfwAllowed() then
+-    purityNsfw = false
+-  end
++  puritySfw = true
++  puritySketchy = false
++  purityNsfw = false
+@@ -108,8 +108,2 @@
+-  local sfw = puritySfw and "1" or "0"
+-  local sketchy = puritySketchy and "1" or "0"
+-  local nsfw = purityNsfw and nsfwAllowed() and "1" or "0"
+-  local purity = sfw .. sketchy .. nsfw
+-  if purity == "000" then
+-    return "100"
+-  end
+-  return purity
++  -- SFW only, including when a local API key permits adult results.
++  return "100"
+@@ -264,3 +258 @@
+-        filterChip(tr("purity_sfw"), puritySfw, "onPuritySfw", "filter_purity_sfw"),
+-        filterChip(tr("purity_sketchy"), puritySketchy, "onPuritySketchy", "filter_purity_sketchy"),
+-        filterChip(tr("purity_nsfw"), purityNsfw, "onPurityNsfw", "filter_purity_nsfw", nsfwAllowed()),
++        filterChip(tr("purity_sfw"), true, "onPuritySfw", "filter_purity_sfw", false),
+@@ -432 +424 @@
+-  if wallpaper == nil then
++  if wallpaper == nil or wallpaper.purity ~= "sfw" then
+@@ -541,0 +534,4 @@
++      -- Reject unclassified responses before rendering or downloading thumbnails.
++      if type(wallpaper) ~= "table" or wallpaper.purity ~= "sfw" then
++        continue
++      end

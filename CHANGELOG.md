@@ -4,6 +4,10 @@
 
 ### Fixed
 
+- Enforce SFW-only Wallhaven searches and reject suggestive, adult or unclassified
+  results before rendering or downloading thumbnails. Keep the restriction in a
+  pinned local plugin that takes precedence over upstream updates.
+
 - Recognize existing Windows installations before asking for onboarding, reuse
   the local RDP window on Niri, and show launch failures in the panel with a
   cleared password field. Bound GitLab status queries so an unavailable provider

@@ -31,9 +31,9 @@ Noctalia usa `~/Pictures/Wallpaper` como biblioteca local y
 
 - El selector nativo `wallpaper`, que busca por nombre dentro de la biblioteca
   local. También se puede abrir con `Mod+Space` y el prefijo `/wall`.
-- El plugin oficial `noctalia/wallhaven`, que permite buscar, previsualizar,
-  descargar y aplicar imágenes de Wallhaven. Las descargas quedan disponibles
-  también en el selector local.
+- El plugin `noctalia/wallhaven`, con un filtro SFW obligatorio aplicado por Nix,
+  que permite buscar, previsualizar, descargar y aplicar imágenes de Wallhaven.
+  Las descargas quedan disponibles también en el selector local.
 
 Los cambios hechos desde la UI o mediante `noctalia msg wallpaper-set` se
 guardan en el estado local de Noctalia y pueden reemplazar el fondo
@@ -45,6 +45,18 @@ noctalia msg wallpaper-set "$HOME/Pictures/Wallpaper/mi-fondo.png"
 
 Wallhaven funciona sin API key para búsquedas normales. Una clave opcional se
 debe ingresar sólo en la configuración local del plugin y nunca en el repo.
+
+La variante local fija `purity=100` en todas las búsquedas y descarta resultados
+`sketchy`, `nsfw` o sin clasificación antes de mostrar o descargar miniaturas.
+El panel no ofrece controles para habilitar contenido sugerente o adulto, aunque
+haya una API key. Usa una caché separada para las miniaturas filtradas.
+
+Home Manager instala esta variante desde una revisión fija del plugin oficial.
+La fuente local tiene prioridad sobre el catálogo remoto, de modo que actualizar
+plugins desde Noctalia no elimina el filtro. Las pruebas del paquete comprueban
+las peticiones y el descarte de resultados antes de descargar imágenes.
+El filtro depende de la clasificación de Wallhaven: no analiza visualmente las
+imágenes que el proveedor haya etiquetado erróneamente como SFW.
 
 ## Providers del launcher
 
